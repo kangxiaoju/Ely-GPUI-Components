@@ -45,15 +45,7 @@ pub struct Tooltip {
 impl Tooltip {
     pub fn text(title: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView {
         let title = title.into();
-        Self::rich(move |_, _| {
-            div()
-                .debug_selector({
-                    let title = title.clone();
-                    move || format!("tooltip-text-{title}")
-                })
-                .child(title.clone())
-                .into_any_element()
-        })
+        Self::rich(move |_, _| title.clone().into_any_element())
     }
 
     /// Title plus a quiet trailing hint, such as a shortcut.

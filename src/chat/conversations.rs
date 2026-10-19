@@ -140,8 +140,10 @@ impl ConversationItem {
 
 impl RenderOnce for ConversationItem {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let title = self.conversation.title.clone();
         let key = self.conversation.key.clone();
+        let title = self.conversation.title.clone();
+        let title_selector = SharedString::from(format!("conversation-title-{key}"));
+        let tooltip_selector = SharedString::from(format!("conversation-title-tooltip-{title}"));
         let group = SharedString::from(format!("conversation-{}", self.id));
         let menu = match (self.on_rename, self.on_pin, self.on_delete) {
             (Some(rename), Some(pin), Some(delete)) => {
@@ -180,7 +182,13 @@ impl RenderOnce for ConversationItem {
             .id(self.id.clone())
             .role(Role::ListItem)
             .aria_label(title.clone())
-            .tooltip(Tooltip::text(title.clone()))
+            .tooltip(Tooltip::rich(move |_, _| {
+                let selector = tooltip_selector.clone();
+                div()
+                    .debug_selector(move || selector.to_string())
+                    .child(title.clone())
+                    .into_any_element()
+            }))
             .group(group.clone())
             .track_focus(&focus)
             .flex()
@@ -217,7 +225,13 @@ impl RenderOnce for ConversationItem {
                         .color(colors.fg_subtle),
                 )
             })
-            .child(div().flex_1().min_w_0().child(Ellipsis::new(title)))
+            .child(
+                div()
+                    .debug_selector(move || title_selector.to_string())
+                    .flex_1()
+                    .min_w_0()
+                    .child(Ellipsis::new(self.conversation.title.clone())),
+            )
             .children(menu.map(|menu| {
                 div()
                     .flex_none()
