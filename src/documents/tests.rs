@@ -167,6 +167,103 @@ fn document_viewer_evicts_pages_past_its_pixel_budget(cx: &mut TestAppContext) {
     );
 }
 
+#[derive(Clone)]
+struct LoadingSource(Rc<RefCell<usize>>);
+
+impl PageSource for LoadingSource {
+    fn len(&self) -> usize {
+        1
+    }
+
+    fn size(&self, _: usize) -> Size<f32> {
+        size(400.0, 1_000.0)
+    }
+
+    fn request(
+        &self,
+        _: usize,
+        _: f32,
+        _: PageRequestKind,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> PageResource {
+        *self.0.borrow_mut() += 1;
+        let image = ImageSource::from("ready.png");
+        PageResource::loading(window.spawn(cx, async move |_| PageResource::Ready {
+            image,
+            pixels: 400_000,
+        }))
+    }
+}
+
+struct LoadingReader(LoadingSource);
+
+impl Render for LoadingReader {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        DocumentViewer::source("loading-viewer", "loading.pdf", self.0.clone())
+    }
+}
+
+#[gpui::test]
+fn document_viewer_deduplicates_an_in_flight_page_request(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(0));
+    let source = LoadingSource(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| LoadingReader(source));
+    for _ in 0..4 {
+        cx.update(|window, _| window.refresh());
+    }
+    settle(cx);
+    assert_eq!(*requests.borrow(), 1, "one request remains in flight");
+}
+
+#[gpui::test]
+fn document_viewer_does_not_retain_a_resource_larger_than_its_budget(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = Requested(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| LazyReader(source, 0));
+    settle(cx);
+    let first = requests.borrow().len();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(requests.borrow().len() > first, "a zero budget retains no image");
+}
+
+struct ThumbnailReader(Requested);
+
+impl Render for ThumbnailReader {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        DocumentViewer::source("thumb-viewer", "long.pdf", self.0.clone()).thumbnails()
+    }
+}
+
+#[gpui::test]
+fn document_viewer_requests_the_scrolled_thumbnail_viewport(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = Requested(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| ThumbnailReader(source));
+    cx.simulate_resize(size(px(840.0), px(520.0)));
+    settle(cx);
+    requests.borrow_mut().clear();
+
+    cx.simulate_event(ScrollWheelEvent {
+        position: point(px(80.0), px(300.0)),
+        delta: ScrollDelta::Pixels(point(px(0.0), px(-100_000.0))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    settle(cx);
+    let thumbs: Vec<usize> = requests
+        .borrow()
+        .iter()
+        .filter_map(|(page, kind)| (*kind == PageRequestKind::Thumbnail).then_some(*page))
+        .collect();
+    assert!(thumbs.iter().any(|page| *page > 250), "requested {thumbs:?}");
+    assert!(thumbs.iter().all(|page| *page > 250), "requested {thumbs:?}");
+}
+
 /// A point on the pages, below the bars, mid-view.
 fn on_pages(cx: &mut VisualTestContext) -> Point<Pixels> {
     cx.update(|window, _| point(window.viewport_size().width / 2.0, px(300.0)))

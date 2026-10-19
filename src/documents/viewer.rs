@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     collections::{HashMap, VecDeque},
     rc::Rc,
 };
@@ -6,7 +7,7 @@ use std::{
 use gpui::{
     AnyElement, App, Bounds, ElementId, Entity, ImageSource, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Pixels, Point, RenderOnce, ScrollHandle, SharedString, Size,
-    StatefulInteractiveElement, Styled, Window, canvas, div, img, point, prelude::*, size,
+    StatefulInteractiveElement, Styled, Task, Window, canvas, div, img, point, prelude::*, size,
 };
 
 use super::{
@@ -47,9 +48,16 @@ pub enum PageRequestKind {
 /// The current result of asking a lazy page source for an image.
 #[derive(Clone)]
 pub enum PageResource {
-    Loading,
+    Loading(Rc<RefCell<Option<Task<PageResource>>>>),
     Ready { image: ImageSource, pixels: usize },
     Failed(SharedString),
+}
+
+impl PageResource {
+    /// A request whose task resolves to the image or its failure.
+    pub fn loading(task: Task<PageResource>) -> Self {
+        Self::Loading(Rc::new(RefCell::new(Some(task))))
+    }
 }
 
 /// Pages supplied on demand. Sizes are in document points and resources may change on later asks.
@@ -130,12 +138,15 @@ impl PageCache {
             self.pixels = self.pixels.saturating_sub(pixels);
         }
         self.order.retain(|cached| *cached != key);
+        if matches!(&resource, PageResource::Ready { pixels, .. } if *pixels > self.budget) {
+            return;
+        }
         if let PageResource::Ready { pixels, .. } = &resource {
             self.pixels = self.pixels.saturating_add(*pixels);
         }
         self.resources.insert(key, resource);
         self.order.push_back(key);
-        while self.pixels > self.budget && self.resources.len() > 1 {
+        while self.pixels > self.budget {
             let Some(oldest) = self.order.pop_front() else { break };
             if let Some(PageResource::Ready { pixels, .. }) = self.resources.remove(&oldest) {
                 self.pixels = self.pixels.saturating_sub(pixels);
@@ -162,8 +173,21 @@ pub(crate) fn page_resource(
         return resource;
     }
     let resource = source.request(page, scale, kind, window, cx);
-    if !matches!(resource, PageResource::Loading) {
-        cache.update(cx, |cache, _| cache.insert(key, resource.clone()));
+    cache.update(cx, |cache, _| cache.insert(key, resource.clone()));
+    if let PageResource::Loading(task) = &resource
+        && let Some(task) = task.borrow_mut().take()
+    {
+        let cache = cache.downgrade();
+        window
+            .spawn(cx, async move |cx| {
+                let resource = task.await;
+                let _ = cx.update(|window, cx| {
+                    cache.update(cx, |cache, _| cache.insert(key, resource))?;
+                    window.refresh();
+                    anyhow::Ok(())
+                });
+            })
+            .detach();
     }
     resource
 }
@@ -174,7 +198,7 @@ pub(crate) fn page_picture(
     theme: &crate::theme::Theme,
 ) -> AnyElement {
     match resource {
-        PageResource::Loading => div()
+        PageResource::Loading(_) => div()
             .size_full()
             .flex()
             .items_center()

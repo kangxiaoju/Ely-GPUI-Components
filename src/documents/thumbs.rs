@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui::{
     App, ElementId, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce,
-    StatefulInteractiveElement, Styled, Window, div, prelude::*,
+    ScrollHandle, StatefulInteractiveElement, Styled, Window, div, prelude::*,
 };
 
 use super::viewer::{
@@ -65,13 +65,17 @@ impl PageThumbnailList {
 
 impl RenderOnce for PageThumbnailList {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let scroll = window
+            .use_keyed_state((self.id.clone(), "scroll"), cx, |_, _| ScrollHandle::default())
+            .read(cx)
+            .clone();
         let width = cx.theme().label_width().to_pixels(window.rem_size()) * THUMB;
         let cache = self.cache.unwrap_or_else(|| {
             window.use_keyed_state((self.id.clone(), "page-cache"), cx, |_, _| {
                 PageCache::new(64 * 1024 * 1024)
             })
         });
-        let visible = self.current.saturating_sub(2)..(self.current + 3).min(self.source.len());
+        let visible = scroll.top_item()..(scroll.bottom_item() + 1).min(self.source.len());
         let requested: std::collections::HashMap<usize, _> = visible
             .map(|ix| {
                 let scale = f32::from(width) / self.source.size(ix).width;
@@ -95,6 +99,7 @@ impl RenderOnce for PageThumbnailList {
             .id(self.id.clone())
             .h_full()
             .overflow_y_scroll()
+            .track_scroll(&scroll)
             .flex()
             .flex_col()
             .items_center()
