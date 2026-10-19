@@ -6,7 +6,7 @@ use gpui::{
     TestAppContext, VisualTestContext, Window, div, point, px,
 };
 
-use super::{Drawer, PaneGroup, SplitPane};
+use super::{Drawer, PaneGroup, Sidebar, SidebarPlacement, SplitPane, sidebar_width_at};
 use crate::theme::Theme;
 
 type Build = Box<dyn Fn(&mut Window, &mut App) -> AnyElement>;
@@ -300,4 +300,61 @@ fn a_scroll_area_keeps_a_wheel_it_can_use(cx: &mut TestAppContext) {
 #[gpui::test]
 fn a_scroll_area_with_no_room_passes_the_wheel_on(cx: &mut TestAppContext) {
     assert_eq!(wheel_page(px(50.0), cx), px(-40.0));
+}
+
+struct SidebarView(Option<Sidebar>);
+
+impl Render for SidebarView {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .h(px(200.0))
+            .child(self.0.take().expect("the sidebar renders once"))
+    }
+}
+
+fn sidebar_width(sidebar: Sidebar, cx: &mut TestAppContext) -> Pixels {
+    cx.update(Theme::init);
+    let (_, cx) = cx.add_window_view(move |_, _| SidebarView(Some(sidebar)));
+    cx.run_until_parked();
+    cx.debug_bounds("sidebar").expect("the sidebar").size.width
+}
+
+#[gpui::test]
+fn a_sidebar_keeps_its_default_widths(cx: &mut TestAppContext) {
+    assert_eq!(sidebar_width(Sidebar::new("wide", false), cx), px(240.0));
+    assert_eq!(sidebar_width(Sidebar::new("narrow", true), cx), px(56.0));
+}
+
+#[gpui::test]
+fn a_sidebar_uses_its_custom_widths(cx: &mut TestAppContext) {
+    assert_eq!(
+        sidebar_width(
+            Sidebar::new("wide", false)
+                .expanded_width(px(96.0))
+                .collapsed_width(px(40.0)),
+            cx,
+        ),
+        px(96.0)
+    );
+    assert_eq!(
+        sidebar_width(
+            Sidebar::new("narrow", true)
+                .expanded_width(px(96.0))
+                .collapsed_width(px(40.0)),
+            cx,
+        ),
+        px(40.0)
+    );
+}
+
+#[gpui::test]
+fn a_sidebar_divider_faces_its_content() {
+    assert_eq!(SidebarPlacement::Left.border(), (false, true));
+    assert_eq!(SidebarPlacement::Right.border(), (true, false));
+}
+
+#[gpui::test]
+fn a_sidebar_animation_uses_its_custom_widths() {
+    assert_eq!(sidebar_width_at(true, px(96.0), px(40.0), 0.5), px(68.0));
+    assert_eq!(sidebar_width_at(false, px(96.0), px(40.0), 0.25), px(54.0));
 }

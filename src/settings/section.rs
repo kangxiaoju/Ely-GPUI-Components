@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, ElementId, FontWeight, InteractiveElement as _, IntoElement, ParentElement,
-    RenderOnce, Role, SharedString, StatefulInteractiveElement as _, Styled, Window, div,
+    Pixels, RenderOnce, Role, SharedString, StatefulInteractiveElement as _, Styled, Window, div,
     prelude::FluentBuilder as _,
 };
 
@@ -20,6 +20,7 @@ pub struct SettingsLayout {
     id: ElementId,
     sections: Vec<(SharedString, SharedString, IconName)>,
     selected: SharedString,
+    navigation_width: Option<Pixels>,
     page: Option<AnyElement>,
     on_select: OnKey,
 }
@@ -44,9 +45,16 @@ impl SettingsLayout {
             id: id.into(),
             sections,
             selected,
+            navigation_width: None,
             page: None,
             on_select: Rc::new(on_select),
         }
+    }
+
+    /// A fixed width for the section navigation instead of the theme-derived range.
+    pub fn navigation_width(mut self, width: Pixels) -> Self {
+        self.navigation_width = Some(width);
+        self
     }
 
     /// What the open section shows.
@@ -58,6 +66,7 @@ impl SettingsLayout {
 
 impl RenderOnce for SettingsLayout {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let navigation_width = self.navigation_width;
         let on_select = self.on_select;
         let theme = cx.theme();
         let muted = theme.colors.fg_muted;
@@ -89,9 +98,16 @@ impl RenderOnce for SettingsLayout {
             .gap_6()
             .child(
                 div()
-                    .flex_1()
-                    .min_w(theme.label_width())
-                    .max_w(theme.label_width() * 1.25)
+                    .debug_selector(|| "settings-navigation".into())
+                    .when_some(navigation_width, |navigation, width| {
+                        navigation.flex_none().w(width)
+                    })
+                    .when(navigation_width.is_none(), |navigation| {
+                        navigation
+                            .flex_1()
+                            .min_w(theme.label_width())
+                            .max_w(theme.label_width() * 1.25)
+                    })
                     .child(list),
             )
             .child(

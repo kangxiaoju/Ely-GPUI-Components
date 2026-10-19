@@ -302,8 +302,21 @@ fn layout(_: &mut Window, _: &mut App, owner: Entity<Desk>) -> AnyElement {
         "a",
         move |key, _, cx| say(&owner, format!("open {key}"), cx),
     )
+    .navigation_width(px(96.0))
     .page(div())
     .into_any_element()
+}
+
+#[gpui::test]
+fn a_settings_layout_uses_its_navigation_width(cx: &mut TestAppContext) {
+    let (_, cx) = desk(layout, cx);
+    assert_eq!(
+        cx.debug_bounds("settings-navigation")
+            .expect("the settings navigation")
+            .size
+            .width,
+        px(96.0)
+    );
 }
 
 /// Stops: the section list.
