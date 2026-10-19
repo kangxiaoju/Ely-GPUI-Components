@@ -251,11 +251,12 @@ impl PageSource for LoadingSource {
     }
 }
 
-struct LoadingReader(LoadingSource);
+struct LoadingReader(LoadingSource, usize);
 
 impl Render for LoadingReader {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         DocumentViewer::source("loading-viewer", "loading.pdf", self.0.clone())
+            .cache_pixel_budget(self.1)
     }
 }
 
@@ -264,12 +265,33 @@ fn document_viewer_deduplicates_an_in_flight_page_request(cx: &mut TestAppContex
     cx.update(Theme::init);
     let requests = Rc::new(RefCell::new(0));
     let source = LoadingSource(requests.clone());
-    let (_, cx) = cx.add_window_view(move |_, _| LoadingReader(source));
+    let (_, cx) = cx.add_window_view(move |_, _| {
+        LoadingReader(source, super::DEFAULT_CACHE_BUDGET)
+    });
     for _ in 0..4 {
         cx.update(|window, _| window.refresh());
     }
     settle(cx);
     assert_eq!(*requests.borrow(), 1, "one request remains in flight");
+}
+
+#[gpui::test]
+fn document_viewer_bounds_requests_when_an_async_page_exceeds_the_budget(
+    cx: &mut TestAppContext,
+) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(0));
+    let source = LoadingSource(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| LoadingReader(source, 0));
+    for _ in 0..4 {
+        cx.update(|window, _| window.refresh());
+    }
+    settle(cx);
+    assert!(
+        *requests.borrow() <= 2,
+        "an async page larger than its budget is re-requested in a loop, got {}",
+        *requests.borrow()
+    );
 }
 
 #[gpui::test]

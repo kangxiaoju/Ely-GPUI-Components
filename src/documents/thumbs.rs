@@ -6,7 +6,8 @@ use gpui::{
 };
 
 use super::viewer::{
-    DocPage, PageCache, PageRequestKind, PageSource, StaticPages, page_picture, page_resource,
+    DEFAULT_CACHE_BUDGET, DocPage, PageCache, PageRequestKind, PageSource, StaticPages,
+    page_picture, page_resource,
 };
 use crate::{
     forms::Pick,
@@ -72,7 +73,7 @@ impl RenderOnce for PageThumbnailList {
         let width = cx.theme().label_width().to_pixels(window.rem_size()) * THUMB;
         let cache = self.cache.unwrap_or_else(|| {
             window.use_keyed_state((self.id.clone(), "page-cache"), cx, |_, _| {
-                PageCache::new(64 * 1024 * 1024)
+                PageCache::new(DEFAULT_CACHE_BUDGET)
             })
         });
         let visible = scroll.top_item()..(scroll.bottom_item() + 1).min(self.source.len());

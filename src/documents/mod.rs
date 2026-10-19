@@ -63,7 +63,8 @@ pub use tree::{
 };
 pub(crate) use viewer::step as zoom_step;
 pub use viewer::{
-    DocPage, DocumentViewer, PageHit, PageNote, PageRequestKind, PageResource, PageSource,
+    DEFAULT_CACHE_BUDGET, DocPage, DocumentViewer, PageHit, PageNote, PageRequestKind,
+    PageResource, PageSource,
 };
 
 /// Binds the documents keys. `init` calls it.

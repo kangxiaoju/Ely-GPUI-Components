@@ -30,6 +30,9 @@ use crate::{
 /// Zoom steps, as shares of a page's own size.
 const STEPS: [f32; 9] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
 
+/// The default pixel budget for decoded page and thumbnail images.
+pub const DEFAULT_CACHE_BUDGET: usize = 64 * 1024 * 1024;
+
 /// A page the app drew: its picture, a file or a web address, and its size in points.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DocPage {
@@ -84,7 +87,9 @@ impl PageSource for StaticPages {
 
     fn size(&self, page: usize) -> Size<f32> {
         let page = &self.0[page];
-        size(page.width, page.height)
+        // A page with no width or height would divide by zero when thumbnails
+        // scale it; report a minimal size so the source never yields NaN.
+        size(page.width.max(1.0), page.height.max(1.0))
     }
 
     fn request(
@@ -127,6 +132,9 @@ impl PageCache {
     }
 
     fn set_budget(&mut self, budget: usize) {
+        if self.budget == budget {
+            return;
+        }
         self.budget = budget;
         let mut kept = VecDeque::new();
         while let Some(key) = self.order.pop_front() {
@@ -158,13 +166,16 @@ impl PageCache {
     }
 
     fn insert(&mut self, key: PageKey, resource: PageResource) {
+        // Reject a Ready larger than the budget before touching the existing
+        // entry, so an in-flight Loading is not dropped: dropping it would make
+        // the next `get` miss, re-request, and loop forever.
+        if matches!(&resource, PageResource::Ready { pixels, .. } if *pixels > self.budget) {
+            return;
+        }
         if let Some(PageResource::Ready { pixels, .. }) = self.resources.remove(&key) {
             self.pixels = self.pixels.saturating_sub(pixels);
         }
         self.order.retain(|cached| *cached != key);
-        if matches!(&resource, PageResource::Ready { pixels, .. } if *pixels > self.budget) {
-            return;
-        }
         if let PageResource::Ready { pixels, .. } = &resource {
             self.pixels = self.pixels.saturating_add(*pixels);
         }
@@ -172,8 +183,17 @@ impl PageCache {
         self.order.push_back(key);
         while self.pixels > self.budget {
             let Some(oldest) = self.order.pop_front() else { break };
-            if let Some(PageResource::Ready { pixels, .. }) = self.resources.remove(&oldest) {
-                self.pixels = self.pixels.saturating_sub(pixels);
+            match self.resources.get(&oldest) {
+                Some(PageResource::Ready { pixels, .. }) => {
+                    let pixels = *pixels;
+                    self.resources.remove(&oldest);
+                    self.pixels = self.pixels.saturating_sub(pixels);
+                }
+                // In-flight and failed entries are not pixel-budgeted; keep them.
+                Some(PageResource::Loading(_)) | Some(PageResource::Failed(_)) => {
+                    self.order.push_back(oldest);
+                }
+                None => {}
             }
         }
     }
@@ -331,7 +351,7 @@ impl DocumentViewer {
             id: id.into(),
             title: title.into(),
             source: Rc::new(source),
-            cache_pixel_budget: 64 * 1024 * 1024,
+            cache_pixel_budget: DEFAULT_CACHE_BUDGET,
             zoom: 1.0,
             on_zoom: None,
             thumbnails: false,
