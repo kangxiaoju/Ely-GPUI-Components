@@ -355,6 +355,48 @@ fn a_sidebar_divider_faces_its_content() {
 
 #[gpui::test]
 fn a_sidebar_animation_uses_its_custom_widths() {
-    assert_eq!(sidebar_width_at(true, px(96.0), px(40.0), 0.5), px(68.0));
-    assert_eq!(sidebar_width_at(false, px(96.0), px(40.0), 0.25), px(54.0));
+    assert_eq!(sidebar_width_at(px(96.0), px(40.0), 0.5), px(68.0));
+    assert_eq!(sidebar_width_at(px(40.0), px(96.0), 0.25), px(54.0));
+}
+
+struct ChangingSidebar {
+    collapsed: bool,
+    expanded: Pixels,
+    collapsed_width: Pixels,
+}
+
+impl Render for ChangingSidebar {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().h(px(200.0)).child(
+            Sidebar::new("changing-sidebar", self.collapsed)
+                .expanded_width(self.expanded)
+                .collapsed_width(self.collapsed_width),
+        )
+    }
+}
+
+#[gpui::test]
+fn changed_endpoints_restart_from_the_rendered_width(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let (sidebar, cx) = cx.add_window_view(|_, _| ChangingSidebar {
+        collapsed: false,
+        expanded: px(96.0),
+        collapsed_width: px(40.0),
+    });
+    cx.run_until_parked();
+    let before = cx.debug_bounds("sidebar").expect("the sidebar").size.width;
+
+    sidebar.update(cx, |sidebar, cx| {
+        sidebar.collapsed = true;
+        sidebar.expanded = px(160.0);
+        sidebar.collapsed_width = px(20.0);
+        cx.notify();
+    });
+    cx.update(|window, _| window.refresh());
+
+    let restarted = cx.debug_bounds("sidebar").expect("the sidebar").size.width;
+    assert!(
+        (restarted - before).abs() < px(1.0),
+        "the width jumped from {before:?} to {restarted:?}"
+    );
 }

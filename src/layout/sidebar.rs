@@ -7,13 +7,14 @@ use web_time::Instant;
 
 use crate::{motion, theme::ActiveTheme};
 
-/// The side of the content where a sidebar sits; its divider faces the content.
+/// Which edge draws the divider facing the content. The caller places the sidebar before or after
+/// the content in its flex layout; this value does not reorder elements.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SidebarPlacement {
-    /// The sidebar is before the content, with its divider on the right.
+    /// The caller placed the sidebar before the content, so the divider draws on the right.
     #[default]
     Left,
-    /// The sidebar is after the content, with its divider on the left.
+    /// The caller placed the sidebar after the content, so the divider draws on the left.
     Right,
 }
 
@@ -26,24 +27,24 @@ impl SidebarPlacement {
     }
 }
 
-pub(crate) fn sidebar_width_at(
-    collapsed: bool,
-    expanded: Pixels,
-    collapsed_width: Pixels,
-    t: f32,
-) -> Pixels {
-    let (from, to) = if collapsed {
-        (expanded, collapsed_width)
-    } else {
-        (collapsed_width, expanded)
-    };
+pub(crate) fn sidebar_width_at(from: Pixels, to: Pixels, t: f32) -> Pixels {
     from + (to - from) * t
 }
 
 struct Width {
-    collapsed: bool,
+    from: Pixels,
+    to: Pixels,
     generation: u64,
     changed: Instant,
+}
+
+impl Width {
+    fn current(&self, duration: std::time::Duration) -> Pixels {
+        let share = (self.changed.elapsed().as_secs_f32()
+            / duration.as_secs_f32().max(f32::EPSILON))
+        .min(1.0);
+        sidebar_width_at(self.from, self.to, motion::ease_in_out_cubic(share))
+    }
 }
 
 /// Side column that folds to an icon rail, width animated.
@@ -82,7 +83,8 @@ impl Sidebar {
         self
     }
 
-    /// Places the sidebar on one side of its content, with the divider facing inward.
+    /// Chooses which edge draws the content-side divider. The caller still places the sidebar
+    /// before or after the content in its flex layout.
     pub fn placement(mut self, placement: SidebarPlacement) -> Self {
         self.placement = placement;
         self
@@ -98,31 +100,38 @@ impl ParentElement for Sidebar {
 impl RenderOnce for Sidebar {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let collapsed = self.collapsed;
+        let (wide, narrow, border_color, background) = {
+            let theme = cx.theme();
+            (
+                self.expanded_width
+                    .unwrap_or_else(|| theme.sidebar_width(false).to_pixels(window.rem_size())),
+                self.collapsed_width
+                    .unwrap_or_else(|| theme.sidebar_width(true).to_pixels(window.rem_size())),
+                theme.colors.border,
+                theme.colors.bg,
+            )
+        };
+        let target = if collapsed { narrow } else { wide };
+        let duration = motion::duration(motion::BASE, cx);
         let state = window.use_keyed_state(self.id.clone(), cx, |_, _| Width {
-            collapsed,
+            from: target,
+            to: target,
             generation: 0,
             changed: Instant::now(),
         });
-        if state.read(cx).collapsed != collapsed {
+        if state.read(cx).to != target {
             state.update(cx, |width, _| {
-                width.collapsed = collapsed;
+                width.from = width.current(duration);
+                width.to = target;
                 width.generation += 1;
                 width.changed = Instant::now();
             });
         }
-        let (generation, changed) = {
+        let (from, to, generation, changed) = {
             let width = state.read(cx);
-            (width.generation, width.changed)
+            (width.from, width.to, width.generation, width.changed)
         };
-        let theme = cx.theme();
-        let wide = self
-            .expanded_width
-            .unwrap_or_else(|| theme.sidebar_width(false).to_pixels(window.rem_size()));
-        let narrow = self
-            .collapsed_width
-            .unwrap_or_else(|| theme.sidebar_width(true).to_pixels(window.rem_size()));
         let (border_left, border_right) = self.placement.border();
-        let duration = motion::duration(motion::BASE, cx);
         let column = div()
             .id(self.id)
             .debug_selector(|| "sidebar".into())
@@ -133,19 +142,17 @@ impl RenderOnce for Sidebar {
             .overflow_hidden()
             .when(border_left, |column| column.border_l_1())
             .when(border_right, |column| column.border_r_1())
-            .border_color(theme.colors.border)
-            .bg(theme.colors.bg)
+            .border_color(border_color)
+            .bg(background)
             .children(self.body);
         if generation == 0 || changed.elapsed() >= duration {
-            return column
-                .w(if collapsed { narrow } else { wide })
-                .into_any_element();
+            return column.w(to).into_any_element();
         }
         column
             .with_animation(
                 ("width", generation),
                 Animation::new(duration).with_easing(motion::ease_in_out_cubic),
-                move |column, t| column.w(sidebar_width_at(collapsed, wide, narrow, t)),
+                move |column, t| column.w(sidebar_width_at(from, to, t)),
             )
             .into_any_element()
     }
