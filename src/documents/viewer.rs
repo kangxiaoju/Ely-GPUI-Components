@@ -126,6 +126,30 @@ impl PageCache {
         }
     }
 
+    fn set_budget(&mut self, budget: usize) {
+        self.budget = budget;
+        let mut kept = VecDeque::new();
+        while let Some(key) = self.order.pop_front() {
+            if self.pixels <= budget {
+                kept.push_back(key);
+                continue;
+            }
+            match self.resources.get(&key) {
+                Some(PageResource::Ready { pixels, .. }) => {
+                    let pixels = *pixels;
+                    self.resources.remove(&key);
+                    self.pixels = self.pixels.saturating_sub(pixels);
+                }
+                Some(PageResource::Loading(_)) | Some(PageResource::Failed(_)) => {
+                    kept.push_back(key);
+                }
+                None => {}
+            }
+        }
+        kept.append(&mut self.order);
+        self.order = kept;
+    }
+
     fn get(&mut self, key: PageKey) -> Option<PageResource> {
         let resource = self.resources.get(&key)?.clone();
         self.order.retain(|cached| *cached != key);
@@ -391,13 +415,14 @@ impl RenderOnce for DocumentViewer {
         let cache = window.use_keyed_state((self.id.clone(), "page-cache"), cx, |_, _| {
             PageCache::new(self.cache_pixel_budget)
         });
-        cache.update(cx, |cache, _| cache.budget = self.cache_pixel_budget);
+        cache.update(cx, |cache, _| cache.set_budget(self.cache_pixel_budget));
         let (scroll, page_now, width, pinning) = {
             let desk = desk.read(cx);
             (desk.scroll.clone(), desk.page, desk.width, desk.pinning)
         };
         let zoom = self.zoom;
-        let nearby = page_now.saturating_sub(2)..(page_now + 3).min(self.source.len());
+        let nearby = scroll.top_item().saturating_sub(2)
+            ..(scroll.bottom_item() + 3).min(self.source.len());
         let requested: HashMap<usize, PageResource> = nearby
             .map(|ix| {
                 let resource = page_resource(

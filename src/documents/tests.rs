@@ -149,6 +149,61 @@ fn document_viewer_requests_only_visible_and_neighbor_pages(cx: &mut TestAppCont
     assert_eq!(requests.borrow().len(), before, "the same viewport reuses its cache");
 }
 
+#[derive(Clone)]
+struct ShortPages(Rc<RefCell<Vec<(usize, PageRequestKind)>>>);
+
+impl PageSource for ShortPages {
+    fn len(&self) -> usize {
+        1_000
+    }
+
+    fn size(&self, _: usize) -> Size<f32> {
+        size(400.0, 20.0)
+    }
+
+    fn request(
+        &self,
+        page: usize,
+        _: f32,
+        kind: PageRequestKind,
+        _: &mut Window,
+        _: &mut App,
+    ) -> PageResource {
+        self.0.borrow_mut().push((page, kind));
+        PageResource::Ready {
+            image: ImageSource::from(format!("short-{page}.png")),
+            pixels: 16_000,
+        }
+    }
+}
+
+struct ShortReader(ShortPages);
+
+impl Render for ShortReader {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        DocumentViewer::source("short-viewer", "short.pdf", self.0.clone())
+    }
+}
+
+#[gpui::test]
+fn document_viewer_requests_every_visible_short_page_and_neighbors(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = ShortPages(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| ShortReader(source));
+    cx.simulate_resize(size(px(840.0), px(520.0)));
+    settle(cx);
+    let full: Vec<usize> = requests
+        .borrow()
+        .iter()
+        .filter_map(|(page, kind)| (*kind == PageRequestKind::Page).then_some(*page))
+        .collect();
+    for page in 0..12 {
+        assert!(full.contains(&page), "visible page {page} absent from {full:?}");
+    }
+    assert!(full.iter().all(|page| *page < 40), "requested remote {full:?}");
+}
+
 #[gpui::test]
 fn document_viewer_evicts_pages_past_its_pixel_budget(cx: &mut TestAppContext) {
     cx.update(Theme::init);
@@ -228,6 +283,40 @@ fn document_viewer_does_not_retain_a_resource_larger_than_its_budget(cx: &mut Te
     cx.update(|window, _| window.refresh());
     cx.run_until_parked();
     assert!(requests.borrow().len() > first, "a zero budget retains no image");
+}
+
+struct VariableBudget {
+    source: Requested,
+    budget: usize,
+}
+
+impl Render for VariableBudget {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        DocumentViewer::source("variable-budget", "long.pdf", self.source.clone())
+            .cache_pixel_budget(self.budget)
+    }
+}
+
+#[gpui::test]
+fn document_viewer_evicts_ready_pages_when_its_budget_shrinks(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = Requested(requests.clone());
+    let (viewer, cx) = cx.add_window_view(move |_, _| VariableBudget {
+        source,
+        budget: 8_000_000,
+    });
+    settle(cx);
+    let first = requests.borrow().len();
+    viewer.update(cx, |viewer, cx| {
+        viewer.budget = 0;
+        cx.notify();
+    });
+    settle(cx);
+    assert!(
+        requests.borrow().len() > first,
+        "ready pages retained after the budget fell to zero"
+    );
 }
 
 struct ThumbnailReader(Requested);
