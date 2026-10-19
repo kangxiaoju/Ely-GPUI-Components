@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui::{
     App, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::*,
+    RenderOnce, Role, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::*,
     transparent_black,
 };
 use jiff::{Timestamp, civil::Date, tz::TimeZone};
@@ -11,7 +11,7 @@ use crate::{
     buttons::{Button, ButtonVariant},
     forms::OnValue,
     menus::{Menu, MenuItem, OverflowMenu},
-    primitives::{FocusRing, Icon, IconName, tab_stop},
+    primitives::{FocusRing, Icon, IconName, Tooltip, tab_stop},
     theme::{ActiveTheme, ControlSize, IconSize, Radius, TextSize},
     typography::{Ellipsis, format::system_zone},
 };
@@ -140,6 +140,7 @@ impl ConversationItem {
 
 impl RenderOnce for ConversationItem {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let title = self.conversation.title.clone();
         let key = self.conversation.key.clone();
         let group = SharedString::from(format!("conversation-{}", self.id));
         let menu = match (self.on_rename, self.on_pin, self.on_delete) {
@@ -177,6 +178,9 @@ impl RenderOnce for ConversationItem {
         let colors = theme.colors.clone();
         div()
             .id(self.id.clone())
+            .role(Role::ListItem)
+            .aria_label(title.clone())
+            .tooltip(Tooltip::text(title.clone()))
             .group(group.clone())
             .track_focus(&focus)
             .flex()
@@ -213,12 +217,7 @@ impl RenderOnce for ConversationItem {
                         .color(colors.fg_subtle),
                 )
             })
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .child(Ellipsis::new(self.conversation.title.clone())),
-            )
+            .child(div().flex_1().min_w_0().child(Ellipsis::new(title)))
             .children(menu.map(|menu| {
                 div()
                     .flex_none()

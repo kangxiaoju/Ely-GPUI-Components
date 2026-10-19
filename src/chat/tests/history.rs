@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use gpui::{
     Context, IntoElement, KeyUpEvent, Keystroke, Modifiers, ParentElement, Render, SharedString,
     Styled, TestAppContext, VisualTestContext, Window, div, point, px,
@@ -95,4 +97,16 @@ fn a_press_on_the_menu_leaves_the_row_shut(cx: &mut TestAppContext) {
     settle(cx);
     let opened = row.read_with(cx, |row, _| row.opened.clone());
     assert_eq!(opened, ["lift"], "only the press on the title opens it");
+}
+
+#[gpui::test]
+fn a_long_title_is_available_from_its_tooltip(cx: &mut TestAppContext) {
+    let (_, cx) = row(cx);
+    cx.simulate_mouse_move(point(px(20.0), px(14.0)), None, Modifiers::none());
+    cx.executor().advance_clock(Duration::from_millis(500));
+    settle(cx);
+    assert!(
+        cx.debug_bounds("tooltip-text-What a lift does").is_some(),
+        "the visible title provides its full-title tooltip"
+    );
 }
