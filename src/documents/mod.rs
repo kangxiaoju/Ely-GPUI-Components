@@ -62,7 +62,9 @@ pub use tree::{
     AlertKind, Inline, Node as MarkdownBlock, Reader as MarkdownReader, Style, alert, is_toc,
 };
 pub(crate) use viewer::step as zoom_step;
-pub use viewer::{DocPage, DocumentViewer, PageHit, PageNote};
+pub use viewer::{
+    DocPage, DocumentViewer, PageHit, PageNote, PageRequestKind, PageResource, PageSource,
+};
 
 /// Binds the documents keys. `init` calls it.
 pub(crate) fn bind_keys(cx: &mut App) {

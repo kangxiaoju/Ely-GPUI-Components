@@ -1,12 +1,14 @@
 use std::{cell::RefCell, rc::Rc};
 
 use gpui::{
-    AppContext as _, Bounds, Context, Entity, Focusable, IntoElement, Modifiers, ParentElement,
-    Pixels, Point, Render, ScrollDelta, ScrollWheelEvent, Styled, TestAppContext, TouchPhase,
-    VisualTestContext, Window, div, point, px, size,
+    App, AppContext as _, Bounds, Context, Entity, Focusable, ImageSource, IntoElement, Modifiers,
+    ParentElement, Pixels, Point, Render, ScrollDelta, ScrollWheelEvent, Size, Styled,
+    TestAppContext, TouchPhase, VisualTestContext, Window, div, point, px, size,
 };
 
-use super::{DocPage, DocumentViewer, PageHit, ZenMode};
+use super::{
+    DocPage, DocumentViewer, PageHit, PageRequestKind, PageResource, PageSource, ZenMode,
+};
 use crate::{
     editor::FindWidget,
     forms::{Input, TextInput},
@@ -84,6 +86,85 @@ fn settle(cx: &mut VisualTestContext) {
     cx.run_until_parked();
     cx.update(|window, _| window.refresh());
     cx.run_until_parked();
+}
+
+#[derive(Clone)]
+struct Requested(Rc<RefCell<Vec<(usize, PageRequestKind)>>>);
+
+impl PageSource for Requested {
+    fn len(&self) -> usize {
+        1_000
+    }
+
+    fn size(&self, _: usize) -> Size<f32> {
+        size(400.0, 1_000.0)
+    }
+
+    fn request(
+        &self,
+        page: usize,
+        _: f32,
+        kind: PageRequestKind,
+        _: &mut Window,
+        _: &mut App,
+    ) -> PageResource {
+        self.0.borrow_mut().push((page, kind));
+        PageResource::Ready {
+            image: ImageSource::from(format!("page-{page}.png")),
+            pixels: 400_000,
+        }
+    }
+}
+
+struct LazyReader(Requested, usize);
+
+impl Render for LazyReader {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().size_full().child(
+            DocumentViewer::source("lazy-viewer", "long.pdf", self.0.clone())
+                .cache_pixel_budget(self.1),
+        )
+    }
+}
+
+#[gpui::test]
+fn document_viewer_requests_only_visible_and_neighbor_pages(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = Requested(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| LazyReader(source, 8_000_000));
+    cx.simulate_resize(size(px(840.0), px(520.0)));
+    settle(cx);
+
+    let full: Vec<usize> = requests
+        .borrow()
+        .iter()
+        .filter_map(|(page, kind)| (*kind == PageRequestKind::Page).then_some(*page))
+        .collect();
+    assert!(full.len() < 8, "requested {full:?}");
+    assert!(full.iter().all(|page| *page < 8), "requested {full:?}");
+
+    let before = requests.borrow().len();
+    settle(cx);
+    assert_eq!(requests.borrow().len(), before, "the same viewport reuses its cache");
+}
+
+#[gpui::test]
+fn document_viewer_evicts_pages_past_its_pixel_budget(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = Requested(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| LazyReader(source, 500_000));
+    cx.simulate_resize(size(px(840.0), px(520.0)));
+    settle(cx);
+    let first = requests.borrow().len();
+
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(
+        requests.borrow().len() > first,
+        "an evicted neighbor is requested again"
+    );
 }
 
 /// A point on the pages, below the bars, mid-view.

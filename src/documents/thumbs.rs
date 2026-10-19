@@ -1,13 +1,14 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, ElementId, InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce,
-    StatefulInteractiveElement, Styled, Window, div, img, prelude::*,
+    App, ElementId, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce,
+    StatefulInteractiveElement, Styled, Window, div, prelude::*,
 };
 
-use super::viewer::DocPage;
+use super::viewer::{
+    DocPage, PageCache, PageRequestKind, PageSource, StaticPages, page_picture, page_resource,
+};
 use crate::{
-    documents::blocks::source,
     forms::Pick,
     theme::{ActiveTheme, Radius, TextSize},
     typography::tabular,
@@ -20,7 +21,8 @@ const THUMB: f32 = 0.75;
 #[derive(IntoElement)]
 pub struct PageThumbnailList {
     id: ElementId,
-    pages: Rc<Vec<DocPage>>,
+    source: Rc<dyn PageSource>,
+    cache: Option<Entity<PageCache>>,
     current: usize,
     on_pick: Option<Pick>,
 }
@@ -33,7 +35,23 @@ impl PageThumbnailList {
     ) -> Self {
         Self {
             id: id.into(),
-            pages: pages.into(),
+            source: Rc::new(StaticPages(pages.into())),
+            cache: None,
+            current,
+            on_pick: None,
+        }
+    }
+
+    pub(crate) fn source(
+        id: impl Into<ElementId>,
+        source: Rc<dyn PageSource>,
+        cache: Entity<PageCache>,
+        current: usize,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            source,
+            cache: Some(cache),
             current,
             on_pick: None,
         }
@@ -46,10 +64,33 @@ impl PageThumbnailList {
 }
 
 impl RenderOnce for PageThumbnailList {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let width = cx.theme().label_width().to_pixels(window.rem_size()) * THUMB;
+        let cache = self.cache.unwrap_or_else(|| {
+            window.use_keyed_state((self.id.clone(), "page-cache"), cx, |_, _| {
+                PageCache::new(64 * 1024 * 1024)
+            })
+        });
+        let visible = self.current.saturating_sub(2)..(self.current + 3).min(self.source.len());
+        let requested: std::collections::HashMap<usize, _> = visible
+            .map(|ix| {
+                let scale = f32::from(width) / self.source.size(ix).width;
+                (
+                    ix,
+                    page_resource(
+                        &self.source,
+                        &cache,
+                        ix,
+                        scale,
+                        PageRequestKind::Thumbnail,
+                        window,
+                        cx,
+                    ),
+                )
+            })
+            .collect();
         let theme = cx.theme();
         let colors = theme.colors.clone();
-        let width = theme.label_width() * THUMB;
         div()
             .id(self.id.clone())
             .h_full()
@@ -59,7 +100,8 @@ impl RenderOnce for PageThumbnailList {
             .items_center()
             .gap_3()
             .p_3()
-            .children(self.pages.iter().enumerate().map(|(ix, page)| {
+            .children((0..self.source.len()).map(|ix| {
+                let shape = self.source.size(ix);
                 let current = ix == self.current;
                 let pick = self.on_pick.clone();
                 div()
@@ -79,17 +121,18 @@ impl RenderOnce for PageThumbnailList {
                     .child(
                         div()
                             .w(width)
-                            .h(width * (page.height / page.width))
+                            .h(width * (shape.height / shape.width))
                             .rounded(theme.radius(Radius::Sm))
                             .border_1()
                             .border_color(if current { colors.focus } else { colors.border })
                             .bg(colors.paper)
-                            .child(
-                                img(source(&page.source))
-                                    .id((self.id.clone(), format!("thumb-picture-{ix}")))
-                                    .size_full()
-                                    .rounded(theme.radius(Radius::Sm)),
-                            ),
+                            .when_some(requested.get(&ix).cloned(), |thumb, resource| {
+                                thumb.child(page_picture(
+                                    (self.id.clone(), format!("thumb-picture-{ix}")).into(),
+                                    resource,
+                                    theme,
+                                ))
+                            }),
                     )
                     .child(
                         tabular(div().text_size(theme.text_size(TextSize::Xs)))
