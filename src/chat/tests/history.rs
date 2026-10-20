@@ -1,12 +1,14 @@
+use std::time::Duration;
+
 use gpui::{
     Context, IntoElement, KeyUpEvent, Keystroke, Modifiers, ParentElement, Render, SharedString,
     Styled, TestAppContext, VisualTestContext, Window, div, point, px,
 };
-use jiff::Timestamp;
+use jiff::{Timestamp, civil::date};
 
 use super::settle;
 use crate::{
-    chat::{Conversation, ConversationItem},
+    chat::{Conversation, ConversationItem, ConversationList},
     forms,
     theme::Theme,
 };
@@ -95,4 +97,47 @@ fn a_press_on_the_menu_leaves_the_row_shut(cx: &mut TestAppContext) {
     settle(cx);
     let opened = row.read_with(cx, |row, _| row.opened.clone());
     assert_eq!(opened, ["lift"], "only the press on the title opens it");
+}
+
+const LONG_TITLE: &str = "A very long conversation title that cannot fit inside ninety-six pixels";
+const LONG_TOOLTIP: &str = "conversation-title-tooltip-A very long conversation title that cannot fit inside ninety-six pixels";
+
+struct NarrowHistory;
+
+impl Render for NarrowHistory {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().w(px(96.0)).h(px(240.0)).child(ConversationList::new(
+            "narrow-history",
+            [Conversation {
+                key: "long".into(),
+                title: LONG_TITLE.into(),
+                at: Timestamp::UNIX_EPOCH,
+                pinned: false,
+            }],
+            date(1970, 1, 1),
+        ))
+    }
+}
+
+#[gpui::test]
+fn a_narrow_conversation_list_recovers_the_exact_long_title(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let (_, cx) = cx.add_window_view(|_, _| NarrowHistory);
+    settle(cx);
+    let title = cx
+        .debug_bounds("conversation-title-long")
+        .expect("the conversation title");
+    assert_eq!(
+        title.size.width,
+        px(68.0),
+        "the title is constrained by the 96px list"
+    );
+
+    cx.simulate_mouse_move(title.center(), None, Modifiers::none());
+    cx.executor().advance_clock(Duration::from_millis(500));
+    settle(cx);
+    assert!(
+        cx.debug_bounds(LONG_TOOLTIP).is_some(),
+        "the tooltip restores the exact full title"
+    );
 }

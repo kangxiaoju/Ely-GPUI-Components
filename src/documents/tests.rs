@@ -1,12 +1,14 @@
 use std::{cell::RefCell, rc::Rc};
 
 use gpui::{
-    AppContext as _, Bounds, Context, Entity, Focusable, IntoElement, Modifiers, ParentElement,
-    Pixels, Point, Render, ScrollDelta, ScrollWheelEvent, Styled, TestAppContext, TouchPhase,
-    VisualTestContext, Window, div, point, px, size,
+    App, AppContext as _, Bounds, Context, Entity, Focusable, ImageSource, IntoElement, Modifiers,
+    ParentElement, Pixels, Point, Render, ScrollDelta, ScrollWheelEvent, Size, Styled,
+    TestAppContext, TouchPhase, VisualTestContext, Window, div, point, px, size,
 };
 
-use super::{DocPage, DocumentViewer, PageHit, ZenMode};
+use super::{
+    DocPage, DocumentViewer, PageHit, PageRequestKind, PageResource, PageSource, ZenMode,
+};
 use crate::{
     editor::FindWidget,
     forms::{Input, TextInput},
@@ -84,6 +86,293 @@ fn settle(cx: &mut VisualTestContext) {
     cx.run_until_parked();
     cx.update(|window, _| window.refresh());
     cx.run_until_parked();
+}
+
+#[derive(Clone)]
+struct Requested(Rc<RefCell<Vec<(usize, PageRequestKind)>>>);
+
+impl PageSource for Requested {
+    fn len(&self) -> usize {
+        1_000
+    }
+
+    fn size(&self, _: usize) -> Size<f32> {
+        size(400.0, 1_000.0)
+    }
+
+    fn request(
+        &self,
+        page: usize,
+        _: f32,
+        kind: PageRequestKind,
+        _: &mut Window,
+        _: &mut App,
+    ) -> PageResource {
+        self.0.borrow_mut().push((page, kind));
+        PageResource::Ready {
+            image: ImageSource::from(format!("page-{page}.png")),
+            pixels: 400_000,
+        }
+    }
+}
+
+struct LazyReader(Requested, usize);
+
+impl Render for LazyReader {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().size_full().child(
+            DocumentViewer::source("lazy-viewer", "long.pdf", self.0.clone())
+                .cache_pixel_budget(self.1),
+        )
+    }
+}
+
+#[gpui::test]
+fn document_viewer_requests_only_visible_and_neighbor_pages(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = Requested(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| LazyReader(source, 8_000_000));
+    cx.simulate_resize(size(px(840.0), px(520.0)));
+    settle(cx);
+
+    let full: Vec<usize> = requests
+        .borrow()
+        .iter()
+        .filter_map(|(page, kind)| (*kind == PageRequestKind::Page).then_some(*page))
+        .collect();
+    assert!(full.len() < 8, "requested {full:?}");
+    assert!(full.iter().all(|page| *page < 8), "requested {full:?}");
+
+    let before = requests.borrow().len();
+    settle(cx);
+    assert_eq!(requests.borrow().len(), before, "the same viewport reuses its cache");
+}
+
+#[derive(Clone)]
+struct ShortPages(Rc<RefCell<Vec<(usize, PageRequestKind)>>>);
+
+impl PageSource for ShortPages {
+    fn len(&self) -> usize {
+        1_000
+    }
+
+    fn size(&self, _: usize) -> Size<f32> {
+        size(400.0, 20.0)
+    }
+
+    fn request(
+        &self,
+        page: usize,
+        _: f32,
+        kind: PageRequestKind,
+        _: &mut Window,
+        _: &mut App,
+    ) -> PageResource {
+        self.0.borrow_mut().push((page, kind));
+        PageResource::Ready {
+            image: ImageSource::from(format!("short-{page}.png")),
+            pixels: 16_000,
+        }
+    }
+}
+
+struct ShortReader(ShortPages);
+
+impl Render for ShortReader {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        DocumentViewer::source("short-viewer", "short.pdf", self.0.clone())
+    }
+}
+
+#[gpui::test]
+fn document_viewer_requests_every_visible_short_page_and_neighbors(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = ShortPages(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| ShortReader(source));
+    cx.simulate_resize(size(px(840.0), px(520.0)));
+    settle(cx);
+    let full: Vec<usize> = requests
+        .borrow()
+        .iter()
+        .filter_map(|(page, kind)| (*kind == PageRequestKind::Page).then_some(*page))
+        .collect();
+    for page in 0..12 {
+        assert!(full.contains(&page), "visible page {page} absent from {full:?}");
+    }
+    assert!(full.iter().all(|page| *page < 40), "requested remote {full:?}");
+}
+
+#[gpui::test]
+fn document_viewer_evicts_pages_past_its_pixel_budget(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = Requested(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| LazyReader(source, 500_000));
+    cx.simulate_resize(size(px(840.0), px(520.0)));
+    settle(cx);
+    let first = requests.borrow().len();
+
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(
+        requests.borrow().len() > first,
+        "an evicted neighbor is requested again"
+    );
+}
+
+#[derive(Clone)]
+struct LoadingSource(Rc<RefCell<usize>>);
+
+impl PageSource for LoadingSource {
+    fn len(&self) -> usize {
+        1
+    }
+
+    fn size(&self, _: usize) -> Size<f32> {
+        size(400.0, 1_000.0)
+    }
+
+    fn request(
+        &self,
+        _: usize,
+        _: f32,
+        _: PageRequestKind,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> PageResource {
+        *self.0.borrow_mut() += 1;
+        let image = ImageSource::from("ready.png");
+        PageResource::loading(window.spawn(cx, async move |_| PageResource::Ready {
+            image,
+            pixels: 400_000,
+        }))
+    }
+}
+
+struct LoadingReader(LoadingSource, usize);
+
+impl Render for LoadingReader {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        DocumentViewer::source("loading-viewer", "loading.pdf", self.0.clone())
+            .cache_pixel_budget(self.1)
+    }
+}
+
+#[gpui::test]
+fn document_viewer_deduplicates_an_in_flight_page_request(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(0));
+    let source = LoadingSource(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| {
+        LoadingReader(source, super::DEFAULT_CACHE_BUDGET)
+    });
+    for _ in 0..4 {
+        cx.update(|window, _| window.refresh());
+    }
+    settle(cx);
+    assert_eq!(*requests.borrow(), 1, "one request remains in flight");
+}
+
+#[gpui::test]
+fn document_viewer_bounds_requests_when_an_async_page_exceeds_the_budget(
+    cx: &mut TestAppContext,
+) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(0));
+    let source = LoadingSource(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| LoadingReader(source, 0));
+    for _ in 0..4 {
+        cx.update(|window, _| window.refresh());
+    }
+    settle(cx);
+    assert!(
+        *requests.borrow() <= 2,
+        "an async page larger than its budget is re-requested in a loop, got {}",
+        *requests.borrow()
+    );
+}
+
+#[gpui::test]
+fn document_viewer_does_not_retain_a_resource_larger_than_its_budget(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = Requested(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| LazyReader(source, 0));
+    settle(cx);
+    let first = requests.borrow().len();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(requests.borrow().len() > first, "a zero budget retains no image");
+}
+
+struct VariableBudget {
+    source: Requested,
+    budget: usize,
+}
+
+impl Render for VariableBudget {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        DocumentViewer::source("variable-budget", "long.pdf", self.source.clone())
+            .cache_pixel_budget(self.budget)
+    }
+}
+
+#[gpui::test]
+fn document_viewer_evicts_ready_pages_when_its_budget_shrinks(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = Requested(requests.clone());
+    let (viewer, cx) = cx.add_window_view(move |_, _| VariableBudget {
+        source,
+        budget: 8_000_000,
+    });
+    settle(cx);
+    let first = requests.borrow().len();
+    viewer.update(cx, |viewer, cx| {
+        viewer.budget = 0;
+        cx.notify();
+    });
+    settle(cx);
+    assert!(
+        requests.borrow().len() > first,
+        "ready pages retained after the budget fell to zero"
+    );
+}
+
+struct ThumbnailReader(Requested);
+
+impl Render for ThumbnailReader {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        DocumentViewer::source("thumb-viewer", "long.pdf", self.0.clone()).thumbnails()
+    }
+}
+
+#[gpui::test]
+fn document_viewer_requests_the_scrolled_thumbnail_viewport(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let source = Requested(requests.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| ThumbnailReader(source));
+    cx.simulate_resize(size(px(840.0), px(520.0)));
+    settle(cx);
+    requests.borrow_mut().clear();
+
+    cx.simulate_event(ScrollWheelEvent {
+        position: point(px(80.0), px(300.0)),
+        delta: ScrollDelta::Pixels(point(px(0.0), px(-100_000.0))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    settle(cx);
+    let thumbs: Vec<usize> = requests
+        .borrow()
+        .iter()
+        .filter_map(|(page, kind)| (*kind == PageRequestKind::Thumbnail).then_some(*page))
+        .collect();
+    assert!(thumbs.iter().any(|page| *page > 250), "requested {thumbs:?}");
+    assert!(thumbs.iter().all(|page| *page > 250), "requested {thumbs:?}");
 }
 
 /// A point on the pages, below the bars, mid-view.

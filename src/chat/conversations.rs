@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui::{
     App, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::*,
+    RenderOnce, Role, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::*,
     transparent_black,
 };
 use jiff::{Timestamp, civil::Date, tz::TimeZone};
@@ -11,7 +11,7 @@ use crate::{
     buttons::{Button, ButtonVariant},
     forms::OnValue,
     menus::{Menu, MenuItem, OverflowMenu},
-    primitives::{FocusRing, Icon, IconName, tab_stop},
+    primitives::{FocusRing, Icon, IconName, Tooltip, tab_stop},
     theme::{ActiveTheme, ControlSize, IconSize, Radius, TextSize},
     typography::{Ellipsis, format::system_zone},
 };
@@ -141,6 +141,9 @@ impl ConversationItem {
 impl RenderOnce for ConversationItem {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let key = self.conversation.key.clone();
+        let title = self.conversation.title.clone();
+        let title_selector = SharedString::from(format!("conversation-title-{key}"));
+        let tooltip_selector = SharedString::from(format!("conversation-title-tooltip-{title}"));
         let group = SharedString::from(format!("conversation-{}", self.id));
         let menu = match (self.on_rename, self.on_pin, self.on_delete) {
             (Some(rename), Some(pin), Some(delete)) => {
@@ -177,6 +180,15 @@ impl RenderOnce for ConversationItem {
         let colors = theme.colors.clone();
         div()
             .id(self.id.clone())
+            .role(Role::ListItem)
+            .aria_label(title.clone())
+            .tooltip(Tooltip::rich(move |_, _| {
+                let selector = tooltip_selector.clone();
+                div()
+                    .debug_selector(move || selector.to_string())
+                    .child(title.clone())
+                    .into_any_element()
+            }))
             .group(group.clone())
             .track_focus(&focus)
             .flex()
@@ -215,6 +227,7 @@ impl RenderOnce for ConversationItem {
             })
             .child(
                 div()
+                    .debug_selector(move || title_selector.to_string())
                     .flex_1()
                     .min_w_0()
                     .child(Ellipsis::new(self.conversation.title.clone())),

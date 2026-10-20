@@ -1,9 +1,13 @@
-use std::rc::Rc;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    rc::Rc,
+};
 
 use gpui::{
-    App, Bounds, ElementId, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
-    Point, RenderOnce, ScrollHandle, SharedString, StatefulInteractiveElement, Styled, Window,
-    canvas, div, img, point, prelude::*,
+    AnyElement, App, Bounds, ElementId, Entity, ImageSource, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, Pixels, Point, RenderOnce, ScrollHandle, SharedString, Size,
+    StatefulInteractiveElement, Styled, Task, Window, canvas, div, img, point, prelude::*, size,
 };
 
 use super::{
@@ -12,8 +16,10 @@ use super::{
 };
 use crate::{
     buttons::{ButtonVariant, IconButton, ToggleButton, ToggleItem},
+    chat::ErrorMessage,
     documents::blocks::source,
     editor::FindWidget,
+    motion::Spinner,
     overlays::HoverCard,
     primitives::{Icon, IconName},
     shell::ToolbarSeparator,
@@ -24,12 +30,236 @@ use crate::{
 /// Zoom steps, as shares of a page's own size.
 const STEPS: [f32; 9] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
 
+/// The default pixel budget for decoded page and thumbnail images.
+pub const DEFAULT_CACHE_BUDGET: usize = 64 * 1024 * 1024;
+
 /// A page the app drew: its picture, a file or a web address, and its size in points.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DocPage {
     pub source: SharedString,
     pub width: f32,
     pub height: f32,
+}
+
+/// Which representation of a document page the viewer asks its owner to draw.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub enum PageRequestKind {
+    Page,
+    Thumbnail,
+}
+
+/// The current result of asking a lazy page source for an image.
+#[derive(Clone)]
+pub enum PageResource {
+    Loading(Rc<RefCell<Option<Task<PageResource>>>>),
+    Ready { image: ImageSource, pixels: usize },
+    Failed(SharedString),
+}
+
+impl PageResource {
+    /// A request whose task resolves to the image or its failure.
+    pub fn loading(task: Task<PageResource>) -> Self {
+        Self::Loading(Rc::new(RefCell::new(Some(task))))
+    }
+}
+
+/// Pages supplied on demand. Sizes are in document points and resources may change on later asks.
+pub trait PageSource {
+    fn len(&self) -> usize;
+    fn size(&self, page: usize) -> Size<f32>;
+    fn request(
+        &self,
+        page: usize,
+        scale: f32,
+        kind: PageRequestKind,
+        window: &mut Window,
+        app: &mut App,
+    ) -> PageResource;
+}
+
+#[derive(Clone)]
+pub(crate) struct StaticPages(pub(crate) Rc<Vec<DocPage>>);
+
+impl PageSource for StaticPages {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn size(&self, page: usize) -> Size<f32> {
+        let page = &self.0[page];
+        // A page with no width or height would divide by zero when thumbnails
+        // scale it; report a minimal size so the source never yields NaN.
+        size(page.width.max(1.0), page.height.max(1.0))
+    }
+
+    fn request(
+        &self,
+        page: usize,
+        _: f32,
+        _: PageRequestKind,
+        _: &mut Window,
+        _: &mut App,
+    ) -> PageResource {
+        PageResource::Ready {
+            image: source(&self.0[page].source),
+            pixels: (self.0[page].width * self.0[page].height) as usize,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+struct PageKey {
+    page: usize,
+    scale: u16,
+    kind: PageRequestKind,
+}
+
+pub(crate) struct PageCache {
+    resources: HashMap<PageKey, PageResource>,
+    order: VecDeque<PageKey>,
+    pixels: usize,
+    budget: usize,
+}
+
+impl PageCache {
+    pub(crate) fn new(budget: usize) -> Self {
+        Self {
+            resources: HashMap::new(),
+            order: VecDeque::new(),
+            pixels: 0,
+            budget,
+        }
+    }
+
+    fn set_budget(&mut self, budget: usize) {
+        if self.budget == budget {
+            return;
+        }
+        self.budget = budget;
+        let mut kept = VecDeque::new();
+        while let Some(key) = self.order.pop_front() {
+            if self.pixels <= budget {
+                kept.push_back(key);
+                continue;
+            }
+            match self.resources.get(&key) {
+                Some(PageResource::Ready { pixels, .. }) => {
+                    let pixels = *pixels;
+                    self.resources.remove(&key);
+                    self.pixels = self.pixels.saturating_sub(pixels);
+                }
+                Some(PageResource::Loading(_)) | Some(PageResource::Failed(_)) => {
+                    kept.push_back(key);
+                }
+                None => {}
+            }
+        }
+        kept.append(&mut self.order);
+        self.order = kept;
+    }
+
+    fn get(&mut self, key: PageKey) -> Option<PageResource> {
+        let resource = self.resources.get(&key)?.clone();
+        self.order.retain(|cached| *cached != key);
+        self.order.push_back(key);
+        Some(resource)
+    }
+
+    fn insert(&mut self, key: PageKey, resource: PageResource) {
+        // Reject a Ready larger than the budget before touching the existing
+        // entry, so an in-flight Loading is not dropped: dropping it would make
+        // the next `get` miss, re-request, and loop forever.
+        if matches!(&resource, PageResource::Ready { pixels, .. } if *pixels > self.budget) {
+            return;
+        }
+        if let Some(PageResource::Ready { pixels, .. }) = self.resources.remove(&key) {
+            self.pixels = self.pixels.saturating_sub(pixels);
+        }
+        self.order.retain(|cached| *cached != key);
+        if let PageResource::Ready { pixels, .. } = &resource {
+            self.pixels = self.pixels.saturating_add(*pixels);
+        }
+        self.resources.insert(key, resource);
+        self.order.push_back(key);
+        while self.pixels > self.budget {
+            let Some(oldest) = self.order.pop_front() else { break };
+            match self.resources.get(&oldest) {
+                Some(PageResource::Ready { pixels, .. }) => {
+                    let pixels = *pixels;
+                    self.resources.remove(&oldest);
+                    self.pixels = self.pixels.saturating_sub(pixels);
+                }
+                // In-flight and failed entries are not pixel-budgeted; keep them.
+                Some(PageResource::Loading(_)) | Some(PageResource::Failed(_)) => {
+                    self.order.push_back(oldest);
+                }
+                None => {}
+            }
+        }
+    }
+}
+
+pub(crate) fn page_resource(
+    source: &Rc<dyn PageSource>,
+    cache: &Entity<PageCache>,
+    page: usize,
+    scale: f32,
+    kind: PageRequestKind,
+    window: &mut Window,
+    cx: &mut App,
+) -> PageResource {
+    let key = PageKey {
+        page,
+        scale: (scale * 100.0).round().clamp(1.0, u16::MAX as f32) as u16,
+        kind,
+    };
+    if let Some(resource) = cache.update(cx, |cache, _| cache.get(key)) {
+        return resource;
+    }
+    let resource = source.request(page, scale, kind, window, cx);
+    cache.update(cx, |cache, _| cache.insert(key, resource.clone()));
+    if let PageResource::Loading(task) = &resource
+        && let Some(task) = task.borrow_mut().take()
+    {
+        let cache = cache.downgrade();
+        window
+            .spawn(cx, async move |cx| {
+                let resource = task.await;
+                let _ = cx.update(|window, cx| {
+                    cache.update(cx, |cache, _| cache.insert(key, resource))?;
+                    window.refresh();
+                    anyhow::Ok(())
+                });
+            })
+            .detach();
+    }
+    resource
+}
+
+pub(crate) fn page_picture(
+    id: ElementId,
+    resource: PageResource,
+    theme: &crate::theme::Theme,
+) -> AnyElement {
+    match resource {
+        PageResource::Loading(_) => div()
+            .size_full()
+            .flex()
+            .items_center()
+            .justify_center()
+            .child(Spinner::new((id, "loading")).size(IconSize::Sm))
+            .into_any_element(),
+        PageResource::Ready { image, .. } => img(image).id(id).size_full().into_any_element(),
+        PageResource::Failed(error) => div()
+            .size_full()
+            .flex()
+            .items_center()
+            .justify_center()
+            .p_3()
+            .text_size(theme.text_size(TextSize::Sm))
+            .child(ErrorMessage::new((id, "error"), "Page could not be loaded").detail(error))
+            .into_any_element(),
+    }
 }
 
 /// A stretch of a page a search found, in the page's points.
@@ -85,7 +315,8 @@ fn page_in_view(scroll: &ScrollHandle, count: usize) -> usize {
 pub struct DocumentViewer {
     id: ElementId,
     title: SharedString,
-    pages: Rc<Vec<DocPage>>,
+    source: Rc<dyn PageSource>,
+    cache_pixel_budget: usize,
     zoom: f32,
     on_zoom: Option<OnZoom>,
     thumbnails: bool,
@@ -108,10 +339,19 @@ impl DocumentViewer {
                 page.source
             );
         }
+        Self::source(id, title, StaticPages(pages))
+    }
+
+    pub fn source(
+        id: impl Into<ElementId>,
+        title: impl Into<SharedString>,
+        source: impl PageSource + 'static,
+    ) -> Self {
         Self {
             id: id.into(),
             title: title.into(),
-            pages,
+            source: Rc::new(source),
+            cache_pixel_budget: DEFAULT_CACHE_BUDGET,
             zoom: 1.0,
             on_zoom: None,
             thumbnails: false,
@@ -119,6 +359,12 @@ impl DocumentViewer {
             notes: Vec::new(),
             on_note: None,
         }
+    }
+
+    /// Caps retained decoded page and thumbnail pixels.
+    pub fn cache_pixel_budget(mut self, pixels: usize) -> Self {
+        self.cache_pixel_budget = pixels;
+        self
     }
 
     /// Scales pages from their size in points; the owner keeps the zoom the steps and fit ask for.
@@ -141,7 +387,7 @@ impl DocumentViewer {
 
     /// The owner's find box, floating over the pages; the owner searches them, and `hits` light where they are, the current one scrolled into view.
     pub fn find(mut self, widget: FindWidget, hits: Vec<PageHit>, current: Option<usize>) -> Self {
-        let pages = self.pages.len();
+        let pages = self.source.len();
         let on_page = |hit: &PageHit| hit.page < pages;
         if current.is_some_and(|current| current >= hits.len()) || !hits.iter().all(on_page) {
             log::error!(
@@ -186,14 +432,34 @@ struct Desk {
 impl RenderOnce for DocumentViewer {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let desk = window.use_keyed_state((self.id.clone(), "desk"), cx, |_, _| Desk::default());
+        let cache = window.use_keyed_state((self.id.clone(), "page-cache"), cx, |_, _| {
+            PageCache::new(self.cache_pixel_budget)
+        });
+        cache.update(cx, |cache, _| cache.set_budget(self.cache_pixel_budget));
         let (scroll, page_now, width, pinning) = {
             let desk = desk.read(cx);
             (desk.scroll.clone(), desk.page, desk.width, desk.pinning)
         };
         let zoom = self.zoom;
+        let nearby = scroll.top_item().saturating_sub(2)
+            ..(scroll.bottom_item() + 3).min(self.source.len());
+        let requested: HashMap<usize, PageResource> = nearby
+            .map(|ix| {
+                let resource = page_resource(
+                    &self.source,
+                    &cache,
+                    ix,
+                    zoom,
+                    PageRequestKind::Page,
+                    window,
+                    cx,
+                );
+                (ix, resource)
+            })
+            .collect();
         let theme = cx.theme();
         let colors = theme.colors.clone();
-        let count = self.pages.len();
+        let count = self.source.len();
         let go = |page: usize, scroll: &ScrollHandle| {
             let scroll = scroll.clone();
             move |_: &gpui::ClickEvent, _: &mut Window, _: &mut App| {
@@ -211,7 +477,7 @@ impl RenderOnce for DocumentViewer {
                     button.on_click(move |_, window, cx| on_zoom(next, window, cx))
                 })
         };
-        let widest = self.pages.iter().map(|page| page.width).fold(0.0, f32::max);
+        let widest = (0..count).map(|page| self.source.size(page).width).fold(0.0, f32::max);
         let fit = (width > 0.0 && widest > 0.0)
             .then(|| (width / widest).clamp(STEPS[0], STEPS[STEPS.len() - 1]));
         let header = div()
@@ -290,17 +556,16 @@ impl RenderOnce for DocumentViewer {
             None => (None, Vec::new(), None),
         };
         let target = current.map(|current| hits[current].clone());
-        let pages = self.pages.iter().enumerate().map(|(ix, page)| {
+        let pages = (0..count).map(|ix| {
+            let shape = self.source.size(ix);
             let (on_note, scroll) = (self.on_note.clone().filter(|_| pinning), scroll.clone());
             div()
                 .id((self.id.clone(), format!("page-{ix}")))
                 .relative()
                 .flex_none()
-                .when(width == 0.0 || page.width * zoom <= width, |page| {
-                    page.mx_auto()
-                })
-                .w(Pixels::from(page.width * zoom))
-                .h(Pixels::from(page.height * zoom))
+                .when(width == 0.0 || shape.width * zoom <= width, |page| page.mx_auto())
+                .w(Pixels::from(shape.width * zoom))
+                .h(Pixels::from(shape.height * zoom))
                 .bg(colors.paper)
                 .shadow(theme.elevation(Elevation::Raised))
                 .when(pinning, |page| page.cursor_crosshair())
@@ -315,11 +580,13 @@ impl RenderOnce for DocumentViewer {
                         on_note(ix, at, window, cx);
                     })
                 })
-                .child(
-                    img(source(&page.source))
-                        .id((self.id.clone(), format!("picture-{ix}")))
-                        .size_full(),
-                )
+                .when_some(requested.get(&ix).cloned(), |page, resource| {
+                    page.child(page_picture(
+                        (self.id.clone(), format!("picture-{ix}")).into(),
+                        resource,
+                        theme,
+                    ))
+                })
                 .children(
                     hits.iter()
                         .enumerate()
@@ -382,9 +649,10 @@ impl RenderOnce for DocumentViewer {
                         .border_r_1()
                         .border_color(colors.border)
                         .child(
-                            PageThumbnailList::new(
+                            PageThumbnailList::source(
                                 (self.id.clone(), "thumbs"),
-                                self.pages.clone(),
+                                self.source.clone(),
+                                cache.clone(),
                                 page_now,
                             )
                             .on_pick(move |page, _, _| scroll.scroll_to_top_of_item(page)),

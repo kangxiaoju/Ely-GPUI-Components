@@ -30,7 +30,9 @@ pub use scroll::{ScrollArea, Scrollbar, on_axis};
 pub(crate) use scroll::{bring_into_view, reveal_when_focused};
 pub use scroll_aids::{ScrollShadow, ScrollToTop, StickyHeader};
 pub use sheet::{Drawer, Sheet};
-pub use sidebar::Sidebar;
+#[cfg(all(test, feature = "test-support"))]
+pub(crate) use sidebar::sidebar_width_at;
+pub use sidebar::{Sidebar, SidebarPlacement};
 pub use split::{SplitPane, resize_edge, resize_handle};
 pub use stack::{AspectRatio, Container, ZStack, h_stack, v_stack};
 pub use surface::{Card, CardHeader, Fieldset, Frame, Panel, Section, Well};
