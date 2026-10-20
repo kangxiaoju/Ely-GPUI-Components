@@ -33,6 +33,7 @@ pub struct Dialog {
     scrim_closes: bool,
     fullscreen: bool,
     first: Option<FocusHandle>,
+    width: Option<gpui::DefiniteLength>,
     on_close: Run,
 }
 
@@ -53,8 +54,15 @@ impl Dialog {
             scrim_closes: true,
             fullscreen: false,
             first: None,
+            width: None,
             on_close: Rc::new(on_close),
         }
+    }
+
+    /// Override the card's width; defaults to the theme's `dialog_width`.
+    pub fn width(mut self, width: impl Into<gpui::DefiniteLength>) -> Self {
+        self.width = Some(width.into());
+        self
     }
 
     pub fn detail(mut self, text: impl Into<SharedString>) -> Self {
@@ -224,7 +232,7 @@ impl RenderOnce for Dialog {
                 .flex()
                 .flex_col()
                 .gap_5()
-                .w(theme.dialog_width())
+                .w(self.width.unwrap_or_else(|| theme.dialog_width().into()))
                 .max_h(window.viewport_size().height - margin * 2.0)
                 .p_6()
                 .rounded(theme.radius(Radius::Xl))
