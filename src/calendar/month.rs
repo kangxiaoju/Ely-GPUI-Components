@@ -15,13 +15,26 @@ use super::{
 };
 use crate::{
     forms::OnValue,
+    i18n,
     layout::seeded::use_seeded,
     primitives::{FocusRing, tab_stop},
     theme::{ActiveTheme, Radius, TextSize},
     typography::{Ellipsis, format, fresh},
 };
 
-const WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/// Builds the muted note beside a day's number (lunar date, holiday, …); `None` leaves the day bare.
+pub type DayNote = Rc<dyn Fn(Date) -> Option<gpui::SharedString>>;
+
+/// i18n keys for the weekday header, Monday first.
+const WEEKDAY_KEYS: [&str; 7] = [
+    "calendar.weekday.mon",
+    "calendar.weekday.tue",
+    "calendar.weekday.wed",
+    "calendar.weekday.thu",
+    "calendar.weekday.fri",
+    "calendar.weekday.sat",
+    "calendar.weekday.sun",
+];
 
 /// A month of days in week rows, each with its events: what spans days lies across them as bars, the rest by the hour as chips, and what does not fit waits behind "N more". Arrows move a day, Page keys turn the month, and Enter or a double press opens the day.
 #[derive(IntoElement)]
@@ -34,6 +47,7 @@ pub struct CalendarMonthView {
     on_day: Option<OnDay>,
     on_event: Option<OnValue>,
     on_month: Option<OnDay>,
+    day_note: Option<DayNote>,
 }
 
 impl CalendarMonthView {
@@ -51,6 +65,7 @@ impl CalendarMonthView {
             on_day: None,
             on_event: None,
             on_month: None,
+            day_note: None,
         }
     }
 
@@ -86,6 +101,15 @@ impl CalendarMonthView {
         self.on_month = Some(Rc::new(handler));
         self
     }
+
+    /// A muted note shown beside each day's number, such as its lunar date or a holiday; the day stays bare where the builder returns `None`.
+    pub fn day_note(
+        mut self,
+        note: impl Fn(Date) -> Option<gpui::SharedString> + 'static,
+    ) -> Self {
+        self.day_note = Some(Rc::new(note));
+        self
+    }
 }
 
 /// What a week row draws with: the view's id and zone, its events, today, the cursor, and what presses do.
@@ -99,6 +123,7 @@ struct Row<'a> {
     pick: OnDay,
     open: OnDay,
     on_event: Option<OnValue>,
+    day_note: Option<DayNote>,
 }
 
 /// Sizes of a month's rows in pixels: a chip, the gap between rows, and the cell's inset.
@@ -163,9 +188,32 @@ impl Row<'_> {
         let on = singles(self.events, day, self.zone);
         let (shown, more) = day_rows(on.len(), hidden, sizes.rows - lanes);
         let label = match day.day() {
-            1 => day.strftime("%b %-d").to_string(),
+            1 => i18n::text(
+                cx,
+                "calendar.monthday",
+                &[
+                    (
+                        "month",
+                        &i18n::text(
+                            cx,
+                            &format!("calendar.short_month.{}", day.month()),
+                            &[],
+                        ),
+                    ),
+                    ("day", &day.day().to_string()),
+                ],
+            )
+            .to_string(),
             number => number.to_string(),
         };
+        let note = self.day_note.as_ref().and_then(|note| note(day)).map(|text| {
+            div()
+                .min_w_0()
+                .px_1p5()
+                .text_size(theme.text_size(TextSize::Xs))
+                .text_color(colors.fg_subtle)
+                .child(Ellipsis::new(text))
+        });
         let fg = if day.first_of_month() == self.shown {
             colors.fg
         } else {
@@ -192,7 +240,11 @@ impl Row<'_> {
                 .hover(|style| style.bg(colors.hover))
                 .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
                 .on_click(move |_, window, cx| open(day, window, cx))
-                .child(div().min_w_0().child(Ellipsis::new(format!("{more} more"))))
+                .child(div().min_w_0().child(Ellipsis::new(i18n::text(
+                    cx,
+                    "calendar.more",
+                    &[("n", &more.to_string())],
+                ))))
         });
         div()
             .id((self.id.clone(), format!("day-{day}")))
@@ -229,21 +281,28 @@ impl Row<'_> {
                 )
             })
             .child(
-                div().h(sizes.chip).flex().items_center().child(
-                    div()
-                        .px_1p5()
-                        .rounded_full()
-                        .text_size(theme.text_size(TextSize::Xs))
-                        .text_color(fg)
-                        .map(|number| match day == self.today {
-                            true => number
-                                .bg(colors.accent)
-                                .text_color(colors.on_accent)
-                                .font_weight(FontWeight::SEMIBOLD),
-                            false => number,
-                        })
-                        .child(label),
-                ),
+                div()
+                    .h(sizes.chip)
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap_1()
+                    .child(
+                        div()
+                            .px_1p5()
+                            .rounded_full()
+                            .text_size(theme.text_size(TextSize::Xs))
+                            .text_color(fg)
+                            .map(|number| match day == self.today {
+                                true => number
+                                    .bg(colors.accent)
+                                    .text_color(colors.on_accent)
+                                    .font_weight(FontWeight::SEMIBOLD),
+                                false => number,
+                            })
+                            .child(label),
+                    )
+                    .children(note),
             )
             .children((0..lanes).map(|_| div().flex_none().h(sizes.chip)))
             .children(on.iter().take(shown).map(|&ix| {
@@ -406,8 +465,10 @@ impl RenderOnce for CalendarMonthView {
             pick,
             open,
             on_event: self.on_event.clone(),
+            day_note: self.day_note.clone(),
         };
-        let weekdays = div().flex().children(WEEKDAYS.map(|name| {
+        let weekday_names = WEEKDAY_KEYS.map(|key| i18n::text(cx, key, &[]));
+        let weekdays = div().flex().children(weekday_names.map(|name| {
             div()
                 .flex_none()
                 .w(relative(1.0 / 7.0))
@@ -421,19 +482,25 @@ impl RenderOnce for CalendarMonthView {
             .into_iter()
             .map(|monday| row.week(monday, &sizes, cx))
             .collect();
-        let title = shown.strftime("%B %Y").to_string();
+        let title = i18n::text(
+            cx,
+            "calendar.title",
+            &[
+                (
+                    "month",
+                    &i18n::text(cx, &format!("calendar.month.{}", shown.month()), &[]),
+                ),
+                ("year", &shown.year().to_string()),
+            ],
+        )
+        .to_string();
+        let back = i18n::text(cx, "calendar.prev_month", &[]).to_string();
+        let on = i18n::text(cx, "calendar.next_month", &[]).to_string();
         div()
             .flex()
             .flex_col()
             .gap_3()
-            .child(head(
-                &self.id,
-                title,
-                "Previous month",
-                "Next month",
-                step,
-                cx,
-            ))
+            .child(head(&self.id, title, &back, &on, step, cx))
             .child(
                 div().flex().flex_col().child(weekdays).child(
                     div()

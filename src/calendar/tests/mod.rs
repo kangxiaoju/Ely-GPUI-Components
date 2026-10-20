@@ -160,6 +160,27 @@ fn a_crowded_day_opens_from_its_more(cx: &mut TestAppContext) {
     assert_eq!(heard(&host, cx), ["open 2026-09-16"]);
 }
 
+/// The same crowded month, but every day carries a muted note beside its number.
+fn noted(_: &Planning, owner: Entity<Planning>) -> gpui::AnyElement {
+    CalendarMonthView::new("month", date(2026, 9, 1), events())
+        .zone(TimeZone::UTC)
+        .today(date(2026, 9, 16))
+        .day_note(|day| Some(format!("初{}", day.day()).into()))
+        .on_day(move |day, _, cx| note(&owner, format!("open {day}"), cx))
+        .into_any_element()
+}
+
+#[gpui::test]
+fn a_day_note_keeps_the_more_within_reach(cx: &mut TestAppContext) {
+    let (host, cx) = planning(noted, cx);
+    let more = cx
+        .debug_bounds("more 2026-09-16")
+        .expect("a note beside the number must not push the more out of the cell");
+    cx.simulate_click(more.center(), Modifiers::none());
+    settle(cx);
+    assert_eq!(heard(&host, cx), ["open 2026-09-16"]);
+}
+
 #[gpui::test]
 fn a_chip_names_its_event_and_leaves_the_day(cx: &mut TestAppContext) {
     let (host, cx) = planning(month, cx);
