@@ -7,6 +7,17 @@ const SHIPPED: &[(&str, &str)] = &[
     ("forms/input.rs", include_str!("../../forms/input.rs")),
     ("forms/select.rs", include_str!("../../forms/select.rs")),
     (
+        "forms/date/calendar.rs",
+        include_str!("../../forms/date/calendar.rs"),
+    ),
+    (
+        "forms/date/picker.rs",
+        include_str!("../../forms/date/picker.rs"),
+    ),
+    ("mail/compose.rs", include_str!("../../mail/compose.rs")),
+    ("mail/signature.rs", include_str!("../../mail/signature.rs")),
+    ("chat/attach.rs", include_str!("../../chat/attach.rs")),
+    (
         "tables/builders.rs",
         include_str!("../../tables/builders.rs"),
     ),
@@ -23,14 +34,20 @@ const SHIPPED: &[(&str, &str)] = &[
 
 #[test]
 fn shipped_components_show_no_fixed_english() {
-    let shown = [".tooltip(\"", ".child(\"", "SharedString::from(\"", "=> \""];
+    let shown = [
+        ".tooltip(\"",
+        ".child(\"",
+        ".placeholder(\"",
+        "SharedString::from(\"",
+        "=> \"",
+    ];
     // After an id: words, not a lowercase id.
     let labels = ["), \"", "\", \"", "(\""];
     let mut found = Vec::new();
     for (path, source) in SHIPPED {
         let code = source.split("#[cfg(test)]").next().unwrap_or(source);
         for (no, line) in code.lines().enumerate() {
-            let checks = ["assert", "panic!", "log::", ".expect("];
+            let checks = ["assert", "panic!", "log::", ".expect(", "debug_selector"];
             if checks.iter().any(|check| line.contains(check)) {
                 continue;
             }
