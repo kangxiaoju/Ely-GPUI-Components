@@ -2,8 +2,9 @@ use std::ops::Range;
 
 use gpui::{
     AnyElement, Bounds, Context, ElementInputHandler, InteractiveElement, IntoElement, MouseButton,
-    MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, Render, ScrollStrategy, Styled,
-    StyledText, Window, canvas, div, fill, font, point, size, uniform_list,
+    MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, Render, ScrollStrategy,
+    StatefulInteractiveElement, Styled, StyledText, Window, canvas, div, fill, font, point, size,
+    uniform_list,
 };
 
 use super::{
@@ -242,9 +243,18 @@ impl Render for CodeEditor {
             }
         };
         let line = (pixels * LEADING).round();
-        let found = folds(&self.buffer);
+        let lightweight = self.lightweight();
+        let found = if lightweight {
+            Vec::new()
+        } else {
+            folds(&self.buffer)
+        };
         let hide = hidden(self.buffer.lines(), &found, &self.folded);
-        let found_brackets = brackets(&self.buffer);
+        let found_brackets = if lightweight {
+            Vec::new()
+        } else {
+            brackets(&self.buffer)
+        };
         let matched = syntax::matched(&found_brackets, self.primary().head);
         let occurrences = match self.needle() {
             Some(needle) if self.focus.is_focused(window) => {
@@ -288,6 +298,7 @@ impl Render for CodeEditor {
             None
         };
         let count = self.frame.rows.len();
+        let content_width = advance * (self.gutter_columns() + self.buffer.widest() + 2) as f32;
         let list = uniform_list(
             "editor-rows",
             count,
@@ -296,7 +307,8 @@ impl Render for CodeEditor {
             }),
         )
         .track_scroll(&self.scroll)
-        .size_full();
+        .h_full()
+        .min_w(content_width);
         let (top, focus, input) = (cx.entity(), self.focus.clone(), cx.entity());
         let unlock = cx.entity();
         let banner = self.options.read_only.then(|| {
@@ -312,10 +324,13 @@ impl Render for CodeEditor {
             })
         });
         let body = div()
+            .id(("editor-horizontal", cx.entity_id().as_u64()))
             .relative()
             .flex_1()
             .h_full()
             .min_h_0()
+            .overflow_x_scroll()
+            .track_scroll(&self.horizontal)
             .child(list)
             .children(sticky)
             .child(
