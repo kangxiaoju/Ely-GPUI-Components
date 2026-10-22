@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, Context, ElementId, Entity, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    SharedString, Styled, Subscription, Window, div, prelude::*,
+    App, Context, ElementId, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    RenderOnce, SharedString, Styled, Subscription, Window, div, prelude::*,
 };
 
 use super::{
@@ -211,8 +211,17 @@ impl RenderOnce for Combobox {
             pick.clone(),
             typing.clone(),
         );
+        let reopen = typing.clone();
         div()
             .id(self.id.clone())
+            .on_mouse_down(MouseButton::Left, move |_, _, cx| {
+                if reopen.read(cx).dismissed {
+                    reopen.update(cx, |typing, cx| {
+                        typing.dismissed = false;
+                        cx.notify();
+                    });
+                }
+            })
             .relative()
             .capture_action(move |_: &Up, _, cx| {
                 if open {
