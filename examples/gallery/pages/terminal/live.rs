@@ -22,13 +22,21 @@ use crate::{
 /// A build's output as a terminal printed it, colors and all.
 const BUILD: &str = "\x1b[1;32m   Compiling\x1b[0m ely-gpui-component v0.1.0\r\n\x1b[1;33mwarning\x1b[0m\x1b[1m: unused variable: `spare`\x1b[0m\r\n  \x1b[1;34m-->\x1b[0m src/main.rs:47:9\r\n\x1b[1;33mwarning\x1b[0m\x1b[1m: field `hint` is never read\x1b[0m\r\n  \x1b[1;34m-->\x1b[0m src/palette.rs:12:5\r\n\x1b[1;32m    Finished\x1b[0m `dev` profile [unoptimized + debuginfo] target(s) in 4.21s\r\n\x1b[1;32m     Running\x1b[0m `target/debug/palette`\r\n\x1b[38;5;110m◆\x1b[0m 5 tints of accent, the last \x1b[38;2;232;243;252m██\x1b[0m #e8f3fc\r\n\x1b[2mdocs: https://github.com/ELY-Open-Source/Ely-GPUI-Components\x1b[0m\r\n";
 
+#[cfg(not(windows))]
 const SHELLS: [(&str, &str); 3] = [
     ("bash", "/bin/bash"),
     ("zsh", "/bin/zsh"),
     ("sh", "/bin/sh"),
 ];
 
+#[cfg(windows)]
+const SHELLS: [(&str, &str); 2] = [
+    ("Windows PowerShell", "powershell.exe"),
+    ("Command Prompt", "cmd.exe"),
+];
+
 /// A shell with no startup files, its prompt the folder's name, in this repository.
+#[cfg(not(windows))]
 fn launch(shell: usize) -> Launch {
     let (name, program) = SHELLS[shell];
     let args = match name {
@@ -44,6 +52,34 @@ fn launch(shell: usize) -> Launch {
             ("PROMPT".into(), "%1~ › ".into()),
             ("BASH_SILENCE_DEPRECATION_WARNING".into(), "1".into()),
         ],
+    }
+}
+
+/// A shell with no profile or AutoRun, its prompt the folder's name, in this repository.
+#[cfg(windows)]
+fn launch(shell: usize) -> Launch {
+    let (_, program) = SHELLS[shell];
+    let cwd = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let folder = cwd
+        .file_name()
+        .expect("the manifest's folder has a name")
+        .to_string_lossy()
+        .into_owned();
+    let args = if program == "powershell.exe" {
+        vec![
+            "-NoLogo".into(),
+            "-NoProfile".into(),
+            "-NoExit".into(),
+            "-Command".into(),
+            "function prompt { (Split-Path -Leaf $PWD) + ' › ' }".into(),
+        ]
+    } else {
+        vec!["/D".into()]
+    };
+    Launch {
+        program: Some((program.into(), args)),
+        cwd: Some(cwd),
+        env: vec![("PROMPT".into(), format!("{folder} › "))],
     }
 }
 
@@ -70,7 +106,17 @@ fn session(
     if let Some((_, terminal)) = sessions.read(cx).iter().find(|(id, _)| *id == pane) {
         return terminal.clone();
     }
-    let terminal = cx.new(|cx| Terminal::spawn(launch(shell), cx).expect("the shell starts"));
+    let terminal = cx.new(|cx| match Terminal::spawn(launch(shell), cx) {
+        Ok(terminal) => terminal,
+        Err(error) => {
+            let message = format!(
+                "gallery: terminal: cannot start {}: {error:#}",
+                SHELLS[shell].1
+            );
+            log::error!("{message}");
+            Terminal::replay(message.as_bytes(), 92, 12, cx)
+        }
+    });
     sessions.update(cx, |all, _| all.push((pane, terminal.clone())));
     terminal
 }

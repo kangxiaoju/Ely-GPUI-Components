@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, RenderOnce, Role, SharedString, StatefulInteractiveElement, Styled,
-    Window, div, prelude::*, relative,
+    MouseButton, ParentElement, Pixels, Point, RenderOnce, Role, SharedString,
+    StatefulInteractiveElement, Styled, Window, div, prelude::*, relative,
 };
 use smallvec::SmallVec;
 
@@ -14,6 +14,7 @@ use crate::{
 };
 
 type OnClick = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+pub(crate) type OnSecondary = Rc<dyn Fn(Point<Pixels>, &mut Window, &mut App)>;
 
 /// One row of a list: something to lead with, a title and a line under it, and something at the end. It lights on hover when it can be pressed, and stays lit when selected.
 #[derive(IntoElement)]
@@ -36,6 +37,7 @@ pub struct ListItem {
     place: Option<(usize, usize)>,
     tooltip: Option<SharedString>,
     on_click: Option<OnClick>,
+    on_secondary: Option<OnSecondary>,
 }
 
 impl ListItem {
@@ -57,6 +59,7 @@ impl ListItem {
             place: None,
             tooltip: None,
             on_click: None,
+            on_secondary: None,
         }
     }
 
@@ -140,8 +143,21 @@ impl ListItem {
         self.disabled
     }
 
+    pub(crate) fn secondary(&self) -> Option<OnSecondary> {
+        self.on_secondary.clone()
+    }
+
     pub(crate) fn title_text(&self) -> &SharedString {
         &self.title
+    }
+
+    /// Gets a right press, where it fell.
+    pub fn on_secondary(
+        mut self,
+        handler: impl Fn(Point<Pixels>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_secondary = Some(Rc::new(handler));
+        self
     }
 
     /// Makes the row pressable; the press keeps focus where it is.
@@ -183,6 +199,8 @@ impl RenderOnce for ListItem {
             .px_3()
             .py_1p5()
             .min_h(theme.control_height(ControlSize::Lg))
+            // Rows in a uniform list fill it.
+            .w_full()
             .rounded(theme.radius(Radius::Md))
             .border_1()
             .border_color(if self.current {
@@ -202,6 +220,12 @@ impl RenderOnce for ListItem {
                     })
                     .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
                     .on_click(move |event, window, cx| on_click(event, window, cx))
+            })
+            .when_some(self.on_secondary, |row, on_secondary| {
+                row.on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                    cx.stop_propagation();
+                    on_secondary(event.position, window, cx);
+                })
             })
             .children(self.leading.map(|leading| div().flex_none().child(leading)))
             .child(

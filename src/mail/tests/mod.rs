@@ -12,8 +12,10 @@ use crate::{
     theme::Theme,
 };
 
+mod fold;
 mod many;
 mod read;
+mod rows;
 mod sort;
 mod write;
 

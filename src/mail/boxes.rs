@@ -1,15 +1,15 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    Window, div,
+    App, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels, Point, RenderOnce,
+    SharedString, Window, div,
 };
 
 use super::labels::hue_dot;
 use crate::{
     data_display::CountBadge,
     forms::OnValue,
-    lists::{ListItem, Sections},
+    lists::{ListItem, OnFold, Sections},
     primitives::{Icon, IconName},
     theme::{ActiveTheme, IconSize},
 };
@@ -85,13 +85,18 @@ impl Mailbox {
     }
 }
 
+type OnMenu = Rc<dyn Fn(&SharedString, Point<Pixels>, &mut Window, &mut App)>;
+
 /// Mailboxes, folders and labels in sections down a column: a press, an arrow or Enter opens one, and the one open is lit. A box with mail unread stands out with its count.
 #[derive(IntoElement)]
 pub struct MailboxList {
     id: ElementId,
-    sections: Vec<(SharedString, Vec<Mailbox>)>,
+    sections: Vec<(SharedString, Vec<Mailbox>, bool)>,
     open: Option<SharedString>,
     on_open: Option<OnValue>,
+    folded: Vec<SharedString>,
+    on_fold: Option<OnFold>,
+    on_menu: Option<OnMenu>,
 }
 
 impl MailboxList {
@@ -101,36 +106,80 @@ impl MailboxList {
             sections: Vec::new(),
             open: None,
             on_open: None,
+            folded: Vec::new(),
+            on_fold: None,
+            on_menu: None,
         }
     }
 
     /// A section under `title`; a title names one section, and a section holds a box.
     pub fn section(
-        mut self,
+        self,
         title: impl Into<SharedString>,
         boxes: impl IntoIterator<Item = Mailbox>,
     ) -> Self {
-        let title = title.into();
+        self.push(title.into(), boxes, false)
+    }
+
+    /// A section as `section`, but never folded.
+    pub fn fixed_section(
+        self,
+        title: impl Into<SharedString>,
+        boxes: impl IntoIterator<Item = Mailbox>,
+    ) -> Self {
+        self.push(title.into(), boxes, true)
+    }
+
+    fn push(
+        mut self,
+        title: SharedString,
+        boxes: impl IntoIterator<Item = Mailbox>,
+        fixed: bool,
+    ) -> Self {
         let boxes: Vec<Mailbox> = boxes.into_iter().collect();
         assert!(!boxes.is_empty(), "section {title} holds no mailbox");
-        let named = self.sections.iter().any(|(other, _)| *other == title);
+        let named = self.sections.iter().any(|(other, _, _)| *other == title);
         assert!(!named, "section {title} twice");
         for (ix, mailbox) in boxes.iter().enumerate() {
             let seen = self
                 .sections
                 .iter()
-                .flat_map(|(_, boxes)| boxes)
+                .flat_map(|(_, boxes, _)| boxes)
                 .chain(&boxes[..ix])
                 .any(|other| other.key == mailbox.key);
             assert!(!seen, "mailbox {} twice", mailbox.key);
         }
-        self.sections.push((title, boxes));
+        self.sections.push((title, boxes, fixed));
         self
     }
 
     /// The box open now, by key.
     pub fn open(mut self, key: impl Into<SharedString>) -> Self {
         self.open = Some(key.into());
+        self
+    }
+
+    /// The sections folded now, by title.
+    pub fn folded(mut self, titles: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
+        self.folded = titles.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Titles fold; a folded section sums its unread.
+    pub fn on_fold(
+        mut self,
+        handler: impl Fn(&SharedString, bool, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_fold = Some(Rc::new(handler));
+        self
+    }
+
+    /// Gets a box's key and where the right press fell.
+    pub fn on_menu(
+        mut self,
+        handler: impl Fn(&SharedString, Point<Pixels>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_menu = Some(Rc::new(handler));
         self
     }
 
@@ -150,7 +199,7 @@ impl RenderOnce for MailboxList {
             let listed = self
                 .sections
                 .iter()
-                .flat_map(|(_, boxes)| boxes)
+                .flat_map(|(_, boxes, _)| boxes)
                 .any(|mailbox| mailbox.key == *open);
             if !listed {
                 log::error!("mailbox list: no mailbox {open}; none open");
@@ -167,14 +216,45 @@ impl RenderOnce for MailboxList {
         };
         let sections = self.sections.iter().fold(
             Sections::new(self.id.clone()),
-            |sections, (title, boxes)| {
+            |sections, (title, boxes, fixed)| {
                 let rows = boxes
                     .iter()
-                    .map(|mailbox| (mailbox.key.clone(), mailbox.item(&self.id, cx)))
+                    .map(|mailbox| {
+                        let item = mailbox.item(&self.id, cx);
+                        let item = match self.on_menu.clone() {
+                            Some(menu) => {
+                                let key = mailbox.key.clone();
+                                item.on_secondary(move |at, window, cx| menu(&key, at, window, cx))
+                            }
+                            None => item,
+                        };
+                        (mailbox.key.clone(), item)
+                    })
                     .collect();
-                sections.section(title.clone(), rows)
+                let sections = sections.section(title.clone(), rows);
+                let sections = if *fixed { sections.fixed() } else { sections };
+                let unread: u32 = boxes.iter().map(|mailbox| mailbox.unread).sum();
+                match self.folded.contains(title) && unread > 0 {
+                    true => {
+                        let named = title.clone();
+                        let badge = CountBadge::new(
+                            (self.id.clone(), format!("folded-{title}")),
+                            unread as usize,
+                        )
+                        .max(999);
+                        let badge = div()
+                            .debug_selector(move || format!("folded-unread {named}"))
+                            .child(badge);
+                        sections.badge(badge.into_any_element())
+                    }
+                    false => sections,
+                }
             },
         );
+        let sections = match self.on_fold.clone() {
+            Some(on_fold) => sections.foldable(self.folded.clone(), on_fold),
+            None => sections,
+        };
         div().debug_selector(|| "mailbox-list".into()).child(
             sections
                 .selected(self.open)
