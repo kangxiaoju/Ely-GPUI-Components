@@ -17,9 +17,26 @@ use crate::{
     typography::tabular,
 };
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum InitialFit {
+    #[default]
+    Contain,
+    WidthShare { share: f32, enlarge: bool },
+}
+
 /// The zoom that shows the whole picture in the stage, never past actual size.
 pub(crate) fn fit(picture: (f32, f32), stage: (f32, f32)) -> f32 {
     (stage.0 / picture.0).min(stage.1 / picture.1).min(1.0)
+}
+
+fn initial_zoom(picture: (f32, f32), stage: (f32, f32), initial_fit: InitialFit) -> f32 {
+    match initial_fit {
+        InitialFit::Contain => fit(picture, stage),
+        InitialFit::WidthShare { share, enlarge } => {
+            let zoom = stage.0 * share.clamp(0.1, 1.0) / picture.0.max(1.0);
+            if enlarge { zoom } else { zoom.min(1.0) }
+        }
+    }
 }
 
 /// An offset of the picture's middle from the stage's middle, kept so no edge comes inside the stage while the picture overhangs it, and centered where it fits.
@@ -426,7 +443,52 @@ impl RenderOnce for ImageViewer {
 
 #[cfg(test)]
 mod tests {
-    use super::{fit, held, zoom_about};
+    use super::{InitialFit, fit, held, initial_zoom, zoom_about};
+
+    #[test]
+    fn width_share_fit_uses_stage_width_and_may_enlarge() {
+        assert_eq!(
+            initial_zoom(
+                (500.0, 300.0),
+                (1000.0, 600.0),
+                InitialFit::WidthShare {
+                    share: 0.7,
+                    enlarge: true,
+                },
+            ),
+            1.4
+        );
+    }
+
+    #[test]
+    fn width_share_fit_does_not_shrink_for_stage_height() {
+        assert_eq!(
+            initial_zoom(
+                (700.0, 2000.0),
+                (1000.0, 300.0),
+                InitialFit::WidthShare {
+                    share: 0.7,
+                    enlarge: false,
+                },
+            ),
+            1.0
+        );
+    }
+
+    #[test]
+    fn default_fit_keeps_existing_contain_behavior() {
+        let picture = (800.0, 400.0);
+        let stage = (400.0, 300.0);
+
+        assert_eq!(
+            initial_zoom(picture, stage, InitialFit::default()),
+            fit(picture, stage)
+        );
+        assert_eq!(
+            initial_zoom((100.0, 50.0), stage, InitialFit::default()),
+            1.0
+        );
+    }
 
     #[test]
     fn a_big_picture_fits_by_its_tighter_side_and_a_small_one_keeps_its_size() {
