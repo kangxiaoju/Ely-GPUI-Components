@@ -20,7 +20,7 @@ pub(crate) fn head(
     back: &str,
     on: &str,
     step: Step,
-    center: Option<AnyElement>,
+    leading: Option<AnyElement>,
     cx: &App,
 ) -> Div {
     let theme = cx.theme();
@@ -50,14 +50,21 @@ pub(crate) fn head(
         .gap_2()
         .child(
             div()
+                .flex()
                 .flex_1()
-                .min_w(theme.label_width())
+                .min_w_0()
+                .items_center()
+                .justify_start()
+                .children(leading),
+        )
+        .child(
+            div()
+                .flex_none()
                 .text_size(theme.text_size(TextSize::Lg))
                 .font_weight(FontWeight::SEMIBOLD)
                 .text_color(theme.colors.fg)
                 .child(title),
         )
-        .children(center.map(|center| div().flex_none().flex().justify_center().child(center)))
         .child(
             div()
                 .flex()

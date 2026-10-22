@@ -95,6 +95,7 @@ impl RenderOnce for CardHeader {
 #[derive(IntoElement)]
 pub struct Card {
     base: Div,
+    body_grow: bool,
     header: Option<CardHeader>,
     footer: Option<AnyElement>,
     body: SmallVec<[AnyElement; 2]>,
@@ -104,6 +105,7 @@ impl Card {
     pub fn new() -> Self {
         Self {
             base: div(),
+            body_grow: false,
             header: None,
             footer: None,
             body: SmallVec::new(),
@@ -117,6 +119,12 @@ impl Card {
 
     pub fn footer(mut self, footer: impl IntoElement) -> Self {
         self.footer = Some(footer.into_any_element());
+        self
+    }
+
+    /// Lets the body take the card's spare height, for a card whose contents scroll.
+    pub fn body_grow(mut self) -> Self {
+        self.body_grow = true;
         self
     }
 }
@@ -142,7 +150,15 @@ impl RenderOnce for Card {
             .when_some(self.header, |card, header| {
                 card.child(div().px_5().pt_5().child(header))
             })
-            .child(div().p_5().flex().flex_col().gap_3().children(self.body))
+            .child(
+                div()
+                    .p_5()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .when(self.body_grow, |body| body.flex_1().min_h_0())
+                    .children(self.body),
+            )
             .when_some(self.footer, |card, footer| {
                 card.child(
                     div()

@@ -8,6 +8,7 @@ use gpui::{
 use smallvec::SmallVec;
 
 use crate::{
+    primitives::Tooltip,
     theme::{ActiveTheme, ControlSize, Radius, TextSize},
     typography::{Ellipsis, LEADING},
 };
@@ -33,6 +34,7 @@ pub struct ListItem {
     struck: bool,
     /// Its place among its list's rows, from one, and their count.
     place: Option<(usize, usize)>,
+    tooltip: Option<SharedString>,
     on_click: Option<OnClick>,
 }
 
@@ -53,6 +55,7 @@ impl ListItem {
             quiet: false,
             struck: false,
             place: None,
+            tooltip: None,
             on_click: None,
         }
     }
@@ -78,6 +81,12 @@ impl ListItem {
     /// A field in place of the title, as a row renamed in place has it; the title stays the row's name.
     pub fn editor(mut self, editor: impl IntoElement) -> Self {
         self.editor = Some(editor.into_any_element());
+        self
+    }
+
+    /// A tip shown on hover, as a row whose title is cut off has its whole name.
+    pub fn tooltip(mut self, text: impl Into<SharedString>) -> Self {
+        self.tooltip = Some(text.into());
         self
     }
 
@@ -158,6 +167,7 @@ impl RenderOnce for ListItem {
         let pressable = self.on_click.is_some() && !self.disabled;
         div()
             .id(self.id)
+            .when_some(self.tooltip, |row, text| row.tooltip(Tooltip::text(text)))
             .role(Role::ListItem)
             .aria_label(self.title.clone())
             .aria_selected(self.selected)

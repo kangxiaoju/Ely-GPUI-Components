@@ -47,7 +47,7 @@ pub struct CalendarMonthView {
     events: Vec<Event>,
     today: Option<Date>,
     zone: Option<TimeZone>,
-    header_center: Option<AnyElement>,
+    header_leading: Option<AnyElement>,
     on_day: Option<OnDay>,
     on_select: Option<OnDay>,
     on_event: Option<OnValue>,
@@ -74,7 +74,7 @@ impl CalendarMonthView {
             on_month: None,
             day_note: None,
             day_badge: None,
-            header_center: None,
+            header_leading: None,
         }
     }
 
@@ -126,9 +126,9 @@ impl CalendarMonthView {
         self
     }
 
-    /// A control shown in the header's middle, between the month title and the page buttons.
-    pub fn header_center(mut self, element: impl IntoElement) -> Self {
-        self.header_center = Some(element.into_any_element());
+    /// A control shown at the header's left, with the month title centered beside it.
+    pub fn header_leading(mut self, element: impl IntoElement) -> Self {
+        self.header_leading = Some(element.into_any_element());
         self
     }
 
@@ -556,7 +556,7 @@ impl RenderOnce for CalendarMonthView {
                 &back,
                 &on,
                 step,
-                self.header_center,
+                self.header_leading,
                 cx,
             ))
             .child(
