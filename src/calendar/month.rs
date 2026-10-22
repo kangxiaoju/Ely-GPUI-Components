@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, Pixels, RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::*,
-    relative, rems,
+    ParentElement, Pixels, Rems, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::*, relative, rems,
 };
 use jiff::{Timestamp, ToSpan, civil::Date, tz::TimeZone};
 
@@ -48,6 +48,8 @@ pub struct CalendarMonthView {
     today: Option<Date>,
     zone: Option<TimeZone>,
     header_leading: Option<AnyElement>,
+    chip: Option<Rems>,
+    day_rows: Option<usize>,
     on_day: Option<OnDay>,
     on_select: Option<OnDay>,
     on_event: Option<OnValue>,
@@ -75,6 +77,8 @@ impl CalendarMonthView {
             day_note: None,
             day_badge: None,
             header_leading: None,
+            chip: None,
+            day_rows: None,
         }
     }
 
@@ -123,6 +127,18 @@ impl CalendarMonthView {
         badge: impl Fn(Date) -> Option<gpui::SharedString> + 'static,
     ) -> Self {
         self.day_badge = Some(Rc::new(badge));
+        self
+    }
+
+    /// The height of an event chip under a day's number; the theme's otherwise.
+    pub fn chip_height(mut self, chip: Rems) -> Self {
+        self.chip = Some(chip);
+        self
+    }
+
+    /// How many event rows a day holds under its number; the theme's otherwise.
+    pub fn day_rows(mut self, rows: usize) -> Self {
+        self.day_rows = Some(rows);
         self
     }
 
@@ -499,10 +515,10 @@ impl RenderOnce for CalendarMonthView {
         let colors = &theme.colors;
         let rem = window.rem_size();
         let sizes = Metrics {
-            chip: theme.calendar().chip.to_pixels(rem),
+            chip: self.chip.unwrap_or(theme.calendar().chip).to_pixels(rem),
             gap: rems(0.125).to_pixels(rem),
             pad: rems(0.25).to_pixels(rem),
-            rows: theme.calendar().day_rows,
+            rows: self.day_rows.unwrap_or(theme.calendar().day_rows),
         };
         let row = Row {
             id: &self.id,
