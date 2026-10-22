@@ -14,7 +14,10 @@ use super::{
     state::{CodeEditor, EditorEvent},
     syntax::{self, Bracket, brackets, folds},
 };
-use crate::theme::{ActiveTheme, TextSize};
+use crate::{
+    layout::Scrollbar,
+    theme::{ActiveTheme, TextSize},
+};
 
 /// What one render worked out, for the rows the list builds after it.
 #[derive(Default)]
@@ -354,8 +357,14 @@ impl Render for CodeEditor {
                 .left_0()
                 .size_full(),
             );
+        let horizontal = Scrollbar::new(
+            ("editor-scrollbar-x", cx.entity_id().as_u64()),
+            &self.horizontal,
+            gpui::Axis::Horizontal,
+        );
         let root = div()
             .id(("code-editor", cx.entity_id().as_u64()))
+            .relative()
             .key_context(CONTEXT)
             .track_focus(&self.focus)
             .size_full()
@@ -384,6 +393,7 @@ impl Render for CodeEditor {
                     .child(body)
                     .children(self.options.minimap.then(|| self.minimap_view(cx))),
             )
+            .child(horizontal)
             .child(
                 canvas(
                     |_, _, _| {},

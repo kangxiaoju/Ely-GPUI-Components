@@ -73,6 +73,12 @@ fn a_long_line_scrolls_horizontally(cx: &mut TestAppContext) {
     let text = "const value = ".to_string() + &"x".repeat(400);
     let (editor, cx) = editor(&text, cx);
     cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("scrollbar-thumb").is_some(),
+        "a long line shows a horizontal scrollbar thumb"
+    );
     let end = text.encode_utf16().count();
     let before = editor.update_in(cx, |editor, window, cx| {
         editor
