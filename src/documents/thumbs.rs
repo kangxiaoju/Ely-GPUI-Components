@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, ElementId, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce,
-    ScrollHandle, StatefulInteractiveElement, Styled, Window, div, prelude::*,
+    App, ElementId, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    RenderOnce, ScrollHandle, StatefulInteractiveElement, Styled, Window, div, prelude::*,
 };
 
 use super::viewer::{
@@ -67,7 +67,9 @@ impl PageThumbnailList {
 impl RenderOnce for PageThumbnailList {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let scroll = window
-            .use_keyed_state((self.id.clone(), "scroll"), cx, |_, _| ScrollHandle::default())
+            .use_keyed_state((self.id.clone(), "scroll"), cx, |_, _| {
+                ScrollHandle::default()
+            })
             .read(cx)
             .clone();
         let width = cx.theme().label_width().to_pixels(window.rem_size()) * THUMB;

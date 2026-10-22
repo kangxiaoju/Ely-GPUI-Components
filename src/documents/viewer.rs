@@ -182,7 +182,9 @@ impl PageCache {
         self.resources.insert(key, resource);
         self.order.push_back(key);
         while self.pixels > self.budget {
-            let Some(oldest) = self.order.pop_front() else { break };
+            let Some(oldest) = self.order.pop_front() else {
+                break;
+            };
             match self.resources.get(&oldest) {
                 Some(PageResource::Ready { pixels, .. }) => {
                     let pixels = *pixels;
@@ -441,8 +443,8 @@ impl RenderOnce for DocumentViewer {
             (desk.scroll.clone(), desk.page, desk.width, desk.pinning)
         };
         let zoom = self.zoom;
-        let nearby = scroll.top_item().saturating_sub(2)
-            ..(scroll.bottom_item() + 3).min(self.source.len());
+        let nearby =
+            scroll.top_item().saturating_sub(2)..(scroll.bottom_item() + 3).min(self.source.len());
         let requested: HashMap<usize, PageResource> = nearby
             .map(|ix| {
                 let resource = page_resource(
@@ -477,7 +479,9 @@ impl RenderOnce for DocumentViewer {
                     button.on_click(move |_, window, cx| on_zoom(next, window, cx))
                 })
         };
-        let widest = (0..count).map(|page| self.source.size(page).width).fold(0.0, f32::max);
+        let widest = (0..count)
+            .map(|page| self.source.size(page).width)
+            .fold(0.0, f32::max);
         let fit = (width > 0.0 && widest > 0.0)
             .then(|| (width / widest).clamp(STEPS[0], STEPS[STEPS.len() - 1]));
         let header = div()
@@ -563,7 +567,9 @@ impl RenderOnce for DocumentViewer {
                 .id((self.id.clone(), format!("page-{ix}")))
                 .relative()
                 .flex_none()
-                .when(width == 0.0 || shape.width * zoom <= width, |page| page.mx_auto())
+                .when(width == 0.0 || shape.width * zoom <= width, |page| {
+                    page.mx_auto()
+                })
                 .w(Pixels::from(shape.width * zoom))
                 .h(Pixels::from(shape.height * zoom))
                 .bg(colors.paper)

@@ -6,9 +6,7 @@ use gpui::{
     TestAppContext, TouchPhase, VisualTestContext, Window, div, point, px, size,
 };
 
-use super::{
-    DocPage, DocumentViewer, PageHit, PageRequestKind, PageResource, PageSource, ZenMode,
-};
+use super::{DocPage, DocumentViewer, PageHit, PageRequestKind, PageResource, PageSource, ZenMode};
 use crate::{
     editor::FindWidget,
     forms::{Input, TextInput},
@@ -146,7 +144,11 @@ fn document_viewer_requests_only_visible_and_neighbor_pages(cx: &mut TestAppCont
 
     let before = requests.borrow().len();
     settle(cx);
-    assert_eq!(requests.borrow().len(), before, "the same viewport reuses its cache");
+    assert_eq!(
+        requests.borrow().len(),
+        before,
+        "the same viewport reuses its cache"
+    );
 }
 
 #[derive(Clone)]
@@ -199,9 +201,15 @@ fn document_viewer_requests_every_visible_short_page_and_neighbors(cx: &mut Test
         .filter_map(|(page, kind)| (*kind == PageRequestKind::Page).then_some(*page))
         .collect();
     for page in 0..12 {
-        assert!(full.contains(&page), "visible page {page} absent from {full:?}");
+        assert!(
+            full.contains(&page),
+            "visible page {page} absent from {full:?}"
+        );
     }
-    assert!(full.iter().all(|page| *page < 40), "requested remote {full:?}");
+    assert!(
+        full.iter().all(|page| *page < 40),
+        "requested remote {full:?}"
+    );
 }
 
 #[gpui::test]
@@ -265,9 +273,8 @@ fn document_viewer_deduplicates_an_in_flight_page_request(cx: &mut TestAppContex
     cx.update(Theme::init);
     let requests = Rc::new(RefCell::new(0));
     let source = LoadingSource(requests.clone());
-    let (_, cx) = cx.add_window_view(move |_, _| {
-        LoadingReader(source, super::DEFAULT_CACHE_BUDGET)
-    });
+    let (_, cx) =
+        cx.add_window_view(move |_, _| LoadingReader(source, super::DEFAULT_CACHE_BUDGET));
     for _ in 0..4 {
         cx.update(|window, _| window.refresh());
     }
@@ -276,9 +283,7 @@ fn document_viewer_deduplicates_an_in_flight_page_request(cx: &mut TestAppContex
 }
 
 #[gpui::test]
-fn document_viewer_bounds_requests_when_an_async_page_exceeds_the_budget(
-    cx: &mut TestAppContext,
-) {
+fn document_viewer_bounds_requests_when_an_async_page_exceeds_the_budget(cx: &mut TestAppContext) {
     cx.update(Theme::init);
     let requests = Rc::new(RefCell::new(0));
     let source = LoadingSource(requests.clone());
@@ -304,7 +309,10 @@ fn document_viewer_does_not_retain_a_resource_larger_than_its_budget(cx: &mut Te
     let first = requests.borrow().len();
     cx.update(|window, _| window.refresh());
     cx.run_until_parked();
-    assert!(requests.borrow().len() > first, "a zero budget retains no image");
+    assert!(
+        requests.borrow().len() > first,
+        "a zero budget retains no image"
+    );
 }
 
 struct VariableBudget {
@@ -371,8 +379,14 @@ fn document_viewer_requests_the_scrolled_thumbnail_viewport(cx: &mut TestAppCont
         .iter()
         .filter_map(|(page, kind)| (*kind == PageRequestKind::Thumbnail).then_some(*page))
         .collect();
-    assert!(thumbs.iter().any(|page| *page > 250), "requested {thumbs:?}");
-    assert!(thumbs.iter().all(|page| *page > 250), "requested {thumbs:?}");
+    assert!(
+        thumbs.iter().any(|page| *page > 250),
+        "requested {thumbs:?}"
+    );
+    assert!(
+        thumbs.iter().all(|page| *page > 250),
+        "requested {thumbs:?}"
+    );
 }
 
 /// A point on the pages, below the bars, mid-view.

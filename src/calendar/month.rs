@@ -25,6 +25,9 @@ use crate::{
 /// Builds the muted note beside a day's number (lunar date, holiday, …); `None` leaves the day bare.
 pub type DayNote = Rc<dyn Fn(Date) -> Option<gpui::SharedString>>;
 
+/// Marks days whose number reads in the danger color, such as days off work.
+pub type DayAlert = Rc<dyn Fn(Date) -> bool>;
+
 /// i18n keys for the weekday header, Monday first.
 const WEEKDAY_KEYS: [&str; 7] = [
     "calendar.weekday.mon",
@@ -49,6 +52,7 @@ pub struct CalendarMonthView {
     on_event: Option<OnValue>,
     on_month: Option<OnDay>,
     day_note: Option<DayNote>,
+    day_alert: Option<DayAlert>,
 }
 
 impl CalendarMonthView {
@@ -68,6 +72,7 @@ impl CalendarMonthView {
             on_event: None,
             on_month: None,
             day_note: None,
+            day_alert: None,
         }
     }
 
@@ -110,11 +115,14 @@ impl CalendarMonthView {
         self
     }
 
+    /// Paints the number of each day `alert` marks in the danger color, such as days off work.
+    pub fn day_alert(mut self, alert: impl Fn(Date) -> bool + 'static) -> Self {
+        self.day_alert = Some(Rc::new(alert));
+        self
+    }
+
     /// A muted note shown beside each day's number, such as its lunar date or a holiday; the day stays bare where the builder returns `None`.
-    pub fn day_note(
-        mut self,
-        note: impl Fn(Date) -> Option<gpui::SharedString> + 'static,
-    ) -> Self {
+    pub fn day_note(mut self, note: impl Fn(Date) -> Option<gpui::SharedString> + 'static) -> Self {
         self.day_note = Some(Rc::new(note));
         self
     }
@@ -132,6 +140,7 @@ struct Row<'a> {
     open: OnDay,
     on_event: Option<OnValue>,
     day_note: Option<DayNote>,
+    day_alert: Option<DayAlert>,
 }
 
 /// Sizes of a month's rows in pixels: a chip, the gap between rows, and the cell's inset.
@@ -202,11 +211,7 @@ impl Row<'_> {
                 &[
                     (
                         "month",
-                        &i18n::text(
-                            cx,
-                            &format!("calendar.short_month.{}", day.month()),
-                            &[],
-                        ),
+                        &i18n::text(cx, &format!("calendar.short_month.{}", day.month()), &[]),
                     ),
                     ("day", &day.day().to_string()),
                 ],
@@ -214,18 +219,23 @@ impl Row<'_> {
             .to_string(),
             number => number.to_string(),
         };
-        let note = self.day_note.as_ref().and_then(|note| note(day)).map(|text| {
-            div()
-                .min_w_0()
-                .px_1p5()
-                .text_size(theme.text_size(TextSize::Xs))
-                .text_color(colors.fg_subtle)
-                .child(Ellipsis::new(text))
-        });
-        let fg = if day.first_of_month() == self.shown {
-            colors.fg
-        } else {
-            colors.fg_subtle
+        let note = self
+            .day_note
+            .as_ref()
+            .and_then(|note| note(day))
+            .map(|text| {
+                div()
+                    .min_w_0()
+                    .px_1p5()
+                    .text_size(theme.text_size(TextSize::Xs))
+                    .text_color(colors.fg_subtle)
+                    .child(Ellipsis::new(text))
+            });
+        let alert = self.day_alert.as_ref().is_some_and(|alert| alert(day));
+        let fg = match (alert, day.first_of_month() == self.shown) {
+            (true, _) => colors.danger,
+            (false, true) => colors.fg,
+            (false, false) => colors.fg_subtle,
         };
         let (pick, open) = (self.pick.clone(), self.open.clone());
         let more = (more > 0).then(|| {
@@ -478,6 +488,7 @@ impl RenderOnce for CalendarMonthView {
             open,
             on_event: self.on_event.clone(),
             day_note: self.day_note.clone(),
+            day_alert: self.day_alert.clone(),
         };
         let weekday_names = WEEKDAY_KEYS.map(|key| i18n::text(cx, key, &[]));
         let weekdays = div().flex().children(weekday_names.map(|name| {
