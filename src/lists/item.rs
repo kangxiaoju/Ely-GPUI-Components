@@ -8,6 +8,7 @@ use gpui::{
 use smallvec::SmallVec;
 
 use crate::{
+    data_display::Tone,
     theme::{ActiveTheme, ControlSize, Radius, TextSize},
     typography::{Ellipsis, LEADING},
 };
@@ -30,6 +31,7 @@ pub struct ListItem {
     disabled: bool,
     strong: bool,
     quiet: bool,
+    tone: Tone,
     struck: bool,
     /// Its place among its list's rows, from one, and their count.
     place: Option<(usize, usize)>,
@@ -51,6 +53,7 @@ impl ListItem {
             disabled: false,
             strong: false,
             quiet: false,
+            tone: Tone::Neutral,
             struck: false,
             place: None,
             on_click: None,
@@ -66,6 +69,12 @@ impl ListItem {
     /// Sets the title in the quiet color, as a muted channel has it.
     pub fn quiet(mut self, quiet: bool) -> Self {
         self.quiet = quiet;
+        self
+    }
+
+    /// Tints the title, as a row that is out of sync or needs attention has it.
+    pub fn tone(mut self, tone: impl Into<Tone>) -> Self {
+        self.tone = tone.into();
         self
     }
 
@@ -206,10 +215,10 @@ impl RenderOnce for ListItem {
                             .text_size(theme.text_size(TextSize::Base))
                             .when(self.strong, |title| title.font_weight(FontWeight::SEMIBOLD))
                             .when(self.struck, |title| title.line_through())
-                            .text_color(if self.quiet {
-                                colors.fg_muted
-                            } else {
-                                colors.fg
+                            .text_color(match (self.tone, self.quiet) {
+                                (Tone::Neutral, true) => colors.fg_muted,
+                                (Tone::Neutral, false) => colors.fg,
+                                (tone, _) => tone.colors(colors).1,
                             })
                             .into_any_element(),
                     })
