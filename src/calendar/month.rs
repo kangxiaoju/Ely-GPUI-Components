@@ -45,6 +45,7 @@ pub struct CalendarMonthView {
     today: Option<Date>,
     zone: Option<TimeZone>,
     on_day: Option<OnDay>,
+    on_select: Option<OnDay>,
     on_event: Option<OnValue>,
     on_month: Option<OnDay>,
     day_note: Option<DayNote>,
@@ -63,6 +64,7 @@ impl CalendarMonthView {
             today: None,
             zone: None,
             on_day: None,
+            on_select: None,
             on_event: None,
             on_month: None,
             day_note: None,
@@ -78,6 +80,12 @@ impl CalendarMonthView {
     /// The zone its days and hours read in; the system's otherwise.
     pub fn zone(mut self, zone: TimeZone) -> Self {
         self.zone = Some(zone);
+        self
+    }
+
+    /// Gets each day as the cursor lands on it: a press, the arrow keys, or a page turn's first day.
+    pub fn on_select(mut self, handler: impl Fn(Date, &mut Window, &mut App) + 'static) -> Self {
+        self.on_select = Some(Rc::new(handler));
         self
     }
 
@@ -391,12 +399,16 @@ impl RenderOnce for CalendarMonthView {
         };
         let pick: OnDay = {
             let cursor = cursor.clone();
+            let (on_select, turn) = (self.on_select.clone(), turn.clone());
             Rc::new(move |day, window, cx| {
                 cursor.update(cx, |cursor, cx| {
                     *cursor = day;
                     cx.notify();
                 });
                 turn(day, window, cx);
+                if let Some(on_select) = &on_select {
+                    on_select(day, window, cx);
+                }
             })
         };
         let open: OnDay = {
