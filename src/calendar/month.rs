@@ -191,7 +191,9 @@ impl Metrics {
 
 impl Row<'_> {
     fn chip(&self, id: String, event: &Event) -> EventChip {
-        let chip = EventChip::new((self.id.clone(), id), event.clone()).zone(self.zone.clone());
+        let chip = EventChip::new((self.id.clone(), id), event.clone())
+            .zone(self.zone.clone())
+            .tooltip(event.title.clone());
         match self.on_event.clone() {
             Some(on_event) => {
                 let key = event.key.clone();
