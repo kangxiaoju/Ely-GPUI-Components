@@ -28,6 +28,9 @@ pub type DayNote = Rc<dyn Fn(Date) -> Option<gpui::SharedString>>;
 /// Marks days whose number reads in the danger color, such as days off work.
 pub type DayAlert = Rc<dyn Fn(Date) -> bool>;
 
+/// Builds the short badge at a day's top-right corner, such as "休" for a day off; `None` leaves the corner bare.
+pub type DayBadge = Rc<dyn Fn(Date) -> Option<gpui::SharedString>>;
+
 /// i18n keys for the weekday header, Monday first.
 const WEEKDAY_KEYS: [&str; 7] = [
     "calendar.weekday.mon",
@@ -53,6 +56,7 @@ pub struct CalendarMonthView {
     on_month: Option<OnDay>,
     day_note: Option<DayNote>,
     day_alert: Option<DayAlert>,
+    day_badge: Option<DayBadge>,
 }
 
 impl CalendarMonthView {
@@ -73,6 +77,7 @@ impl CalendarMonthView {
             on_month: None,
             day_note: None,
             day_alert: None,
+            day_badge: None,
         }
     }
 
@@ -121,6 +126,15 @@ impl CalendarMonthView {
         self
     }
 
+    /// A short badge at each day's top-right corner, such as "休" for a day off.
+    pub fn day_badge(
+        mut self,
+        badge: impl Fn(Date) -> Option<gpui::SharedString> + 'static,
+    ) -> Self {
+        self.day_badge = Some(Rc::new(badge));
+        self
+    }
+
     /// A muted note shown beside each day's number, such as its lunar date or a holiday; the day stays bare where the builder returns `None`.
     pub fn day_note(mut self, note: impl Fn(Date) -> Option<gpui::SharedString> + 'static) -> Self {
         self.day_note = Some(Rc::new(note));
@@ -141,6 +155,7 @@ struct Row<'a> {
     on_event: Option<OnValue>,
     day_note: Option<DayNote>,
     day_alert: Option<DayAlert>,
+    day_badge: Option<DayBadge>,
 }
 
 /// Sizes of a month's rows in pixels: a chip, the gap between rows, and the cell's inset.
@@ -219,6 +234,7 @@ impl Row<'_> {
             .to_string(),
             number => number.to_string(),
         };
+        let alert = self.day_alert.as_ref().is_some_and(|alert| alert(day));
         let note = self
             .day_note
             .as_ref()
@@ -228,10 +244,27 @@ impl Row<'_> {
                     .min_w_0()
                     .px_1p5()
                     .text_size(theme.text_size(TextSize::Xs))
-                    .text_color(colors.fg_subtle)
+                    .text_color(if alert {
+                        colors.danger
+                    } else {
+                        colors.fg_subtle
+                    })
                     .child(Ellipsis::new(text))
             });
-        let alert = self.day_alert.as_ref().is_some_and(|alert| alert(day));
+        let badge = self
+            .day_badge
+            .as_ref()
+            .and_then(|badge| badge(day))
+            .map(|text| {
+                div()
+                    .flex_none()
+                    .px_1()
+                    .rounded(theme.radius(Radius::Sm))
+                    .bg(colors.danger_subtle)
+                    .text_size(theme.text_size(TextSize::Xs))
+                    .text_color(colors.danger)
+                    .child(text)
+            });
         let fg = match (alert, day.first_of_month() == self.shown) {
             (true, _) => colors.danger,
             (false, true) => colors.fg,
@@ -303,7 +336,6 @@ impl Row<'_> {
                     .h(sizes.chip)
                     .flex()
                     .items_center()
-                    .justify_between()
                     .gap_1()
                     .child(
                         div()
@@ -320,7 +352,10 @@ impl Row<'_> {
                             })
                             .child(label),
                     )
-                    .children(note),
+                    .children(note)
+                    .when(badge.is_some(), |row| {
+                        row.child(div().flex_1()).children(badge)
+                    }),
             )
             .children((0..lanes).map(|_| div().flex_none().h(sizes.chip)))
             .children(on.iter().take(shown).map(|&ix| {
@@ -489,6 +524,7 @@ impl RenderOnce for CalendarMonthView {
             on_event: self.on_event.clone(),
             day_note: self.day_note.clone(),
             day_alert: self.day_alert.clone(),
+            day_badge: self.day_badge.clone(),
         };
         let weekday_names = WEEKDAY_KEYS.map(|key| i18n::text(cx, key, &[]));
         let weekdays = div().flex().children(weekday_names.map(|name| {
