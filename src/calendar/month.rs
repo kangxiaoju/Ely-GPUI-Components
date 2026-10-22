@@ -25,9 +25,6 @@ use crate::{
 /// Builds the muted note beside a day's number (lunar date, holiday, …); `None` leaves the day bare.
 pub type DayNote = Rc<dyn Fn(Date) -> Option<gpui::SharedString>>;
 
-/// Marks days whose number reads in the danger color, such as days off work.
-pub type DayAlert = Rc<dyn Fn(Date) -> bool>;
-
 /// Builds the short badge at a day's top-right corner, such as "休" for a day off; `None` leaves the corner bare.
 pub type DayBadge = Rc<dyn Fn(Date) -> Option<gpui::SharedString>>;
 
@@ -55,7 +52,6 @@ pub struct CalendarMonthView {
     on_event: Option<OnValue>,
     on_month: Option<OnDay>,
     day_note: Option<DayNote>,
-    day_alert: Option<DayAlert>,
     day_badge: Option<DayBadge>,
 }
 
@@ -76,7 +72,6 @@ impl CalendarMonthView {
             on_event: None,
             on_month: None,
             day_note: None,
-            day_alert: None,
             day_badge: None,
         }
     }
@@ -120,12 +115,6 @@ impl CalendarMonthView {
         self
     }
 
-    /// Paints the number of each day `alert` marks in the danger color, such as days off work.
-    pub fn day_alert(mut self, alert: impl Fn(Date) -> bool + 'static) -> Self {
-        self.day_alert = Some(Rc::new(alert));
-        self
-    }
-
     /// A short badge at each day's top-right corner, such as "休" for a day off.
     pub fn day_badge(
         mut self,
@@ -154,7 +143,6 @@ struct Row<'a> {
     open: OnDay,
     on_event: Option<OnValue>,
     day_note: Option<DayNote>,
-    day_alert: Option<DayAlert>,
     day_badge: Option<DayBadge>,
 }
 
@@ -234,7 +222,6 @@ impl Row<'_> {
             .to_string(),
             number => number.to_string(),
         };
-        let alert = self.day_alert.as_ref().is_some_and(|alert| alert(day));
         let note = self
             .day_note
             .as_ref()
@@ -244,11 +231,7 @@ impl Row<'_> {
                     .min_w_0()
                     .px_1p5()
                     .text_size(theme.text_size(TextSize::Xs))
-                    .text_color(if alert {
-                        colors.danger
-                    } else {
-                        colors.fg_subtle
-                    })
+                    .text_color(colors.fg_subtle)
                     .child(Ellipsis::new(text))
             });
         let badge = self
@@ -265,10 +248,11 @@ impl Row<'_> {
                     .text_color(colors.danger)
                     .child(text)
             });
-        let fg = match (alert, day.first_of_month() == self.shown) {
-            (true, _) => colors.danger,
-            (false, true) => colors.fg,
-            (false, false) => colors.fg_subtle,
+        let has_badge = badge.is_some();
+        let fg = if day.first_of_month() == self.shown {
+            colors.fg
+        } else {
+            colors.fg_subtle
         };
         let (pick, open) = (self.pick.clone(), self.open.clone());
         let more = (more > 0).then(|| {
@@ -336,6 +320,7 @@ impl Row<'_> {
                     .h(sizes.chip)
                     .flex()
                     .items_center()
+                    .justify_between()
                     .gap_1()
                     .child(
                         div()
@@ -352,11 +337,10 @@ impl Row<'_> {
                             })
                             .child(label),
                     )
-                    .children(note)
-                    .when(badge.is_some(), |row| {
-                        row.child(div().flex_1()).children(badge)
-                    }),
+                    .when(has_badge, |row| row.pr_6())
+                    .children(note),
             )
+            .children(badge.map(|badge| badge.absolute().top_1().right_1()))
             .children((0..lanes).map(|_| div().flex_none().h(sizes.chip)))
             .children(on.iter().take(shown).map(|&ix| {
                 let event = &self.events[ix];
@@ -523,7 +507,6 @@ impl RenderOnce for CalendarMonthView {
             open,
             on_event: self.on_event.clone(),
             day_note: self.day_note.clone(),
-            day_alert: self.day_alert.clone(),
             day_badge: self.day_badge.clone(),
         };
         let weekday_names = WEEKDAY_KEYS.map(|key| i18n::text(cx, key, &[]));
