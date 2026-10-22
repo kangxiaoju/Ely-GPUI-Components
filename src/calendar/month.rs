@@ -47,6 +47,7 @@ pub struct CalendarMonthView {
     events: Vec<Event>,
     today: Option<Date>,
     zone: Option<TimeZone>,
+    header_center: Option<AnyElement>,
     on_day: Option<OnDay>,
     on_select: Option<OnDay>,
     on_event: Option<OnValue>,
@@ -73,6 +74,7 @@ impl CalendarMonthView {
             on_month: None,
             day_note: None,
             day_badge: None,
+            header_center: None,
         }
     }
 
@@ -121,6 +123,12 @@ impl CalendarMonthView {
         badge: impl Fn(Date) -> Option<gpui::SharedString> + 'static,
     ) -> Self {
         self.day_badge = Some(Rc::new(badge));
+        self
+    }
+
+    /// A control shown in the header's middle, between the month title and the page buttons.
+    pub fn header_center(mut self, element: impl IntoElement) -> Self {
+        self.header_center = Some(element.into_any_element());
         self
     }
 
@@ -542,7 +550,15 @@ impl RenderOnce for CalendarMonthView {
             .flex()
             .flex_col()
             .gap_3()
-            .child(head(&self.id, title, &back, &on, step, cx))
+            .child(head(
+                &self.id,
+                title,
+                &back,
+                &on,
+                step,
+                self.header_center,
+                cx,
+            ))
             .child(
                 div().flex().flex_col().child(weekdays).child(
                     div()

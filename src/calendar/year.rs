@@ -315,6 +315,7 @@ impl RenderOnce for YearView {
                 "Previous year",
                 "Next year",
                 step,
+                None,
                 cx,
             ))
             .child(

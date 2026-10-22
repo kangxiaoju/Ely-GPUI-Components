@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use gpui::{App, Div, ElementId, FontWeight, ParentElement, Styled, Window, div};
+use gpui::{AnyElement, App, Div, ElementId, FontWeight, ParentElement, Styled, Window, div};
 use jiff::civil::Date;
 
 use crate::{
@@ -20,6 +20,7 @@ pub(crate) fn head(
     back: &str,
     on: &str,
     step: Step,
+    center: Option<AnyElement>,
     cx: &App,
 ) -> Div {
     let theme = cx.theme();
@@ -56,10 +57,12 @@ pub(crate) fn head(
                 .text_color(theme.colors.fg)
                 .child(title),
         )
+        .children(center.map(|center| div().flex_none().flex().justify_center().child(center)))
         .child(
             div()
-                .flex_none()
                 .flex()
+                .flex_1()
+                .justify_end()
                 .items_center()
                 .gap_1()
                 .child(today)
