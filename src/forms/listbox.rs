@@ -123,7 +123,7 @@ impl RenderOnce for ListBox {
                     Some(on),
                     cx,
                 )
-                .when(!choice.disabled, |row| {
+                .when(choice.pickable(), |row| {
                     row.on_click(move |_, window, cx| press(ix, window, cx))
                 })
             })
@@ -153,7 +153,7 @@ impl RenderOnce for ListBox {
                     "up" => step(&keys, at, -1),
                     "home" => step(&keys, count - 1, 1),
                     "end" => step(&keys, 0, -1),
-                    "enter" | "space" if !keys[at].disabled => {
+                    "enter" | "space" if keys[at].pickable() => {
                         cx.stop_propagation();
                         press(at, window, cx);
                         return;

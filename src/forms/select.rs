@@ -179,7 +179,7 @@ pub(crate) fn listing(
     let pick: Pick = {
         let (rows, picker) = (rows.clone(), picker.clone());
         Rc::new(move |ix, window, cx| {
-            if rows[ix].disabled {
+            if !rows[ix].pickable() {
                 return;
             }
             Picker::show(&picker, false, ix, cx);

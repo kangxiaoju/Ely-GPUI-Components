@@ -81,7 +81,7 @@ impl RenderOnce for MultiSelect {
         let (choices, selected) = (Rc::new(self.choices), Rc::new(self.selected));
         let start = choices
             .iter()
-            .position(|choice| !choice.disabled && selected.contains(&choice.value))
+            .position(|choice| choice.pickable() && selected.contains(&choice.value))
             .unwrap_or_else(|| step(&choices, choices.len() - 1, 1));
         if picker.read(cx).highlighted >= choices.len() {
             picker.update(cx, |picker, _| picker.highlighted = start);
@@ -113,7 +113,7 @@ impl RenderOnce for MultiSelect {
                 commit.clone(),
             );
             Rc::new(move |ix, window, cx| {
-                if choices[ix].disabled {
+                if !choices[ix].pickable() {
                     return;
                 }
                 Picker::show(&picker, true, ix, cx);
