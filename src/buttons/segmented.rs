@@ -17,11 +17,18 @@ use crate::{
 
 type OnChange = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
 
+struct Segment {
+    value: SharedString,
+    label: SharedString,
+    icon: Option<IconName>,
+    badge: Option<usize>,
+}
+
 /// Mutually exclusive segments. A thumb slides to the chosen one. Too narrow for every label in full, segments that all have icons show only their icons, each label a tooltip; otherwise labels end in an ellipsis, down to twice a control's height each. Narrower still, the strip scrolls sideways and a focused segment comes into view.
 #[derive(IntoElement)]
 pub struct SegmentedControl {
     id: ElementId,
-    segments: Vec<(SharedString, SharedString, Option<IconName>)>,
+    segments: Vec<Segment>,
     selected: SharedString,
     size: ControlSize,
     on_change: Option<OnChange>,
@@ -44,7 +51,30 @@ impl SegmentedControl {
         label: impl Into<SharedString>,
         icon: Option<IconName>,
     ) -> Self {
-        self.segments.push((value.into(), label.into(), icon));
+        self.segments.push(Segment {
+            value: value.into(),
+            label: label.into(),
+            icon,
+            badge: None,
+        });
+        self
+    }
+
+    /// Adds a segment with a count badge at its top-right corner. A zero count
+    /// hides the badge; counts above 99 render as `99+`.
+    pub fn segment_badge(
+        mut self,
+        value: impl Into<SharedString>,
+        label: impl Into<SharedString>,
+        icon: Option<IconName>,
+        badge: usize,
+    ) -> Self {
+        self.segments.push(Segment {
+            value: value.into(),
+            label: label.into(),
+            icon,
+            badge: (badge > 0).then_some(badge),
+        });
         self
     }
 
@@ -67,7 +97,7 @@ impl RenderOnce for SegmentedControl {
         let values: Vec<SharedString> = self
             .segments
             .iter()
-            .map(|(value, ..)| value.clone())
+            .map(|segment| segment.value.clone())
             .collect();
         let chosen = values.iter().position(|value| *value == self.selected);
         let (state, marker) = slide(self.id.clone(), &values, &self.selected, window, cx);
@@ -98,7 +128,7 @@ impl RenderOnce for SegmentedControl {
         let strip =
             window.use_keyed_state((self.id.clone(), "strip-width"), cx, |_, _| Pixels::ZERO);
         let shown = *strip.read(cx);
-        let compact = self.segments.iter().all(|(_, _, icon)| icon.is_some())
+        let compact = self.segments.iter().all(|segment| segment.icon.is_some())
             && shown > Pixels::ZERO
             && shown < natural(&self.segments, self.size, window, cx);
         let theme = cx.theme();
@@ -133,82 +163,113 @@ impl RenderOnce for SegmentedControl {
                     )
             },
         );
-        let segments = self
-            .segments
-            .into_iter()
-            .enumerate()
-            .map(|(ix, (value, label, icon))| {
-                let on = Some(ix) == chosen;
-                let fg = if on { colors.fg } else { colors.fg_muted };
-                let (focus, reveal) = stops.remove(0);
-                let (named, labeled) = (value.clone(), value.clone());
-                let spoken = if label.is_empty() {
-                    value.clone()
+        let segments = self.segments.into_iter().enumerate().map(|(ix, segment)| {
+            let Segment {
+                value,
+                label,
+                icon,
+                badge,
+            } = segment;
+            let on = Some(ix) == chosen;
+            let fg = if on { colors.fg } else { colors.fg_muted };
+            let (focus, reveal) = stops.remove(0);
+            let (named, labeled) = (value.clone(), value.clone());
+            let spoken = if label.is_empty() {
+                value.clone()
+            } else {
+                label.clone()
+            };
+            let (change, measure) = (self.on_change.clone(), state.clone());
+            let segment = div()
+                .id(("segment", ix))
+                .role(Role::RadioButton)
+                .aria_toggled(on.into())
+                .aria_label(spoken)
+                .relative()
+                .flex()
+                .flex_auto()
+                .min_w_0()
+                .items_center()
+                .justify_center()
+                .gap_1p5()
+                .h(theme.control_height(self.size))
+                .px(theme.control_padding(self.size))
+                .rounded(theme.radius(Radius::Md))
+                .border_1()
+                .border_color(gpui::transparent_black())
+                .text_size(theme.text_size(text))
+                .font_weight(if on {
+                    FontWeight::SEMIBOLD
                 } else {
-                    label.clone()
-                };
-                let (change, measure) = (self.on_change.clone(), state.clone());
-                let segment = div()
-                    .id(("segment", ix))
-                    .role(Role::RadioButton)
-                    .aria_toggled(on.into())
-                    .aria_label(spoken)
-                    .relative()
-                    .flex()
-                    .flex_auto()
-                    .min_w_0()
-                    .items_center()
-                    .justify_center()
-                    .gap_1p5()
-                    .h(theme.control_height(self.size))
-                    .px(theme.control_padding(self.size))
-                    .rounded(theme.radius(Radius::Md))
-                    .border_1()
-                    .border_color(gpui::transparent_black())
-                    .text_size(theme.text_size(text))
-                    .font_weight(if on {
-                        FontWeight::SEMIBOLD
+                    FontWeight::MEDIUM
+                })
+                .text_color(fg)
+                .debug_selector(move || format!("segment {named}"))
+                .cursor_pointer()
+                .track_focus(&focus)
+                .focus_ring(cx)
+                .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
+                .on_click(move |_, window, cx| {
+                    if on {
+                        return;
+                    }
+                    log::info!("segmented control: {value}");
+                    if let Some(change) = &change {
+                        change(&value, window, cx);
+                    }
+                })
+                .when_some(icon, |segment, icon| {
+                    segment.child(Icon::new(icon).size(icon_size).color(fg))
+                })
+                .when(compact, |segment| {
+                    segment.tooltip(Tooltip::text(label.clone()))
+                })
+                .when(!label.is_empty() && !compact, |segment| {
+                    segment.child(
+                        div()
+                            .min_w_0()
+                            .debug_selector(move || format!("segment-label {labeled}"))
+                            .child(Ellipsis::new(label)),
+                    )
+                })
+                .when_some(badge, |segment, badge| {
+                    let label = if badge > 99 {
+                        "99+".to_string()
                     } else {
-                        FontWeight::MEDIUM
-                    })
-                    .text_color(fg)
-                    .debug_selector(move || format!("segment {named}"))
-                    .cursor_pointer()
-                    .track_focus(&focus)
-                    .focus_ring(cx)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
-                    .on_click(move |_, window, cx| {
-                        if on {
-                            return;
-                        }
-                        log::info!("segmented control: {value}");
-                        if let Some(change) = &change {
-                            change(&value, window, cx);
-                        }
-                    })
-                    .when_some(icon, |segment, icon| {
-                        segment.child(Icon::new(icon).size(icon_size).color(fg))
-                    })
-                    .when(compact, |segment| {
-                        segment.tooltip(Tooltip::text(label.clone()))
-                    })
-                    .when(!label.is_empty() && !compact, |segment| {
-                        segment.child(
-                            div()
-                                .min_w_0()
-                                .debug_selector(move || format!("segment-label {labeled}"))
-                                .child(Ellipsis::new(label)),
-                        )
-                    });
-                div()
-                    .relative()
-                    .flex()
-                    .flex_auto()
-                    .min_w_0()
-                    .child(segment)
-                    .child(measure_item(measure, ix, Axis::Horizontal))
-                    .child(reveal)
-            });
+                        badge.to_string()
+                    };
+                    segment.child(
+                        div()
+                            .absolute()
+                            .top(rems(0.05))
+                            .right(rems(0.15))
+                            .min_w(rems(0.8))
+                            .h(rems(0.8))
+                            .px_1()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded_full()
+                            .text_size(theme.text_size(crate::theme::TextSize::Xs))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .bg(if on { colors.accent } else { colors.active })
+                            .text_color(if on {
+                                colors.on_accent
+                            } else {
+                                colors.fg_muted
+                            })
+                            .child(label),
+                    )
+                });
+            div()
+                .relative()
+                .flex()
+                .flex_auto()
+                .min_w_0()
+                .child(segment)
+                .child(measure_item(measure, ix, Axis::Horizontal))
+                .child(reveal)
+        });
         let control = div()
             .id(self.id.clone())
             .relative()
@@ -239,20 +300,21 @@ impl RenderOnce for SegmentedControl {
 }
 
 /// Every label and icon in full, with padding: the width that cuts none.
-fn natural(
-    segments: &[(SharedString, SharedString, Option<IconName>)],
-    size: ControlSize,
-    window: &Window,
-    cx: &App,
-) -> Pixels {
+fn natural(segments: &[Segment], size: ControlSize, window: &Window, cx: &App) -> Pixels {
     let theme = cx.theme();
     let rem = window.rem_size();
     let (text, icon) = label_size(size);
     let pad = (theme.control_padding(size).to_pixels(rem) + theme.hairline()) * 2.0;
     let glyph = theme.icon_size(icon).to_pixels(rem) + rems(0.375).to_pixels(rem);
     let strip = (rems(0.125).to_pixels(rem) + theme.hairline()) * 2.0;
-    segments.iter().fold(strip, |sum, (_, label, icon)| {
-        let width = text_width(label, text, FontWeight::SEMIBOLD, window, cx);
-        sum + pad + width + if icon.is_some() { glyph } else { Pixels::ZERO }
+    segments.iter().fold(strip, |sum, segment| {
+        let width = text_width(&segment.label, text, FontWeight::SEMIBOLD, window, cx);
+        sum + pad
+            + width
+            + if segment.icon.is_some() {
+                glyph
+            } else {
+                Pixels::ZERO
+            }
     })
 }
