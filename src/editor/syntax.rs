@@ -7,27 +7,34 @@ use crate::forms::{Kind, Syntax, code_highlights_with, lex};
 
 /// Each line that opens a block, and the last line the block holds, read from indentation.
 pub(crate) fn folds(buffer: &Buffer) -> Vec<(usize, usize)> {
-    let blank = |line: usize| buffer.line(line).trim().is_empty();
     let mut out = Vec::new();
+    let mut stack: Vec<(usize, usize, Option<usize>)> = Vec::new();
     for line in 0..buffer.lines() {
-        if blank(line) {
+        let text = buffer.line(line);
+        if text.trim().is_empty() {
             continue;
         }
         let indent = buffer.indent(line);
-        let mut end = None;
-        for next in line + 1..buffer.lines() {
-            if blank(next) {
-                continue;
-            }
-            if buffer.indent(next) <= indent {
+        while let Some(&(_, level, _)) = stack.last() {
+            if level < indent {
                 break;
             }
-            end = Some(next);
+            let (header, _, descendant) = stack.pop().expect("the stack has a last entry");
+            if let Some(end) = descendant {
+                out.push((header, end));
+            }
         }
-        if let Some(end) = end {
-            out.push((line, end));
+        for (_, _, descendant) in &mut stack {
+            *descendant = Some(line);
+        }
+        stack.push((line, indent, None));
+    }
+    for (header, _, descendant) in stack {
+        if let Some(end) = descendant {
+            out.push((header, end));
         }
     }
+    out.sort_unstable();
     out
 }
 
@@ -195,5 +202,16 @@ mod tests {
         let buffer = Buffer::new("let total = total_cost + total;");
         let found = occurrences(&buffer, "total", 0..1);
         assert_eq!(found, [4..9, 25..30]);
+    }
+    #[test]
+    fn deeply_indented_lines_fold_in_one_forward_pass() {
+        let text = (0..10_000)
+            .map(|line| format!("{}line{line}", " ".repeat(line % 20)))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let buffer = Buffer::new(text);
+        let found = folds(&buffer);
+        assert!(!found.is_empty());
+        assert!(found.iter().all(|(start, end)| start < end));
     }
 }

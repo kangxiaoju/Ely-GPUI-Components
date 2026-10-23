@@ -2,12 +2,13 @@ use std::{cell::Cell, path::PathBuf, rc::Rc};
 
 use gpui::{
     Bounds, Context, InteractiveElement, IntoElement, Modifiers, MouseButton, MouseDownEvent,
-    MouseUpEvent, ParentElement, Pixels, Render, ScrollDelta, ScrollWheelEvent, Styled,
-    TestAppContext, TouchPhase, VisualTestContext, Window, div, point, px,
+    MouseUpEvent, ParentElement, Pixels, Render, ScrollDelta, ScrollHandle, ScrollWheelEvent,
+    StatefulInteractiveElement, Styled, TestAppContext, TouchPhase, VisualTestContext, Window, div,
+    point, px,
 };
 
 use super::{picture, press, settle, setup};
-use crate::media::{ImageThumbnail, ImageViewer};
+use crate::media::{ImageThumbnail, ImageViewer, InitialFit};
 
 /// A viewer 400 by 300 over a picture the test may change.
 struct Viewing(PathBuf);
@@ -27,6 +28,54 @@ fn viewing(path: PathBuf, cx: &mut TestAppContext) -> &mut VisualTestContext {
     cx.update(|window, _| window.activate_window());
     settle(cx);
     cx
+}
+
+/// A viewer whose initial fit can change without changing its picture.
+struct FitChanging {
+    path: PathBuf,
+    fit: InitialFit,
+}
+
+impl Render for FitChanging {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .w(px(400.0))
+            .h(px(300.0))
+            .child(ImageViewer::new("viewer", self.path.clone()).initial_fit(self.fit))
+    }
+}
+
+/// A width-share viewer in a fixed, vertically scrollable host.
+struct WidthViewing(PathBuf, ScrollHandle);
+
+impl Render for WidthViewing {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .id("width-viewer-host")
+            .debug_selector(|| "width-viewer-host".into())
+            .w(px(500.0))
+            .h(px(300.0))
+            .overflow_y_scroll()
+            .track_scroll(&self.1)
+            .child(
+                ImageViewer::new("viewer", self.0.clone()).initial_fit(InitialFit::WidthShare {
+                    share: 0.7,
+                    enlarge: true,
+                }),
+            )
+    }
+}
+
+fn width_viewing(path: PathBuf, cx: &mut TestAppContext) -> (ScrollHandle, &mut VisualTestContext) {
+    setup(cx);
+    let scroll = ScrollHandle::new();
+    let (_, cx) = cx.add_window_view({
+        let scroll = scroll.clone();
+        move |_, _| WidthViewing(path, scroll)
+    });
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    (scroll, cx)
 }
 
 /// A press on the stage, which takes focus as a user's would.
@@ -63,6 +112,137 @@ fn shown(cx: &mut VisualTestContext) -> Bounds<Pixels> {
 }
 
 #[gpui::test]
+fn width_share_uses_seventy_percent_of_the_fixed_host(cx: &mut TestAppContext) {
+    let (_, cx) = width_viewing(picture("width-share", 1000, 500), cx);
+    let host = cx
+        .debug_bounds("width-viewer-host")
+        .expect("the host draws");
+    let picture = shown(cx);
+    let expected = host.size.width * 0.7;
+
+    assert!(
+        (picture.size.width - expected).abs() < px(2.0),
+        "the picture is {picture:?}, not about 70% of {host:?}"
+    );
+}
+
+#[gpui::test]
+fn width_share_may_enlarge_a_small_picture_past_its_pixels(cx: &mut TestAppContext) {
+    let (_, cx) = width_viewing(picture("width-share-small", 100, 50), cx);
+    let picture = shown(cx);
+
+    assert!(
+        picture.size.width > px(100.0),
+        "the small picture is enlarged: {picture:?}"
+    );
+}
+
+#[gpui::test]
+fn a_tall_width_share_picture_gives_the_host_scrollable_height(cx: &mut TestAppContext) {
+    let (scroll, cx) = width_viewing(picture("width-share-tall", 200, 1200), cx);
+    let host = cx
+        .debug_bounds("width-viewer-host")
+        .expect("the host draws");
+    let picture = shown(cx);
+    let stage = cx
+        .debug_bounds("image-viewer-stage")
+        .expect("the stage draws");
+    let top_inset = picture.top() - stage.top();
+    assert!(
+        (px(0.0)..=px(1.0)).contains(&top_inset),
+        "the tall picture starts at the stage content top, inside its 1px border: {picture:?} in {stage:?}"
+    );
+    assert!(
+        picture.size.height > host.size.height,
+        "the picture provides natural height beyond the viewport: {picture:?} in {host:?}"
+    );
+
+    cx.simulate_event(ScrollWheelEvent {
+        position: host.center(),
+        delta: ScrollDelta::Pixels(point(px(0.0), px(-100.0))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    settle(cx);
+    assert!(
+        scroll.offset().y < px(0.0),
+        "the host scrolls through the picture"
+    );
+}
+
+#[gpui::test]
+fn changing_initial_fit_resets_zoom_but_preserves_rotation(cx: &mut TestAppContext) {
+    setup(cx);
+    let (view, cx) = cx.add_window_view(|_, _| FitChanging {
+        path: picture("fit-change", 200, 100),
+        fit: InitialFit::Contain,
+    });
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    focus_stage(cx);
+    press("r", cx);
+    assert!(
+        shown(cx).size.height > shown(cx).size.width,
+        "the picture is turned upright"
+    );
+    press("=", cx);
+    assert!(
+        shown(cx).size.width > px(100.0),
+        "the turned picture has an explicit zoom before the policy changes"
+    );
+
+    view.update(cx, |view, cx| {
+        view.fit = InitialFit::WidthShare {
+            share: 0.7,
+            enlarge: true,
+        };
+        cx.notify();
+    });
+    settle(cx);
+    let picture = shown(cx);
+    assert!(
+        picture.size.height > picture.size.width,
+        "changing fit preserves the quarter turn: {picture:?}"
+    );
+    assert!(
+        (picture.size.width - px(280.0)).abs() < px(2.0),
+        "the new width-share policy is applied: {picture:?}"
+    );
+}
+
+#[gpui::test]
+fn a_nonfinite_width_share_is_stable_across_repeated_renders(cx: &mut TestAppContext) {
+    setup(cx);
+    let (view, cx) = cx.add_window_view(|_, _| FitChanging {
+        path: picture("nonfinite-fit", 200, 100),
+        fit: InitialFit::WidthShare {
+            share: f32::NAN,
+            enlarge: true,
+        },
+    });
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    focus_stage(cx);
+    press("r", cx);
+    assert!(
+        shown(cx).size.height > shown(cx).size.width,
+        "turned upright"
+    );
+
+    view.update(cx, |_, cx| cx.notify());
+    settle(cx);
+    let picture = shown(cx);
+    assert!(
+        picture.size.height > picture.size.width,
+        "the normalized builder policy compares equal on the next render: {picture:?}"
+    );
+    assert!(
+        f32::from(picture.size.width).is_finite() && f32::from(picture.size.height).is_finite(),
+        "the rendered size remains finite: {picture:?}"
+    );
+}
+
+#[gpui::test]
 fn keys_zoom_by_steps_fit_and_turn_the_picture(cx: &mut TestAppContext) {
     let cx = viewing(picture("keys", 200, 100), cx);
     assert_eq!(
@@ -74,6 +254,10 @@ fn keys_zoom_by_steps_fit_and_turn_the_picture(cx: &mut TestAppContext) {
         .debug_bounds("image-viewer-stage")
         .expect("the stage draws");
     assert_eq!(shown(cx).center(), stage.center(), "and sits in the middle");
+    assert!(
+        shown(cx).size.height <= stage.size.height && shown(cx).size.width <= stage.size.width,
+        "the default viewer still contains the picture"
+    );
     focus_stage(cx);
     press("=", cx);
     assert_eq!(

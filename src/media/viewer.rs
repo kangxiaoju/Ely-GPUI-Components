@@ -17,9 +17,41 @@ use crate::{
     typography::tabular,
 };
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum InitialFit {
+    #[default]
+    Contain,
+    WidthShare {
+        share: f32,
+        enlarge: bool,
+    },
+}
+
+impl InitialFit {
+    fn normalized(self) -> Self {
+        match self {
+            Self::Contain => Self::Contain,
+            Self::WidthShare { share, enlarge } => Self::WidthShare {
+                share: if share.is_finite() { share } else { 0.7 }.clamp(0.1, 1.0),
+                enlarge,
+            },
+        }
+    }
+}
+
 /// The zoom that shows the whole picture in the stage, never past actual size.
 pub(crate) fn fit(picture: (f32, f32), stage: (f32, f32)) -> f32 {
     (stage.0 / picture.0).min(stage.1 / picture.1).min(1.0)
+}
+
+fn initial_zoom(picture: (f32, f32), stage: (f32, f32), initial_fit: InitialFit) -> f32 {
+    match initial_fit.normalized() {
+        InitialFit::Contain => fit(picture, stage),
+        InitialFit::WidthShare { share, enlarge } => {
+            let zoom = stage.0 * share / picture.0.max(1.0);
+            if enlarge { zoom } else { zoom.min(1.0) }
+        }
+    }
 }
 
 /// An offset of the picture's middle from the stage's middle, kept so no edge comes inside the stage while the picture overhangs it, and centered where it fits.
@@ -43,10 +75,12 @@ const MOST: f32 = 4.0;
 /// Share of the stage an arrow key pans.
 const PAN: f32 = 0.1;
 
-/// The view's own state: the picture it shows; its zoom, none while it fits; its offset in points; its quarter turns; the stage's bounds; and where a drag was last.
+/// The view's own state: the picture it shows; its initial fit policy; its zoom, none while it uses
+/// that policy; its offset in points; its quarter turns; the stage's bounds; and where a drag was last.
 #[derive(Default)]
 struct View {
     source: Option<Resource>,
+    initial_fit: InitialFit,
     zoom: Option<f32>,
     offset: (f32, f32),
     turns: u8,
@@ -69,32 +103,46 @@ impl View {
         )
     }
 
-    /// Zooms to `to`, or to fit, about `at`, keeping the offset held.
+    /// Zooms to `to`, or to the initial fit, about `at`, keeping the offset held.
     fn zoom_to(&mut self, to: Option<f32>, at: (f32, f32), picture: (f32, f32)) {
         let stage = self.size();
-        let fitted = fit(picture, stage);
-        let (from, next) = (
-            self.zoom.unwrap_or(fitted),
-            to.unwrap_or(fitted).clamp(fitted.min(0.25), MOST),
-        );
+        let initial = initial_zoom(picture, stage, self.initial_fit);
+        let Some(to) = to else {
+            self.zoom = None;
+            self.offset = (0.0, 0.0);
+            log::info!("image viewer: zoom {:.0}%", initial * 100.0);
+            return;
+        };
+        let from = self.zoom.unwrap_or(initial);
+        let next = to.clamp(initial.min(0.25), MOST);
         let offset = zoom_about(self.offset, at, from, next);
-        self.zoom = to.map(|_| next);
+        self.zoom = Some(next);
         self.offset = held(offset, (picture.0 * next, picture.1 * next), stage);
         log::info!("image viewer: zoom {:.0}%", next * 100.0);
     }
 
     fn pan(&mut self, by: (f32, f32), picture: (f32, f32)) {
-        let zoom = self.zoom.unwrap_or_else(|| fit(picture, self.size()));
+        if self.zoom.is_none() && matches!(self.initial_fit, InitialFit::WidthShare { .. }) {
+            return;
+        }
+        let zoom = self
+            .zoom
+            .unwrap_or_else(|| initial_zoom(picture, self.size(), self.initial_fit));
         let offset = (self.offset.0 + by.0, self.offset.1 + by.1);
         self.offset = held(offset, (picture.0 * zoom, picture.1 * zoom), self.size());
     }
 }
 
-/// A picture to look at closely. It fits its stage at first, and again when the host gives it another; the buttons and the plus and minus keys zoom by steps and Cmd-scroll smoothly, 0 fits and 1 shows actual size, a double press toggles the two; a drag, a scroll or the arrows pan once it overhangs; R turns it a quarter clockwise and Shift-R back. The host gives it a height.
+/// A picture to look at closely. It uses its configured initial fit at first, and again when the
+/// host gives it another; the buttons and the plus and minus keys zoom by steps and Cmd-scroll
+/// smoothly, 0 restores the initial fit and 1 shows actual size, a double press toggles the two; a
+/// drag, a scroll or the arrows pan once it overhangs; R turns it a quarter clockwise and Shift-R
+/// back. The host gives it a height unless a width-share picture supplies its natural height.
 #[derive(IntoElement)]
 pub struct ImageViewer {
     id: ElementId,
     source: Resource,
+    initial_fit: InitialFit,
 }
 
 impl ImageViewer {
@@ -103,20 +151,35 @@ impl ImageViewer {
         Self {
             id: id.into(),
             source: source.into(),
+            initial_fit: InitialFit::default(),
         }
+    }
+
+    /// Sets how the picture is sized before the user chooses an explicit zoom.
+    pub fn initial_fit(mut self, initial_fit: InitialFit) -> Self {
+        self.initial_fit = initial_fit.normalized();
+        self
     }
 }
 
 impl RenderOnce for ImageViewer {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let view = window.use_keyed_state((self.id.clone(), "view"), cx, |_, _| View::default());
-        if view.read(cx).source.as_ref() != Some(&self.source) {
+        let source_changed = view.read(cx).source.as_ref() != Some(&self.source);
+        if source_changed {
             view.update(cx, |view, _| {
                 *view = View {
                     source: Some(self.source.clone()),
+                    initial_fit: self.initial_fit,
                     stage: view.stage,
                     ..View::default()
                 }
+            });
+        } else if view.read(cx).initial_fit != self.initial_fit {
+            view.update(cx, |view, _| {
+                view.initial_fit = self.initial_fit;
+                view.zoom = None;
+                view.offset = (0.0, 0.0);
             });
         }
         let decoded = window.use_asset::<ImageAssetLoader>(&self.source, cx);
@@ -150,11 +213,14 @@ impl RenderOnce for ImageViewer {
         );
         let theme = cx.theme();
         let colors = theme.colors.clone();
-        let (zoom, offset, stage) = {
+        let (zoom, offset, stage, manual_zoom) = {
             let view = view.read(cx);
             let stage = view.size();
-            let zoom = pixels.map(|pixels| view.zoom.unwrap_or_else(|| fit(pixels, stage)));
-            (zoom, view.offset, stage)
+            let zoom = pixels.map(|pixels| {
+                view.zoom
+                    .unwrap_or_else(|| initial_zoom(pixels, stage, view.initial_fit))
+            });
+            (zoom, view.offset, stage, view.zoom.is_some())
         };
         let button = |key: &'static str, icon: IconName, tip: &'static str, act: Act| {
             let (acted, pixels) = (view.clone(), pixels);
@@ -173,7 +239,9 @@ impl RenderOnce for ImageViewer {
         };
         let step = move |up: bool| {
             move |view: &mut View, pixels: (f32, f32)| {
-                let now = view.zoom.unwrap_or_else(|| fit(pixels, view.size()));
+                let now = view
+                    .zoom
+                    .unwrap_or_else(|| initial_zoom(pixels, view.size(), view.initial_fit));
                 if let Some(next) = zoom_step(now, up) {
                     view.zoom_to(Some(next), (0.0, 0.0), pixels);
                 }
@@ -247,11 +315,16 @@ impl RenderOnce for ImageViewer {
                         Box::new(turn(1)),
                     )),
             );
+        let natural = !manual_zoom && matches!(self.initial_fit, InitialFit::WidthShare { .. });
         let shown = pixels.zip(zoom).map(|(pixels, zoom)| {
             let size = (pixels.0 * zoom, pixels.1 * zoom);
             let (left, top) = (
                 (stage.0 - size.0) / 2.0 + offset.0,
-                (stage.1 - size.1) / 2.0 + offset.1,
+                if natural {
+                    0.0
+                } else {
+                    (stage.1 - size.1) / 2.0 + offset.1
+                },
             );
             (size, left, top)
         });
@@ -304,9 +377,14 @@ impl RenderOnce for ImageViewer {
             .id(self.id.clone())
             .debug_selector(|| "image-viewer-stage".into())
             .relative()
-            .flex_1()
-            .min_h_0()
             .w_full()
+            .when(!natural, |stage| stage.flex_1().min_h_0())
+            .when_some(
+                natural
+                    .then(|| shown.map(|(size, _, _)| Pixels::from(size.1)))
+                    .flatten(),
+                |stage, height| stage.h(height).flex_none(),
+            )
             .overflow_hidden()
             .bg(colors.sunken)
             .border_1()
@@ -341,7 +419,9 @@ impl RenderOnce for ImageViewer {
                         let zooming = event.modifiers.platform || event.modifiers.control;
                         wheel.update(cx, |view, cx| {
                             if zooming {
-                                let now = view.zoom.unwrap_or_else(|| fit(pixels, view.size()));
+                                let now = view.zoom.unwrap_or_else(|| {
+                                    initial_zoom(pixels, view.size(), view.initial_fit)
+                                });
                                 let at = event.position - view.stage.center();
                                 let next = now * (-f32::from(delta.y) * 0.01).exp();
                                 view.zoom_to(
@@ -388,7 +468,9 @@ impl RenderOnce for ImageViewer {
                         let shift = event.keystroke.modifiers.shift;
                         keys.update(cx, |view, cx| {
                             let (w, h) = view.size();
-                            let now = view.zoom.unwrap_or_else(|| fit(pixels, (w, h)));
+                            let now = view
+                                .zoom
+                                .unwrap_or_else(|| initial_zoom(pixels, (w, h), view.initial_fit));
                             match key {
                                 "+" | "=" => {
                                     if let Some(next) = zoom_step(now, true) {
@@ -415,7 +497,8 @@ impl RenderOnce for ImageViewer {
                     })
             });
         div()
-            .size_full()
+            .w_full()
+            .when(!natural, |viewer| viewer.h_full())
             .flex()
             .flex_col()
             .gap_2()
@@ -426,7 +509,72 @@ impl RenderOnce for ImageViewer {
 
 #[cfg(test)]
 mod tests {
-    use super::{fit, held, zoom_about};
+    use super::{InitialFit, fit, held, initial_zoom, zoom_about};
+
+    #[test]
+    fn width_share_fit_uses_stage_width_and_may_enlarge() {
+        assert_eq!(
+            initial_zoom(
+                (500.0, 300.0),
+                (1000.0, 600.0),
+                InitialFit::WidthShare {
+                    share: 0.7,
+                    enlarge: true,
+                },
+            ),
+            1.4
+        );
+    }
+
+    #[test]
+    fn width_share_fit_does_not_shrink_for_stage_height() {
+        assert_eq!(
+            initial_zoom(
+                (700.0, 2000.0),
+                (1000.0, 300.0),
+                InitialFit::WidthShare {
+                    share: 0.7,
+                    enlarge: false,
+                },
+            ),
+            1.0
+        );
+    }
+
+    #[test]
+    fn width_share_normalizes_nonfinite_shares_to_a_stable_finite_zoom() {
+        for share in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let fit = InitialFit::WidthShare {
+                share,
+                enlarge: true,
+            }
+            .normalized();
+            assert_eq!(
+                fit,
+                InitialFit::WidthShare {
+                    share: 0.7,
+                    enlarge: true,
+                }
+            );
+            assert!(initial_zoom((500.0, 300.0), (1000.0, 600.0), fit).is_finite());
+            assert_eq!(fit, fit.normalized(), "normalization is stable");
+        }
+    }
+
+    #[test]
+    fn default_fit_keeps_existing_contain_behavior() {
+        let picture = (800.0, 400.0);
+        let stage = (400.0, 300.0);
+
+        assert_eq!(
+            initial_zoom(picture, stage, InitialFit::default()),
+            fit(picture, stage)
+        );
+        assert_eq!(
+            initial_zoom((100.0, 50.0), stage, InitialFit::default()),
+            1.0
+        );
+    }
 
     #[test]
     fn a_big_picture_fits_by_its_tighter_side_and_a_small_one_keeps_its_size() {

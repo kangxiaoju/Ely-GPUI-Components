@@ -40,7 +40,7 @@ pub use strip::VideoThumbnailStrip;
 pub use subtitles::{Cue, SubtitleEditor};
 pub use thumbnail::ImageThumbnail;
 pub use upload::ImageUpload;
-pub use viewer::ImageViewer;
+pub use viewer::{ImageViewer, InitialFit};
 
 /// `at` within `length`: a live position past the end logs and sits at the end.
 fn played(at: Duration, length: Duration, owner: &str) -> Duration {

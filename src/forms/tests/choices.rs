@@ -176,6 +176,46 @@ fn a_long_combobox_opens_with_its_choice_in_view(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_combobox_reopens_on_click_after_a_pick_without_blurring(cx: &mut TestAppContext) {
+    setup(cx);
+    cx.update(|cx| Theme::update(cx, |theme| theme.reduced_motion = true));
+    let (view, cx) = cx.add_window_view(|window, cx| Long {
+        kind: Kind::Combobox,
+        field: cx.new(|cx| TextInput::new(window, cx)),
+        picks: Vec::new(),
+    });
+    cx.update(|window, _| window.activate_window());
+    let (trigger, list) = cx.update(|window, cx| {
+        let theme = cx.theme();
+        (
+            theme
+                .control_height(ControlSize::Md)
+                .to_pixels(window.rem_size()),
+            theme.list_max_height().to_pixels(window.rem_size()),
+        )
+    });
+    let field = point(px(40.0), px(200.0) + trigger / 2.0);
+    let foot = point(
+        px(40.0),
+        px(200.0) + trigger + motion::NUDGE + list - px(8.0),
+    );
+
+    for _ in 0..2 {
+        cx.simulate_mouse_move(field, None, Modifiers::none());
+        cx.simulate_click(field, Modifiers::none());
+        frames(cx);
+        cx.simulate_mouse_move(foot, None, Modifiers::none());
+        cx.simulate_click(foot, Modifiers::none());
+        frames(cx);
+    }
+
+    assert_eq!(
+        view.read_with(cx, |view, _| view.picks.clone()),
+        ["r25", "r25"]
+    );
+}
+
+#[gpui::test]
 fn a_long_multi_select_opens_with_its_first_choice_in_view(cx: &mut TestAppContext) {
     assert_eq!(
         press_the_foot(Kind::Multi, cx),
