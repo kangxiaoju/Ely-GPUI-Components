@@ -2,12 +2,15 @@ use std::{
     ops::Range,
     sync::atomic::{AtomicU64, Ordering},
 };
+use unicode_width::UnicodeWidthChar;
 
 /// Source text and where each line starts, in bytes.
 #[derive(Clone, Debug)]
 pub struct Buffer {
     text: String,
     starts: Vec<usize>,
+    widest: usize,
+    longest: usize,
     stamp: u64,
 }
 
@@ -25,19 +28,38 @@ fn stamp() -> u64 {
     NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
-fn starts(text: &str) -> Vec<usize> {
-    std::iter::once(0)
+fn shape(text: &str) -> (Vec<usize>, usize, usize) {
+    let starts: Vec<usize> = std::iter::once(0)
         .chain(text.match_indices('\n').map(|(at, _)| at + 1))
-        .collect()
+        .collect();
+    let mut widest = 0;
+    let mut longest = 0;
+    for line in text.split('\n') {
+        longest = longest.max(line.len());
+        let columns = line
+            .chars()
+            .map(|ch| {
+                if ch == '\t' {
+                    4
+                } else {
+                    ch.width().unwrap_or(0)
+                }
+            })
+            .sum();
+        widest = widest.max(columns);
+    }
+    (starts, widest, longest)
 }
 
 impl Buffer {
     pub fn new(text: impl Into<String>) -> Self {
         let text = text.into();
-        let starts = starts(&text);
+        let (starts, widest, longest) = shape(&text);
         Self {
             text,
             starts,
+            widest,
+            longest,
             stamp: stamp(),
         }
     }
@@ -62,6 +84,14 @@ impl Buffer {
     /// How many lines it holds; an empty buffer holds one.
     pub fn lines(&self) -> usize {
         self.starts.len()
+    }
+
+    pub(crate) fn widest(&self) -> usize {
+        self.widest
+    }
+
+    pub(crate) fn longest(&self) -> usize {
+        self.longest
     }
 
     /// A line's bytes, without its line break.
@@ -133,7 +163,7 @@ impl Buffer {
             self.text.len()
         );
         self.text.replace_range(range, text);
-        self.starts = starts(&self.text);
+        (self.starts, self.widest, self.longest) = shape(&self.text);
         self.stamp = stamp();
     }
 }

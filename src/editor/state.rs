@@ -1,8 +1,8 @@
 use std::{collections::BTreeSet, ops::Range, time::Duration};
 
 use gpui::{
-    App, AppContext as _, Context, EventEmitter, FocusHandle, Focusable, Pixels, SharedString,
-    Subscription, Task, UniformListScrollHandle, Window,
+    App, AppContext as _, Context, EventEmitter, FocusHandle, Focusable, Pixels, ScrollHandle,
+    SharedString, Subscription, Task, UniformListScrollHandle, Window,
 };
 
 use super::{
@@ -119,6 +119,7 @@ pub struct CodeEditor {
     pub(crate) history_bytes: usize,
     pub(crate) focus: FocusHandle,
     pub(crate) scroll: UniformListScrollHandle,
+    pub(crate) horizontal: ScrollHandle,
     pub(crate) folded: BTreeSet<usize>,
     pub(crate) options: Options,
     pub(crate) marks: Marks,
@@ -193,6 +194,7 @@ impl CodeEditor {
             history_bytes: super::prose::HISTORY_BYTES,
             focus,
             scroll: UniformListScrollHandle::new(),
+            horizontal: ScrollHandle::new(),
             folded: BTreeSet::new(),
             options: Options {
                 language: "Plain text".into(),
@@ -310,6 +312,11 @@ impl CodeEditor {
 
     pub fn language_name(&self) -> &SharedString {
         &self.options.language
+    }
+
+    /// Large or minified sources skip expensive whole-buffer decoration scans.
+    pub fn lightweight(&self) -> bool {
+        self.buffer.len() >= 128 * 1024 || self.buffer.longest() >= 16 * 1024
     }
 
     /// The line the inline chat sits under, while it is open.

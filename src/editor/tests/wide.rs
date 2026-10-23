@@ -1,6 +1,9 @@
 //! A wide character takes its laid-out width, not one column.
 
-use gpui::{Bounds, EntityInputHandler, TestAppContext, VisualTestContext};
+use gpui::{
+    Bounds, EntityInputHandler, Modifiers, ScrollDelta, ScrollWheelEvent, TestAppContext,
+    TouchPhase, VisualTestContext, point, px,
+};
 
 use super::editor;
 
@@ -63,4 +66,52 @@ fn an_input_method_edit_measures_before_the_next_draw(cx: &mut TestAppContext) {
         let bounds = editor.bounds_for_range(1..1, Bounds::default(), window, cx);
         assert!(bounds.is_some(), "the caret after it is measured");
     });
+}
+
+#[gpui::test]
+fn a_long_line_scrolls_horizontally(cx: &mut TestAppContext) {
+    let text = "const value = ".to_string() + &"x".repeat(400);
+    let (editor, cx) = editor(&text, cx);
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("scrollbar-thumb").is_some(),
+        "a long line shows a horizontal scrollbar thumb"
+    );
+    let end = text.encode_utf16().count();
+    let before = editor.update_in(cx, |editor, window, cx| {
+        editor
+            .bounds_for_range(end..end, Bounds::default(), window, cx)
+            .expect("the line end is laid out")
+            .origin
+            .x
+    });
+
+    cx.simulate_event(ScrollWheelEvent {
+        position: point(px(200.0), px(100.0)),
+        delta: ScrollDelta::Pixels(point(px(-240.0), px(0.0))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    cx.run_until_parked();
+
+    let after = editor.update_in(cx, |editor, window, cx| {
+        editor
+            .bounds_for_range(end..end, Bounds::default(), window, cx)
+            .expect("the line end stays laid out")
+            .origin
+            .x
+    });
+    assert!(
+        after < before,
+        "horizontal wheel must shift the long line: {before:?} -> {after:?}"
+    );
+}
+
+#[gpui::test]
+fn a_large_minified_file_uses_lightweight_rendering(cx: &mut TestAppContext) {
+    let text = "x".repeat(128 * 1024);
+    let (editor, _) = editor(&text, cx);
+    assert!(editor.read_with(cx, |editor, _| editor.lightweight()));
 }
