@@ -99,6 +99,7 @@ impl RenderOnce for AllDayRow {
                 event.clone(),
             )
             .zone(zone.clone())
+            .centered()
             .open(bar.before, bar.after);
             let chip = match self.on_event.clone() {
                 Some(on_event) => {

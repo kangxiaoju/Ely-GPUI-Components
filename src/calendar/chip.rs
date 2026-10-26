@@ -31,6 +31,7 @@ pub struct EventChip {
     before: bool,
     after: bool,
     tooltip: Option<SharedString>,
+    centered: bool,
     on_click: Option<Run>,
 }
 
@@ -43,6 +44,7 @@ impl EventChip {
             before: false,
             after: false,
             tooltip: None,
+            centered: false,
             on_click: None,
         }
     }
@@ -57,6 +59,11 @@ impl EventChip {
     pub(crate) fn open(mut self, before: bool, after: bool) -> Self {
         self.before = before;
         self.after = after;
+        self
+    }
+
+    pub(crate) fn centered(mut self) -> Self {
+        self.centered = true;
         self
     }
 
@@ -151,6 +158,7 @@ impl RenderOnce for EventChip {
                 div()
                     .flex_1()
                     .min_w_0()
+                    .when(self.centered, |title| title.text_center())
                     .child(Ellipsis::new(self.event.title.clone())),
             )
     }

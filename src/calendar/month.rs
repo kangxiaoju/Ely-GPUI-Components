@@ -215,6 +215,7 @@ impl Row<'_> {
             .when(!bar.after, |slot| slot.pr_1())
             .child(
                 self.chip(format!("bar-{}-{monday}", event.key), event)
+                    .centered()
                     .open(bar.before, bar.after),
             )
             .into_any_element()
