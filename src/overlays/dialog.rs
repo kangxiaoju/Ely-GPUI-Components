@@ -169,7 +169,8 @@ impl RenderOnce for Dialog {
                 .expect("a dialog that takes Enter names its field with focus_first");
             (field, build(close.clone()))
         });
-        let (escape, dismiss, button) = (close.clone(), close.clone(), close);
+        let (escape, dismiss, fullscreen_button, standard_button) =
+            (close.clone(), close.clone(), close.clone(), close);
         let fullscreen = self.fullscreen;
         let card = if fullscreen {
             div()
@@ -196,7 +197,7 @@ impl RenderOnce for Dialog {
                             IconButton::new((self.id.clone(), "close"), IconName::X)
                                 .variant(ButtonVariant::Ghost)
                                 .tooltip(i18n::text(cx, "dialog.close", &[]))
-                                .on_click(move |_, window, cx| button(window, cx)),
+                                .on_click(move |_, window, cx| fullscreen_button(window, cx)),
                         ),
                 )
                 .child(
@@ -241,7 +242,20 @@ impl RenderOnce for Dialog {
                 .border_1()
                 .border_color(colors.border)
                 .shadow(theme.elevation(Elevation::Modal))
-                .child(heading)
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .gap_4()
+                        .child(heading)
+                        .child(
+                            IconButton::new((self.id.clone(), "close"), IconName::X)
+                                .variant(ButtonVariant::Ghost)
+                                .tooltip(i18n::text(cx, "dialog.close", &[]))
+                                .on_click(move |_, window, cx| standard_button(window, cx)),
+                        ),
+                )
                 .children(body)
                 .children(actions)
         };
