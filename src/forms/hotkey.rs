@@ -117,11 +117,21 @@ impl RenderOnce for HotkeyInput {
             .map(|field| match (&self.value, recording) {
                 (_, true) => field.child(
                     div()
+                        .debug_selector(|| "hotkey-value".into())
                         .text_color(colors.fg_subtle)
                         .child("Press a shortcut…"),
                 ),
-                (Some(stroke), false) => field.child(KbdCombo::new(&stroke.unparse())),
-                (None, false) => field.child(div().text_color(colors.fg_subtle).child("None")),
+                (Some(stroke), false) => field.child(
+                    div()
+                        .debug_selector(|| "hotkey-value".into())
+                        .child(KbdCombo::new(&stroke.unparse())),
+                ),
+                (None, false) => field.child(
+                    div()
+                        .debug_selector(|| "hotkey-value".into())
+                        .text_color(colors.fg_subtle)
+                        .child("None"),
+                ),
             })
             .child(
                 Icon::new(IconName::Keyboard)
@@ -137,30 +147,41 @@ mod tests {
     use std::rc::Rc;
 
     use gpui::{
-        Context, FocusHandle, IntoElement, KeyBinding, KeyUpEvent, Keystroke, ParentElement,
-        Render, TestAppContext, VisualTestContext, Window,
+        Context, FocusHandle, InteractiveElement, IntoElement, KeyBinding, KeyUpEvent, Keystroke,
+        ParentElement, Render, Styled, TestAppContext, VisualTestContext, Window,
     };
 
     use super::HotkeyInput;
     use crate::{
         primitives::{FocusNext, FocusScope},
-        theme::Theme,
+        theme::{ActiveTheme, Theme},
     };
 
     struct Bench {
         root: FocusHandle,
         disabled: bool,
         changes: Rc<Cell<usize>>,
+        reference: bool,
     }
 
     impl Render for Bench {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             let changes = self.changes.clone();
-            FocusScope::new(&self.root).root().child(
+            let root = FocusScope::new(&self.root).root().child(
                 HotkeyInput::new("hotkey", None)
                     .disabled(self.disabled)
                     .on_change(move |_, _, _| changes.set(changes.get() + 1)),
-            )
+            );
+            if self.reference {
+                root.child(
+                    gpui::div()
+                        .debug_selector(|| "hotkey-base-reference".into())
+                        .text_size(cx.theme().text_size(crate::theme::TextSize::Base))
+                        .child("None"),
+                )
+            } else {
+                root
+            }
         }
     }
 
@@ -184,6 +205,7 @@ mod tests {
             root: cx.focus_handle(),
             disabled: true,
             changes,
+            reference: false,
         });
         let root = view.read_with(cx, |bench, _| bench.root.clone());
         cx.update(|window, cx| window.focus(&root, cx));
@@ -193,8 +215,29 @@ mod tests {
         assert!(cx.update(|window, _| root.is_focused(window)));
     }
 
-    #[test]
-    fn enabled_hotkey_input_keeps_base_text_size() {
-        assert_eq!(super::hotkey_text_size(), crate::theme::TextSize::Base);
+    #[gpui::test]
+    fn enabled_hotkey_input_renders_base_text_and_reports_input(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            Theme::init(cx);
+            cx.bind_keys([KeyBinding::new("tab", FocusNext, None)]);
+        });
+        let changes = Rc::new(Cell::new(0));
+        let observed = changes.clone();
+        let (view, cx) = cx.add_window_view(move |_, cx| Bench {
+            root: cx.focus_handle(),
+            disabled: false,
+            changes,
+            reference: true,
+        });
+        let root = view.read_with(cx, |bench, _| bench.root.clone());
+        cx.update(|window, cx| window.focus(&root, cx));
+        press("tab", cx);
+        press("ctrl-k", cx);
+        assert_eq!(observed.get(), 1);
+        let value = cx.debug_bounds("hotkey-value").expect("hotkey value draws");
+        let reference = cx
+            .debug_bounds("hotkey-base-reference")
+            .expect("base reference draws");
+        assert_eq!(value.size.height, reference.size.height);
     }
 }
