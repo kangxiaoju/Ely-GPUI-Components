@@ -7,7 +7,7 @@ use gpui::{
 
 use crate::{
     primitives::{FocusRing, Icon, IconName},
-    theme::{ActiveTheme, ControlSize, IconSize, Radius},
+    theme::{ActiveTheme, ControlSize, IconSize, Radius, TextSize},
     typography::KbdCombo,
 };
 
@@ -46,6 +46,10 @@ impl HotkeyInput {
     }
 }
 
+fn hotkey_text_size() -> TextSize {
+    TextSize::Base
+}
+
 impl RenderOnce for HotkeyInput {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let disabled = self.disabled;
@@ -73,6 +77,7 @@ impl RenderOnce for HotkeyInput {
             .border_1()
             .border_color(colors.border_strong)
             .bg(colors.surface)
+            .text_size(theme.text_size(hotkey_text_size()))
             .when(!disabled, |field| {
                 field
                     .focus_ring(cx)
@@ -186,5 +191,10 @@ mod tests {
         press("ctrl-k", cx);
         assert_eq!(observed.get(), 0);
         assert!(cx.update(|window, _| root.is_focused(window)));
+    }
+
+    #[test]
+    fn enabled_hotkey_input_keeps_base_text_size() {
+        assert_eq!(super::hotkey_text_size(), crate::theme::TextSize::Base);
     }
 }
