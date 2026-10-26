@@ -89,8 +89,9 @@ impl Dialog {
         self
     }
 
-    /// Only its actions and Escape close it; a press on the scrim does not.
-    pub(crate) fn held(mut self) -> Self {
+    /// Only its actions and Escape close it; a press on the scrim does not. Use
+    /// this when a field opens a floating picker that may extend beyond the card.
+    pub fn held(mut self) -> Self {
         self.scrim_closes = false;
         self
     }
