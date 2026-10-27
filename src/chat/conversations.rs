@@ -10,6 +10,7 @@ use jiff::{Timestamp, civil::Date, tz::TimeZone};
 use crate::{
     buttons::{Button, ButtonVariant},
     forms::OnValue,
+    i18n,
     menus::{Menu, MenuItem, OverflowMenu},
     primitives::{FocusRing, Icon, IconName, Tooltip, tab_stop},
     theme::{ActiveTheme, ControlSize, IconSize, Radius, TextSize},
@@ -332,9 +333,9 @@ impl RenderOnce for ConversationList {
                         .text_size(theme.text_size(TextSize::Sm))
                         .text_color(colors.fg_subtle)
                         .child(if self.query.trim().is_empty() {
-                            "No conversations yet"
+                            i18n::text(cx, "chat.conversations.empty", &[])
                         } else {
-                            "No conversations match"
+                            i18n::text(cx, "chat.conversations.no_match", &[])
                         }),
                 )
             })
