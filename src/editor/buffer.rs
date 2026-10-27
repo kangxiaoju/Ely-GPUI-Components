@@ -11,6 +11,8 @@ pub struct Buffer {
     starts: Vec<usize>,
     widest: usize,
     longest: usize,
+    last_line_bytes: usize,
+    last_line_columns: usize,
     stamp: u64,
 }
 
@@ -28,38 +30,39 @@ fn stamp() -> u64 {
     NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
-fn shape(text: &str) -> (Vec<usize>, usize, usize) {
+fn width(ch: char) -> usize {
+    if ch == '\t' { 4 } else { ch.width().unwrap_or(0) }
+}
+
+fn shape(text: &str) -> (Vec<usize>, usize, usize, usize, usize) {
     let starts: Vec<usize> = std::iter::once(0)
         .chain(text.match_indices('\n').map(|(at, _)| at + 1))
         .collect();
     let mut widest = 0;
     let mut longest = 0;
+    let mut last_line_bytes = 0;
+    let mut last_line_columns = 0;
     for line in text.split('\n') {
+        let columns = line.chars().map(width).sum();
         longest = longest.max(line.len());
-        let columns = line
-            .chars()
-            .map(|ch| {
-                if ch == '\t' {
-                    4
-                } else {
-                    ch.width().unwrap_or(0)
-                }
-            })
-            .sum();
         widest = widest.max(columns);
+        last_line_bytes = line.len();
+        last_line_columns = columns;
     }
-    (starts, widest, longest)
+    (starts, widest, longest, last_line_bytes, last_line_columns)
 }
 
 impl Buffer {
     pub fn new(text: impl Into<String>) -> Self {
         let text = text.into();
-        let (starts, widest, longest) = shape(&text);
+        let (starts, widest, longest, last_line_bytes, last_line_columns) = shape(&text);
         Self {
             text,
             starts,
             widest,
             longest,
+            last_line_bytes,
+            last_line_columns,
             stamp: stamp(),
         }
     }
@@ -163,28 +166,41 @@ impl Buffer {
             self.text.len()
         );
         self.text.replace_range(range, text);
-        (self.starts, self.widest, self.longest) = shape(&self.text);
+        (
+            self.starts,
+            self.widest,
+            self.longest,
+            self.last_line_bytes,
+            self.last_line_columns,
+        ) = shape(&self.text);
         self.stamp = stamp();
     }
 
     pub(crate) fn append(&mut self, text: &str) {
+        self.append_counted(text, &mut 0);
+    }
+
+    fn append_counted(&mut self, text: &str, scanned: &mut usize) {
         if text.is_empty() {
             return;
         }
         let old_len = self.text.len();
-        let last_start = *self.starts.last().unwrap_or(&0);
         self.text.push_str(text);
-        self.starts
-            .extend(text.match_indices('\n').map(|(at, _)| old_len + at + 1));
-
-        let affected = &self.text[last_start..];
-        for line in affected.split('\n') {
-            self.longest = self.longest.max(line.len());
-            let columns = line
-                .chars()
-                .map(|ch| if ch == '\t' { 4 } else { ch.width().unwrap_or(0) })
-                .sum();
-            self.widest = self.widest.max(columns);
+        *scanned += text.len();
+        let mut consumed = 0;
+        for part in text.split_inclusive('\n') {
+            consumed += part.len();
+            let has_newline = part.ends_with('\n');
+            let content = part.strip_suffix('\n').unwrap_or(part);
+            self.last_line_bytes += content.len();
+            self.last_line_columns += content.chars().map(width).sum::<usize>();
+            self.longest = self.longest.max(self.last_line_bytes);
+            self.widest = self.widest.max(self.last_line_columns);
+            if has_newline {
+                self.starts.push(old_len + consumed);
+                self.last_line_bytes = 0;
+                self.last_line_columns = 0;
+            }
         }
         self.stamp = stamp();
     }
@@ -348,5 +364,16 @@ mod tests {
         assert_eq!(buffer.word_end(22), 23, "a line end steps to the next line");
         assert_eq!(buffer.word_at(6), 4..9);
         assert_eq!(buffer.word_at(10), 10..11, "a mark is its own run");
+    }
+
+    #[test]
+    fn many_small_appends_scan_only_new_bytes() {
+        let mut buffer = Buffer::new("");
+        let mut scanned = 0;
+        for _ in 0..1_000 {
+            buffer.append_counted("你", &mut scanned);
+        }
+        assert_eq!(scanned, "你".len() * 1_000);
+        assert_eq!(buffer.last_line_bytes, scanned);
     }
 }
