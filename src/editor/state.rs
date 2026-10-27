@@ -338,6 +338,19 @@ impl CodeEditor {
         self.commit(before, false, cx);
     }
 
+    /// Appends generated text without creating a user undo step.
+    /// Intended for bounded streaming output in read-only editors.
+    pub fn append_programmatic(&mut self, text: &str, cx: &mut Context<Self>) {
+        if text.is_empty() {
+            return;
+        }
+        let end = self.buffer.len();
+        self.buffer.replace(end..end, text);
+        self.folded.retain(|line| *line < self.buffer.lines());
+        cx.emit(EditorEvent::Changed);
+        self.restart_blink(cx);
+    }
+
     pub fn set_cursor_shape(&mut self, shape: CursorShape, cx: &mut Context<Self>) {
         self.options.cursor = shape;
         cx.notify();

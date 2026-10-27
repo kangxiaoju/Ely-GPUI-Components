@@ -149,6 +149,18 @@ fn a_read_only_editor_ignores_typing_and_undo(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn programmatic_append_is_incremental_and_not_undoable(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("", cx);
+    editor.update(cx, |editor, cx| {
+        editor.append_programmatic("hello", cx);
+        editor.append_programmatic(" world", cx);
+        assert_eq!(editor.text(), "hello world");
+        editor.undo(cx);
+        assert_eq!(editor.text(), "hello world");
+    });
+}
+
+#[gpui::test]
 fn enter_presses_the_banner_button_inside_the_editor(cx: &mut TestAppContext) {
     let (editor, cx) = editor("x", cx);
     cx.update(|window, cx| {
