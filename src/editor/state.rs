@@ -328,6 +328,16 @@ impl CodeEditor {
         self.options.read_only
     }
 
+    /// Diagnostics currently attached by the editor owner.
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        &self.marks.diagnostics
+    }
+
+    /// Inlay hints currently attached by the editor owner.
+    pub fn inlay_hints(&self) -> &[InlayHint] {
+        &self.marks.hints
+    }
+
     pub fn set_text(&mut self, text: impl Into<String>, cx: &mut Context<Self>) {
         let before = self.snapshot();
         self.buffer = Buffer::new(text);
