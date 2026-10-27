@@ -202,25 +202,28 @@ impl RenderOnce for DragDropOverlay {
     }
 }
 
-/// The rows a composer offers at `/` or `@`, and what a pick does.
+/// The rows a composer offers at `/`, `@` or `#`, and what a pick does.
 fn offers(
     id: ElementId,
     field: &Entity<TextInput>,
     commands: &[Choice],
     context: &[Choice],
+    projects: &[Choice],
     on_command: Option<OnValue>,
     on_mention: Option<OnValue>,
+    on_project: Option<OnValue>,
     cx: &App,
 ) -> Suggestions {
     let input = field.read(cx);
     let (text, caret) = (input.text().to_string(), input.cursor());
-    let active = active_trigger(&text, caret, &['/', '@'], |ch| !ch.is_whitespace())
-        .filter(|(at, mark)| *mark == '@' || *at == 0);
+    let active = active_trigger(&text, caret, &['/', '@', '#'], |ch| !ch.is_whitespace())
+        .filter(|(at, mark)| *mark == '@' || *mark == '#' || *at == 0);
     let query = active.map_or(String::new(), |(at, mark)| {
         text[at + mark.len_utf8()..caret].to_lowercase()
     });
     let (listed, run) = match active {
         Some((_, '/')) => (commands, on_command),
+        Some((_, '#')) => (projects, on_project),
         Some(_) => (context, on_mention),
         None => (&[][..], None),
     };
@@ -266,6 +269,7 @@ pub struct PromptInput {
     tools: SmallVec<[AnyElement; 4]>,
     commands: (Vec<Choice>, Option<OnValue>),
     context: (Vec<Choice>, Option<OnValue>),
+    projects: (Vec<Choice>, Option<OnValue>),
     on_drop: Option<OnPaths>,
 }
 
@@ -285,6 +289,7 @@ impl PromptInput {
             tools: SmallVec::new(),
             commands: (Vec::new(), None),
             context: (Vec::new(), None),
+            projects: (Vec::new(), None),
             on_drop: None,
         }
     }
@@ -327,6 +332,16 @@ impl PromptInput {
         self
     }
 
+    /// Projects offered at `#`; `on_project` gets the one picked.
+    pub fn projects(
+        mut self,
+        projects: impl IntoIterator<Item = Choice>,
+        on_project: impl Fn(&SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.projects = (projects.into_iter().collect(), Some(Rc::new(on_project)));
+        self
+    }
+
     /// Takes files dropped on the composer.
     pub fn on_drop(
         mut self,
@@ -349,8 +364,10 @@ impl RenderOnce for PromptInput {
             &self.field,
             &self.commands.0,
             &self.context.0,
+            &self.projects.0,
             self.commands.1.clone(),
             self.context.1.clone(),
+            self.projects.1.clone(),
             cx,
         );
         let button = SendButton::new((self.id.clone(), "send"), ready, move |window, cx| {
