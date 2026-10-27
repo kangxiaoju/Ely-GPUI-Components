@@ -160,6 +160,14 @@ fn locales_write_their_own_numbers_and_dates() {
 }
 
 #[cfg(feature = "test-support")]
+#[gpui::test]
+fn builtin_only_i18n_switches_between_shipped_locales(cx: &mut gpui::TestAppContext) {
+    cx.update(|cx| cx.set_global(I18n::new("zh-CN")));
+    cx.update(|cx| I18n::set_locale("en-US", cx));
+    cx.update(|cx| assert_eq!(cx.global::<I18n>().locale().tag, "en-US"));
+}
+
+#[cfg(feature = "test-support")]
 mod shown {
     use gpui::{
         Context, InteractiveElement, IntoElement, ParentElement, Render, Styled, TestAppContext,

@@ -65,7 +65,8 @@ impl I18n {
         let locale = Locale::of(tag);
         let i18n = cx.global_mut::<I18n>();
         assert!(
-            i18n.catalogs.iter().any(|(tag, _)| *tag == locale.tag),
+            i18n.catalogs.is_empty()
+                || i18n.catalogs.iter().any(|(tag, _)| *tag == locale.tag),
             "no catalog for {}",
             locale.tag
         );
