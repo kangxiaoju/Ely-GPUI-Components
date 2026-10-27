@@ -166,6 +166,28 @@ impl Buffer {
         (self.starts, self.widest, self.longest) = shape(&self.text);
         self.stamp = stamp();
     }
+
+    pub(crate) fn append(&mut self, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        let old_len = self.text.len();
+        let last_start = *self.starts.last().unwrap_or(&0);
+        self.text.push_str(text);
+        self.starts
+            .extend(text.match_indices('\n').map(|(at, _)| old_len + at + 1));
+
+        let affected = &self.text[last_start..];
+        for line in affected.split('\n') {
+            self.longest = self.longest.max(line.len());
+            let columns = line
+                .chars()
+                .map(|ch| if ch == '\t' { 4 } else { ch.width().unwrap_or(0) })
+                .sum();
+            self.widest = self.widest.max(columns);
+        }
+        self.stamp = stamp();
+    }
 }
 
 /// What kind of character a word motion sees.
@@ -296,6 +318,24 @@ mod tests {
         assert_eq!(buffer.text(), "a\nc\nb");
         assert_eq!(buffer.lines(), 3);
         assert_eq!(buffer.line(2), "b");
+    }
+
+    #[test]
+    fn append_updates_utf8_and_multiline_shape_incrementally() {
+        let mut buffer = Buffer::new("前缀");
+        buffer.append("🙂a\n第二行\n");
+        assert_eq!(buffer.text(), "前缀🙂a\n第二行\n");
+        assert_eq!(buffer.lines(), 3);
+        assert_eq!(buffer.line(0), "前缀🙂a");
+        assert_eq!(buffer.line(1), "第二行");
+        assert_eq!(buffer.line(2), "");
+        assert_eq!(buffer.starts, vec![0, "前缀🙂a\n".len(), buffer.len()]);
+        let widest = buffer.widest;
+        let longest = buffer.longest;
+        buffer.append("x");
+        assert!(buffer.widest >= widest);
+        assert!(buffer.longest >= longest);
+        assert_eq!(buffer.line(2), "x");
     }
 
     #[test]

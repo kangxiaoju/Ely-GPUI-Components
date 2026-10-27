@@ -344,8 +344,7 @@ impl CodeEditor {
         if text.is_empty() {
             return;
         }
-        let end = self.buffer.len();
-        self.buffer.replace(end..end, text);
+        self.buffer.append(text);
         self.folded.retain(|line| *line < self.buffer.lines());
         cx.emit(EditorEvent::Changed);
         self.restart_blink(cx);
