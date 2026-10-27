@@ -337,21 +337,33 @@ mod tests {
     }
 
     #[test]
-    fn append_updates_utf8_and_multiline_shape_incrementally() {
-        let mut buffer = Buffer::new("前缀");
-        buffer.append("🙂a\n第二行\n");
-        assert_eq!(buffer.text(), "前缀🙂a\n第二行\n");
-        assert_eq!(buffer.lines(), 3);
-        assert_eq!(buffer.line(0), "前缀🙂a");
-        assert_eq!(buffer.line(1), "第二行");
-        assert_eq!(buffer.line(2), "");
-        assert_eq!(buffer.starts, vec![0, "前缀🙂a\n".len(), buffer.len()]);
-        let widest = buffer.widest;
-        let longest = buffer.longest;
-        buffer.append("x");
-        assert!(buffer.widest >= widest);
-        assert!(buffer.longest >= longest);
-        assert_eq!(buffer.line(2), "x");
+    fn append_matches_full_shape_for_unicode_tabs_and_lines() {
+        let mut buffer = Buffer::new("前\t缀");
+        let before = buffer.stamp();
+        buffer.append("🙂e\u{301}\n第二\t行\n");
+        let expected = shape(buffer.text());
+        assert_eq!(buffer.starts, expected.0);
+        assert_eq!(buffer.lines(), expected.0.len());
+        assert_eq!(buffer.widest, expected.1);
+        assert_eq!(buffer.longest, expected.2);
+        assert_eq!(buffer.last_line_bytes, expected.3);
+        assert_eq!(buffer.last_line_columns, expected.4);
+        assert_eq!(buffer.line(buffer.lines() - 1), "");
+        assert_ne!(buffer.stamp(), before);
+    }
+
+    #[test]
+    fn append_after_trailing_newline_matches_full_shape() {
+        let mut buffer = Buffer::new("wide界\n");
+        buffer.append("\tcombining e\u{301}\nlast");
+        let expected = shape(buffer.text());
+        assert_eq!(buffer.starts, expected.0);
+        assert_eq!(buffer.lines(), expected.0.len());
+        assert_eq!(buffer.widest, expected.1);
+        assert_eq!(buffer.longest, expected.2);
+        assert_eq!(buffer.last_line_bytes, expected.3);
+        assert_eq!(buffer.last_line_columns, expected.4);
+        assert_eq!(buffer.line(buffer.lines() - 1), "last");
     }
 
     #[test]
@@ -367,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    fn many_small_appends_scan_only_new_bytes() {
+    fn many_small_appends_scan_exactly_new_bytes() {
         let mut buffer = Buffer::new("");
         let mut scanned = 0;
         for _ in 0..1_000 {
@@ -375,5 +387,6 @@ mod tests {
         }
         assert_eq!(scanned, "你".len() * 1_000);
         assert_eq!(buffer.last_line_bytes, scanned);
+        assert_eq!(shape(buffer.text()).3, scanned);
     }
 }

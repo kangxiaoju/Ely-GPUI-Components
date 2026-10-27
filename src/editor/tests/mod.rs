@@ -10,7 +10,7 @@ use gpui::{
     VisualTestContext,
 };
 
-use super::{CodeEditor, GhostText, InlayHint, LineNumbers, layout::Row};
+use super::{CodeEditor, EditorEvent, GhostText, InlayHint, LineNumbers, layout::Row};
 use crate::theme::Theme;
 
 pub(super) fn editor<'a>(
@@ -158,6 +158,25 @@ fn programmatic_append_is_incremental_and_not_undoable(cx: &mut TestAppContext) 
         editor.undo(cx);
         assert_eq!(editor.text(), "hello world");
     });
+}
+
+#[gpui::test]
+fn programmatic_append_emits_once_for_text_and_never_for_empty(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("", cx);
+    let changed = Rc::new(Cell::new(0));
+    cx.update(|_, cx| {
+        let changed = Rc::clone(&changed);
+        cx.subscribe(&editor, move |_, event: &EditorEvent, _| {
+            if *event == EditorEvent::Changed {
+                changed.set(changed.get() + 1);
+            }
+        })
+        .detach();
+    });
+    editor.update(cx, |editor, cx| editor.append_programmatic("hello", cx));
+    assert_eq!(changed.get(), 1);
+    editor.update(cx, |editor, cx| editor.append_programmatic("", cx));
+    assert_eq!(changed.get(), 1);
 }
 
 #[gpui::test]
