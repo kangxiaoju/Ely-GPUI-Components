@@ -26,16 +26,53 @@ pub struct Conversation {
     pub pinned: bool,
 }
 
-/// The heading a conversation files under by the day it last moved, seen from `today`.
-pub(crate) fn group_name(day: Date, today: Date) -> String {
+/// The heading a conversation files under, by the day it last moved; its text is localized at render.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Group {
+    Pinned,
+    Today,
+    Yesterday,
+    Previous7Days,
+    Previous30Days,
+    /// A month earlier this year.
+    Month(i8),
+    /// A month in an earlier year.
+    MonthYear(i8, i16),
+}
+
+/// The group a day falls in, seen from `today`.
+pub(crate) fn group_name(day: Date, today: Date) -> Group {
     let days = (today - day).get_days();
     match days {
-        ..=0 => "Today".to_string(),
-        1 => "Yesterday".to_string(),
-        2..=7 => "Previous 7 days".to_string(),
-        8..=30 => "Previous 30 days".to_string(),
-        _ if day.year() == today.year() => day.strftime("%B").to_string(),
-        _ => day.strftime("%B %Y").to_string(),
+        ..=0 => Group::Today,
+        1 => Group::Yesterday,
+        2..=7 => Group::Previous7Days,
+        8..=30 => Group::Previous30Days,
+        _ if day.year() == today.year() => Group::Month(day.month()),
+        _ => Group::MonthYear(day.month(), day.year()),
+    }
+}
+
+/// The localized heading for a group.
+pub(crate) fn group_label(group: Group, cx: &App) -> SharedString {
+    match group {
+        Group::Pinned => i18n::text(cx, "chat.conversations.pinned", &[]),
+        Group::Today => i18n::text(cx, "chat.conversations.today", &[]),
+        Group::Yesterday => i18n::text(cx, "chat.conversations.yesterday", &[]),
+        Group::Previous7Days => i18n::text(cx, "chat.conversations.previous_7_days", &[]),
+        Group::Previous30Days => i18n::text(cx, "chat.conversations.previous_30_days", &[]),
+        Group::Month(month) => {
+            i18n::text(cx, &format!("date.month_long.{month}"), &[])
+        }
+        Group::MonthYear(month, year) => {
+            let month = i18n::text(cx, &format!("date.month_long.{month}"), &[]);
+            let year = year.to_string();
+            i18n::text(
+                cx,
+                "chat.conversations.month_year",
+                &[("month", &month), ("year", &year)],
+            )
+        }
     }
 }
 
@@ -53,19 +90,19 @@ pub(crate) fn grouped(
     query: &str,
     today: Date,
     zone: &TimeZone,
-) -> Vec<(String, Vec<usize>)> {
+) -> Vec<(Group, Vec<usize>)> {
     let mut kept: Vec<usize> = (0..conversations.len())
         .filter(|ix| matches(&conversations[*ix].title, query))
         .collect();
     kept.sort_by_key(|ix| std::cmp::Reverse(conversations[*ix].at));
-    let mut groups: Vec<(String, Vec<usize>)> = Vec::new();
+    let mut groups: Vec<(Group, Vec<usize>)> = Vec::new();
     let pinned: Vec<usize> = kept
         .iter()
         .copied()
         .filter(|ix| conversations[*ix].pinned)
         .collect();
     if !pinned.is_empty() {
-        groups.push(("Pinned".to_string(), pinned));
+        groups.push((Group::Pinned, pinned));
     }
     for ix in kept.into_iter().filter(|ix| !conversations[*ix].pinned) {
         let name = group_name(conversations[ix].at.to_zoned(zone.clone()).date(), today);
@@ -152,20 +189,22 @@ impl RenderOnce for ConversationItem {
                 Some(
                     Menu::new()
                         .item(
-                            MenuItem::new("Rename")
+                            MenuItem::new(i18n::text(cx, "chat.conversations.rename", &[]))
                                 .icon(IconName::Pencil)
                                 .on_click(move |window, cx| rename(&a, window, cx)),
                         )
                         .item(
                             match self.conversation.pinned {
-                                true => MenuItem::new("Unpin").icon(IconName::PinOff),
-                                false => MenuItem::new("Pin").icon(IconName::Pin),
+                                true => MenuItem::new(i18n::text(cx, "chat.conversations.unpin", &[]))
+                                    .icon(IconName::PinOff),
+                                false => MenuItem::new(i18n::text(cx, "chat.conversations.pin", &[]))
+                                    .icon(IconName::Pin),
                             }
                             .on_click(move |window, cx| pin(&b, window, cx)),
                         )
                         .separator()
                         .item(
-                            MenuItem::new("Delete")
+                            MenuItem::new(i18n::text(cx, "chat.conversations.delete", &[]))
                                 .icon(IconName::Trash2)
                                 .on_click(move |window, cx| delete(&c, window, cx)),
                         ),
@@ -242,7 +281,7 @@ impl RenderOnce for ConversationItem {
                     })
                     .child(
                         OverflowMenu::new((self.id.clone(), "menu"), menu)
-                            .tooltip("Conversation actions"),
+                            .tooltip(i18n::text(cx, "chat.conversations.actions", &[])),
                     )
             }))
     }
@@ -351,7 +390,7 @@ impl RenderOnce for ConversationList {
                             .text_size(theme.text_size(TextSize::Xs))
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(colors.fg_subtle)
-                            .child(name),
+                            .child(group_label(name, cx)),
                     )
                     .children(items.into_iter().map(|ix| {
                         let conversation = self.conversations[ix].clone();
@@ -402,12 +441,12 @@ mod tests {
     #[test]
     fn days_name_their_groups() {
         let today = date(2026, 9, 26);
-        assert_eq!(group_name(today, today), "Today");
-        assert_eq!(group_name(date(2026, 9, 25), today), "Yesterday");
-        assert_eq!(group_name(date(2026, 9, 21), today), "Previous 7 days");
-        assert_eq!(group_name(date(2026, 9, 1), today), "Previous 30 days");
-        assert_eq!(group_name(date(2026, 3, 4), today), "March");
-        assert_eq!(group_name(date(2025, 12, 31), today), "December 2025");
+        assert_eq!(group_name(today, today), Group::Today);
+        assert_eq!(group_name(date(2026, 9, 25), today), Group::Yesterday);
+        assert_eq!(group_name(date(2026, 9, 21), today), Group::Previous7Days);
+        assert_eq!(group_name(date(2026, 9, 1), today), Group::Previous30Days);
+        assert_eq!(group_name(date(2026, 3, 4), today), Group::Month(3));
+        assert_eq!(group_name(date(2025, 12, 31), today), Group::MonthYear(12, 2025));
     }
 
     #[test]
@@ -419,19 +458,15 @@ mod tests {
             conversation("type", 0, false),
         ];
         let groups = grouped(&all, "", date(2026, 9, 26), &TimeZone::UTC);
-        let names: Vec<(&str, Vec<usize>)> = groups
-            .iter()
-            .map(|(name, items)| (name.as_str(), items.clone()))
-            .collect();
         assert_eq!(
-            names,
+            groups,
             [
-                ("Pinned", vec![1]),
-                ("Today", vec![0, 3]),
-                ("Yesterday", vec![2])
+                (Group::Pinned, vec![1]),
+                (Group::Today, vec![0, 3]),
+                (Group::Yesterday, vec![2])
             ]
         );
         let found = grouped(&all, "ABOUT dark", date(2026, 9, 26), &TimeZone::UTC);
-        assert_eq!(found, [("Yesterday".to_string(), vec![2])]);
+        assert_eq!(found, [(Group::Yesterday, vec![2])]);
     }
 }
