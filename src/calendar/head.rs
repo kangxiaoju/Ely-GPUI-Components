@@ -13,7 +13,7 @@ pub(crate) type OnDay = Rc<dyn Fn(Date, &mut Window, &mut App)>;
 /// Steps a view back (-1), to today (0) or on (1).
 pub(crate) type Step = Rc<dyn Fn(i32, &mut Window, &mut App)>;
 
-/// A view's title, and beside it Today and the arrows back and on; the arrows drop below a narrow title.
+/// A view's title, and beside it Today and the arrows back and on; the arrows drop below a narrow title. `today_leading` sits just before Today.
 pub(crate) fn head(
     id: &ElementId,
     title: String,
@@ -21,6 +21,7 @@ pub(crate) fn head(
     on: &str,
     step: Step,
     leading: Option<AnyElement>,
+    today_leading: Option<AnyElement>,
     cx: &App,
 ) -> Div {
     let theme = cx.theme();
@@ -72,6 +73,7 @@ pub(crate) fn head(
                 .justify_end()
                 .items_center()
                 .gap_1()
+                .children(today_leading)
                 .child(today)
                 .child(button("back", IconName::ChevronLeft, back, -1))
                 .child(button("on", IconName::ChevronRight, on, 1)),

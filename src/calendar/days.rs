@@ -279,7 +279,7 @@ impl<const DAYS: usize> RenderOnce for CalendarDays<DAYS> {
             .flex()
             .flex_col()
             .gap_3()
-            .child(head(&self.id, title, back, on, step, None, cx))
+            .child(head(&self.id, title, back, on, step, None, None, cx))
             .child(
                 div()
                     .flex_1()

@@ -48,6 +48,7 @@ pub struct CalendarMonthView {
     today: Option<Date>,
     zone: Option<TimeZone>,
     header_leading: Option<AnyElement>,
+    today_leading: Option<AnyElement>,
     chip: Option<Rems>,
     day_rows: Option<usize>,
     on_day: Option<OnDay>,
@@ -77,6 +78,7 @@ impl CalendarMonthView {
             day_note: None,
             day_badge: None,
             header_leading: None,
+            today_leading: None,
             chip: None,
             day_rows: None,
         }
@@ -145,6 +147,12 @@ impl CalendarMonthView {
     /// A control shown at the header's left, with the month title centered beside it.
     pub fn header_leading(mut self, element: impl IntoElement) -> Self {
         self.header_leading = Some(element.into_any_element());
+        self
+    }
+
+    /// A control shown in the header's trailing cluster, just before the Today button.
+    pub fn today_leading(mut self, element: impl IntoElement) -> Self {
+        self.today_leading = Some(element.into_any_element());
         self
     }
 
@@ -576,6 +584,7 @@ impl RenderOnce for CalendarMonthView {
                 &on,
                 step,
                 self.header_leading,
+                self.today_leading,
                 cx,
             ))
             .child(
