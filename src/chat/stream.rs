@@ -178,14 +178,16 @@ impl RenderOnce for StreamingMarkdown {
         } else {
             self.source[..end].to_string()
         };
-        MarkdownRenderer::new((self.id.clone(), "text"), shown).code(|id, language, code| {
-            let block = CodeBlock::new(id, code);
-            match language {
-                Some(language) => block.language(language),
-                None => block,
-            }
-            .into_any_element()
-        })
+        MarkdownRenderer::new((self.id.clone(), "text"), shown)
+            .selectable(!self.live)
+            .code(|id, language, code| {
+                let block = CodeBlock::new(id, code);
+                match language {
+                    Some(language) => block.language(language),
+                    None => block,
+                }
+                .into_any_element()
+            })
     }
 }
 

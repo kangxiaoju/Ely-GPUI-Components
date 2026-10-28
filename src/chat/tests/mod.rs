@@ -11,6 +11,7 @@ mod cite;
 mod compose;
 mod history;
 mod welcome;
+mod selection;
 
 use super::{
     DateSeparator, ImageGrid, ImageMessage, MessageAvatar, MessageBubble, MessageEditor,

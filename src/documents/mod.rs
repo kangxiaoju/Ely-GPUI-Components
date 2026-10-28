@@ -72,4 +72,5 @@ pub use viewer::{
 pub(crate) fn bind_keys(cx: &mut App) {
     rich::bind_keys(cx);
     document::bind_keys(cx);
+    render::bind_keys(cx);
 }

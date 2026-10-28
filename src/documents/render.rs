@@ -1,9 +1,10 @@
 use std::{ops::Range, path::Path, rc::Rc, sync::Arc};
 
 use gpui::{
-    AnyElement, App, ElementId, Entity, FontWeight, HighlightStyle, InteractiveText, IntoElement,
-    ParentElement, RenderOnce, SharedString, Styled, StyledText, TextLayout, Window, div,
-    prelude::*, relative,
+    AnyElement, App, CursorStyle, ElementId, Entity, FontWeight, HighlightStyle, InteractiveElement,
+    InteractiveText, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, ParentElement,
+    RenderOnce, SharedString, StatefulInteractiveElement, Styled, StyledText, TextLayout, Window,
+    div, relative,
 };
 
 use super::{
@@ -23,12 +24,17 @@ use crate::{
 mod blocks;
 mod math_text;
 mod point;
+mod selection;
 mod style;
 mod table;
 
 pub(crate) use point::{OnPoint, Place, Pointed, point_lines};
 use style::highlight;
 pub(crate) use table::{CellAt, OpenCell};
+
+pub(crate) fn bind_keys(cx: &mut App) {
+    selection::bind_keys(cx);
+}
 
 pub(crate) type OnLink = Rc<dyn Fn(&str, &mut Window, &mut App)>;
 /// Reveals the heading whose source starts at a byte.
@@ -47,6 +53,8 @@ pub struct MarkdownRenderer {
     base: Option<Arc<Path>>,
     /// Drawn instead of the source when given.
     blocks: Option<Rc<[Node]>>,
+    /// Enables read-only text selection and clipboard actions.
+    selectable: bool,
     pictures: Option<Rc<Pictures>>,
 }
 
@@ -61,6 +69,7 @@ impl MarkdownRenderer {
             code: None,
             base: None,
             blocks: None,
+            selectable: false,
             pictures: None,
         }
     }
@@ -108,6 +117,12 @@ impl MarkdownRenderer {
     /// Takes link presses instead of the browser.
     pub fn on_link(mut self, handler: impl Fn(&str, &mut Window, &mut App) + 'static) -> Self {
         self.on_link = Some(Rc::new(handler));
+        self
+    }
+
+    /// Lets a reader drag-select rendered prose and copy it with the platform shortcut.
+    pub fn selectable(mut self, selectable: bool) -> Self {
+        self.selectable = selectable;
         self
     }
 }
@@ -191,6 +206,9 @@ struct Draw<'a> {
     table: std::cell::Cell<bool>,
     /// Tables drawn so far.
     tables: std::cell::Cell<usize>,
+    /// Flat plain text built in drawing order; separators match copied block breaks.
+    plain: std::cell::RefCell<String>,
+    selection: Option<(Entity<selection::MarkdownSelection>, Range<usize>)>,
 }
 
 impl Draw<'_> {
@@ -200,22 +218,101 @@ impl Draw<'_> {
         (self.id.clone(), format!("{what}-{at}")).into()
     }
 
+    fn selectable_text(
+        &self,
+        element: AnyElement,
+        at: impl Fn(gpui::Point<gpui::Pixels>) -> usize + 'static,
+        selection: Option<Entity<selection::MarkdownSelection>>,
+    ) -> AnyElement {
+        let Some(selection) = selection else {
+            return element;
+        };
+        let hit = Rc::new(at);
+        let press = selection.clone();
+        let press_hit = hit.clone();
+        let drag = selection.clone();
+        let drag_hit = hit;
+        let release = selection.clone();
+        div()
+            .cursor(CursorStyle::IBeam)
+            .on_mouse_down(
+                MouseButton::Left,
+                move |event: &MouseDownEvent, window, cx| {
+                    window.prevent_default();
+                    let focus = press.read(cx).focus.clone();
+                    window.focus(&focus, cx);
+                    let at = press_hit(event.position);
+                    press.update(cx, |state, cx| {
+                        state.press(at, event.modifiers, event.click_count);
+                        cx.notify();
+                    });
+                },
+            )
+            .on_mouse_move(move |event: &MouseMoveEvent, _, cx| {
+                if event.dragging() {
+                    let at = drag_hit(event.position);
+                    drag.update(cx, |state, cx| {
+                        state.drag_to(at);
+                        cx.notify();
+                    });
+                }
+            })
+            .on_mouse_up(MouseButton::Left, move |_, _, cx| {
+                release.update(cx, |state, _| state.release());
+            })
+            .child(element)
+            .into_any_element()
+    }
+
     fn inline(&self, inline: &Inline, cx: &App) -> AnyElement {
+        let start = self.plain.borrow().len();
+        self.plain.borrow_mut().push_str(&inline.text);
+        self.plain.borrow_mut().push('\n');
+        let selected = self.selection.as_ref().map(|(_, range)| range.clone());
+        let over = selected
+            .and_then(|selected| {
+                selection::highlight(start..start + inline.text.len(), selected, cx)
+            })
+            .into_iter()
+            .collect();
         let links = (!inline.links.is_empty()).then(|| self.key("links"));
         if !inline.styles.iter().any(|(_, style)| *style == Style::Math) {
             let (drawn, layout) =
-                drawn_text(inline, (&[], Vec::new()), links, self.hooks.on_link, cx);
+                drawn_text(inline, (&[], over), links, self.hooks.on_link, cx);
+            let hit = layout.clone();
+            let len = inline.text.len();
+            let selected = self.selection.as_ref().map(|(state, _)| state.clone());
             let at = move |position| {
-                layout
-                    .index_for_position(position)
-                    .unwrap_or_else(|near| near)
+                start
+                    + hit
+                        .index_for_position(position)
+                        .unwrap_or_else(|near| near)
+                        .min(len)
             };
-            return self.point_text(drawn, at, inline);
+            let pointed = layout.clone();
+            let drawn = self.point_text(
+                drawn,
+                move |position| {
+                    pointed
+                        .index_for_position(position)
+                        .unwrap_or_else(|near| near)
+                },
+                inline,
+            );
+            return self.selectable_text(drawn, at, selected);
         }
         let on_link = self.hooks.on_link.clone();
         let (drawn, at) =
             math_text::MathText::new(self.key("math"), inline.clone(), links, on_link);
-        self.point_text(drawn.into_any_element(), at, inline)
+        let selected = self.selection.as_ref().map(|(state, _)| state.clone());
+        let hit = Rc::new(at);
+        let pointed = hit.clone();
+        let drawn = self.point_text(
+            drawn.into_any_element(),
+            move |position| pointed(position),
+            inline,
+        );
+        self.selectable_text(drawn, move |position| start + hit(position), selected)
     }
 
     fn nodes(&self, nodes: &[Node], cx: &App) -> Vec<AnyElement> {
@@ -412,13 +509,15 @@ pub(crate) fn draw_nodes(
         lists: std::cell::Cell::new(0),
         table: std::cell::Cell::new(false),
         tables: std::cell::Cell::new(0),
+        plain: std::cell::RefCell::new(String::new()),
+        selection: None,
     };
     draw.nodes(nodes, cx)
 }
 
 impl RenderOnce for MarkdownRenderer {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let theme = cx.theme();
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let body_size = cx.theme().text_size(self.size);
         let parsed;
         let nodes: &[Node] = match &self.blocks {
             Some(blocks) => blocks,
@@ -427,6 +526,14 @@ impl RenderOnce for MarkdownRenderer {
                 &parsed
             }
         };
+        let selection = self.selectable.then(|| {
+            window.use_keyed_state((self.id.clone(), "selection"), cx, |_, cx| {
+                selection::MarkdownSelection::new(cx)
+            })
+        });
+        let selected = selection
+            .as_ref()
+            .map(|state| (state.clone(), state.read(cx).range()));
         let draw = Draw {
             id: &self.id,
             hooks: Hooks {
@@ -446,14 +553,45 @@ impl RenderOnce for MarkdownRenderer {
             lists: std::cell::Cell::new(0),
             table: std::cell::Cell::new(false),
             tables: std::cell::Cell::new(0),
+            plain: std::cell::RefCell::new(String::new()),
+            selection: selected,
         };
-        div()
+        let root = div()
             .flex()
             .flex_col()
             .gap_3()
-            .text_size(theme.text_size(self.size))
-            .line_height(theme.text_size(self.size) * 1.6)
-            .children(draw.nodes(nodes, cx))
+            .text_size(body_size)
+            .line_height(body_size * 1.6)
+            .children(draw.nodes(nodes, cx));
+        let Some(selection) = selection else {
+            return root.into_any_element();
+        };
+        let plain: SharedString = draw
+            .plain
+            .into_inner()
+            .trim_end_matches('\n')
+            .to_string()
+            .into();
+        selection.update(cx, |state, _| state.sync_text(plain));
+        let focus = selection.read(cx).focus.clone();
+        let copy = selection.clone();
+        let all = selection.clone();
+        root.id((self.id.clone(), "selectable"))
+            .key_context(selection::context())
+            .track_focus(&focus)
+            .cursor(CursorStyle::IBeam)
+            .on_action(move |_: &selection::Copy, _, cx| {
+                if let Some(text) = copy.read(cx).selected_text() {
+                    cx.write_to_clipboard(gpui::ClipboardItem::new_string(text));
+                }
+            })
+            .on_action(move |_: &selection::SelectAll, _, cx| {
+                all.update(cx, |state, cx| {
+                    state.select_all();
+                    cx.notify();
+                });
+            })
+            .into_any_element()
     }
 }
 
