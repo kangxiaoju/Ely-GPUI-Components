@@ -265,16 +265,20 @@ impl Draw<'_> {
     }
 
     fn inline(&self, inline: &Inline, cx: &App) -> AnyElement {
-        let start = self.plain.borrow().len();
-        self.plain.borrow_mut().push_str(&inline.text);
-        self.plain.borrow_mut().push('\n');
+        let start = if self.selection.is_some() {
+            let mut plain = self.plain.borrow_mut();
+            let start = plain.len();
+            plain.push_str(&inline.text);
+            plain.push('\n');
+            start
+        } else {
+            0
+        };
         let selected = self.selection.as_ref().map(|(_, range)| range.clone());
-        let over = selected
-            .and_then(|selected| {
-                selection::highlight(start..start + inline.text.len(), selected, cx)
-            })
-            .into_iter()
-            .collect();
+        let overlay = selected.and_then(|selected| {
+            selection::highlight(start..start + inline.text.len(), selected, cx)
+        });
+        let over = overlay.clone().into_iter().collect();
         let links = (!inline.links.is_empty()).then(|| self.key("links"));
         if !inline.styles.iter().any(|(_, style)| *style == Style::Math) {
             let (drawn, layout) =
@@ -302,8 +306,13 @@ impl Draw<'_> {
             return self.selectable_text(drawn, at, selected);
         }
         let on_link = self.hooks.on_link.clone();
-        let (drawn, at) =
-            math_text::MathText::new(self.key("math"), inline.clone(), links, on_link);
+        let (drawn, at) = math_text::MathText::new(
+            self.key("math"),
+            inline.clone(),
+            links,
+            on_link,
+            overlay,
+        );
         let selected = self.selection.as_ref().map(|(state, _)| state.clone());
         let hit = Rc::new(at);
         let pointed = hit.clone();

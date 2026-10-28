@@ -33,6 +33,7 @@ pub(super) struct MathText {
     inline: Inline,
     links: Option<ElementId>,
     on_link: Option<OnLink>,
+    selection: Option<(Range<usize>, HighlightStyle)>,
     shown: Rc<RefCell<Option<Shown>>>,
     text: Option<AnyElement>,
     /// Each picture, its size, and the drawn span it covers.
@@ -48,6 +49,7 @@ impl MathText {
         inline: Inline,
         links: Option<ElementId>,
         on_link: Option<OnLink>,
+        selection: Option<(Range<usize>, HighlightStyle)>,
     ) -> (Self, impl Fn(Point<Pixels>) -> usize + 'static) {
         let shown = Rc::new(RefCell::new(None));
         let read = shown.clone();
@@ -64,6 +66,7 @@ impl MathText {
             id,
             inline,
             links,
+            selection,
             on_link,
             shown,
             text: None,
@@ -205,9 +208,12 @@ impl Element for MathText {
             color: Some(cx.theme().colors.danger),
             ..HighlightStyle::default()
         };
-        let said = (errors.iter())
+        let mut said: Vec<(Range<usize>, HighlightStyle)> = (errors.iter())
             .map(|ix| (swaps[*ix].1.clone(), danger))
             .collect();
+        if let Some((range, style)) = &self.selection {
+            said.push((forward(&swaps, range.start)..forward(&swaps, range.end), *style));
+        }
         let (mut text, layout) = drawn_text(
             &inline,
             (&hidden, said),
@@ -346,7 +352,7 @@ mod tests {
                 styles: vec![(self.math.clone(), Style::Math)],
                 ..Inline::default()
             };
-            let (text, at) = MathText::new("probe".into(), inline, None, None);
+            let (text, at) = MathText::new("probe".into(), inline, None, None, None);
             *self.found.borrow_mut() = Some((text.shown.clone(), Box::new(at)));
             let shell = gpui::div()
                 .w(gpui::px(self.width))
