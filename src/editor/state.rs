@@ -62,6 +62,7 @@ pub(crate) struct Options {
     pub minimap: bool,
     pub sticky: bool,
     pub read_only: bool,
+    pub read_only_banner: bool,
     pub tab: usize,
     pub highlighter: Option<super::prose::LineHighlighter>,
     /// Text size against the theme's.
@@ -207,6 +208,7 @@ impl CodeEditor {
                 minimap: false,
                 sticky: false,
                 read_only: false,
+                read_only_banner: true,
                 tab: 4,
                 highlighter: None,
                 scale: 1.0,
@@ -281,6 +283,13 @@ impl CodeEditor {
 
     pub fn read_only(mut self) -> Self {
         self.options.read_only = true;
+        self
+    }
+
+    /// Read-only output without the unlock strip; intended for generated/result panes.
+    pub fn read_only_without_banner(mut self) -> Self {
+        self.options.read_only = true;
+        self.options.read_only_banner = false;
         self
     }
 

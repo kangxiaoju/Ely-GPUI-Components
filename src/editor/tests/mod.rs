@@ -149,6 +149,20 @@ fn a_read_only_editor_ignores_typing_and_undo(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn read_only_without_banner_stays_locked_and_draws_no_banner(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let (editor, cx) = cx.add_window_view(|window, cx| {
+        CodeEditor::new("result", window, cx).read_only_without_banner()
+    });
+    cx.run_until_parked();
+    assert!(editor.read_with(cx, |editor, _| editor.is_read_only()));
+    assert!(
+        cx.debug_bounds("read-only-banner").is_none(),
+        "silent read-only output must not render an unlock banner"
+    );
+}
+
+#[gpui::test]
 fn programmatic_append_is_incremental_and_not_undoable(cx: &mut TestAppContext) {
     let (editor, cx) = editor("", cx);
     editor.update(cx, |editor, cx| {

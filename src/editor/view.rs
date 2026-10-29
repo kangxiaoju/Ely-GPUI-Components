@@ -318,7 +318,7 @@ impl Render for CodeEditor {
         .min_w(content_width);
         let (top, focus, input) = (cx.entity(), self.focus.clone(), cx.entity());
         let unlock = cx.entity();
-        let banner = self.options.read_only.then(|| {
+        let banner = (self.options.read_only && self.options.read_only_banner).then(|| {
             ReadOnlyBanner::new(
                 ("read-only", cx.entity_id().as_u64()),
                 "This file is read-only.",
