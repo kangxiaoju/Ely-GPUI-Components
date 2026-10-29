@@ -1,107 +1,154 @@
-[package]
-name = "ely-gpui-component"
-version = "0.1.1"
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.98"
 license = "MIT"
-description = "A restrained component library for GPUI, in light and dark."
 repository = "https://github.com/ELY-Open-Source/Ely-GPUI-Components"
-publish = false
+homepage = "https://elygpui.com"
+readme = "README.md"
+keywords = ["gpui", "ui", "components", "widgets", "gui"]
+categories = ["gui"]
 
-[features]
-default = ["runtime_shaders"]
-runtime_shaders = ["gpui_platform/runtime_shaders"]
-test-support = ["gpui/test-support", "gpui/leak-detection"]
-
-[dependencies]
+[workspace.dependencies]
+ely-desktop = { path = "crates/ely-desktop", version = "0.1.1" }
+ely-rendering = { path = "crates/ely-rendering", version = "0.1.1" }
+ely-tooling = { path = "crates/ely-tooling", version = "0.1.1" }
+ely-misc = { path = "crates/ely-misc", version = "0.1.1" }
+ely-maps = { path = "crates/ely-maps", version = "0.1.1" }
+ely-interaction = { path = "crates/ely-interaction", version = "0.1.1" }
+ely-onboarding = { path = "crates/ely-onboarding", version = "0.1.1" }
+ely-account = { path = "crates/ely-account", version = "0.1.1" }
+ely-settings = { path = "crates/ely-settings", version = "0.1.1" }
+ely-dashboard = { path = "crates/ely-dashboard", version = "0.1.1" }
+ely-devtools = { path = "crates/ely-devtools", version = "0.1.1" }
+ely-canvas = { path = "crates/ely-canvas", version = "0.1.1" }
+ely-project = { path = "crates/ely-project", version = "0.1.1" }
+ely-calendar = { path = "crates/ely-calendar", version = "0.1.1" }
+ely-mail = { path = "crates/ely-mail", version = "0.1.1" }
+ely-messaging = { path = "crates/ely-messaging", version = "0.1.1" }
+ely-files = { path = "crates/ely-files", version = "0.1.1" }
+ely-media = { path = "crates/ely-media", version = "0.1.1" }
+ely-generative = { path = "crates/ely-generative", version = "0.1.1" }
+ely-agent = { path = "crates/ely-agent", version = "0.1.1" }
+ely-chat = { path = "crates/ely-chat", version = "0.1.1" }
+ely-collab = { path = "crates/ely-collab", version = "0.1.1" }
+ely-documents = { path = "crates/ely-documents", version = "0.1.1" }
+ely-debug = { path = "crates/ely-debug", version = "0.1.1" }
+ely-git = { path = "crates/ely-git", version = "0.1.1" }
+ely-terminal = { path = "crates/ely-terminal", version = "0.1.1" }
+ely-editor = { path = "crates/ely-editor", version = "0.1.1" }
+ely-finance = { path = "crates/ely-finance", version = "0.1.1" }
+ely-charts = { path = "crates/ely-charts", version = "0.1.1" }
+ely-core = { path = "crates/ely-core", version = "0.2.0", default-features = false }
 anyhow = "1"
-base64 = "0.22"
-barcoders = { version = "2", default-features = false, features = ["std"] }
 emojis = "0.9"
 futures = "0.3"
-gpui = { package = "gpui-pre", version = "=0.3.8", default-features = false, features = ["stacker"] }
-gpui_platform = { package = "gpui-pre-platform", version = "=0.3.8", features = ["font-kit"] }
+gpui = { package = "gpui-pre", version = "=0.3.10", default-features = false }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.10" }
+gpui_web = { package = "gpui-pre-web", version = "=0.3.10" }
 image = { version = "0.25", default-features = false }
-iso_currency = { version = "0.7", features = ["iterator"] }
+iso_currency = "0.7"
 isocountry = "0.3"
-isolang = { version = "2.4", features = ["local_names", "list_languages"] }
 jiff = "0.2"
 log = "0.4"
-markdown = "=1.0.0"
-mermaid-rs-renderer = { version = "=0.3.1", default-features = false }
-pulldown-cmark = { version = "0.13", default-features = false }
 qrcode = { version = "0.14", default-features = false }
-ratex-layout = "=0.1.14"
-ratex-parser = "=0.1.14"
-ratex-svg = { version = "=0.1.14", features = ["embed-fonts"] }
-ratex-types = "=0.1.14"
+raw-window-handle = "0.6"
 regex = "1"
-rqrr = { version = "0.11", default-features = false }
-rust-embed = "8.12"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-similar = { version = "3.2", default-features = false, features = ["std", "text", "inline", "unicode"] }
 smallvec = "1"
 unicode-segmentation = "1"
 unicode-width = "0.2"
-usvg = "0.46"
-vte = { version = "0.15", default-features = false, features = ["std", "ansi"] }
 web-time = "1.1"
 
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-alacritty_terminal = { version = "0.26", default-features = false }
-
-[target.'cfg(target_family = "wasm")'.dependencies]
-jiff = { version = "0.2", features = ["js"] }
-rust-embed = { version = "8.12", features = ["debug-embed"] }
-similar = { version = "3.2", default-features = false, features = ["wasm32_web_time"] }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-block = "0.1"
-cocoa = "0.26"
-objc = "0.2"
-raw-window-handle = "0.6"
-wry = { version = "0.57", default-features = false }
-
-[target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.62", features = ["Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-image = { version = "0.25", default-features = false, features = ["png"] }
-zbus = { version = "5", default-features = false, features = ["async-io"] }
-
-[target.'cfg(unix)'.dependencies]
-rustix = { version = "1", default-features = false, features = ["std", "fs"] }
-
-[dev-dependencies]
-env_logger = "0.11"
-
-[target.'cfg(target_family = "wasm")'.dev-dependencies]
-gpui_web = { package = "gpui-pre-web", version = "=0.3.8" }
-js-sys = "0.3"
-wasm-bindgen = "0.2"
-web-sys = { version = "0.3", features = ["Location", "UrlSearchParams", "Window"] }
-
-[target.'cfg(target_os = "macos")'.dev-dependencies]
-core-foundation = "0.10"
-core-graphics = "0.24"
-image = { version = "0.25", default-features = false, features = ["png"] }
-
-[target.'cfg(target_os = "windows")'.dev-dependencies]
-image = { version = "0.25", default-features = false, features = ["png"] }
-raw-window-handle = "0.6"
-windows-sys = { version = "0.59", features = [
-    "Win32_Foundation",
-    "Win32_Graphics_Gdi",
-    "Win32_Storage_Xps",
-    "Win32_UI_WindowsAndMessaging",
-] }
-
-[lints.rust]
+[workspace.lints.rust]
+unreachable_pub = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
 
-[lints.clippy]
+[workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+undocumented_unsafe_blocks = "warn"
+
+[package]
+name = "ely-gpui-component"
+version = "0.1.1"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "A restrained component library for GPUI, in light and dark."
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+include = ["/src", "/tests", "/benches", "/README.md", "/LICENSE"]
+
+[[test]]
+name = "form"
+required-features = ["test-support"]
+
+[[test]]
+name = "table"
+required-features = ["test-support"]
+
+[[test]]
+name = "workspace"
+required-features = ["test-support"]
+
+[[bench]]
+name = "budget"
+harness = false
+required-features = ["test-support"]
+
+[features]
+default = ["runtime_shaders", "fonts"]
+fonts = ["ely-core/fonts"]
+platform = ["ely-core/platform"]
+runtime_shaders = ["ely-core/runtime_shaders"]
+test-support = ["ely-core/test-support", "gpui/test-support", "gpui/leak-detection"]
+
+[dependencies]
+ely-account.workspace = true
+ely-agent.workspace = true
+ely-calendar.workspace = true
+ely-canvas.workspace = true
+ely-charts.workspace = true
+ely-chat.workspace = true
+ely-collab.workspace = true
+ely-core.workspace = true
+ely-dashboard.workspace = true
+ely-debug.workspace = true
+ely-desktop.workspace = true
+ely-devtools.workspace = true
+ely-documents.workspace = true
+ely-editor.workspace = true
+ely-files.workspace = true
+ely-finance.workspace = true
+ely-generative.workspace = true
+ely-git.workspace = true
+ely-interaction.workspace = true
+ely-mail.workspace = true
+ely-maps.workspace = true
+ely-media.workspace = true
+ely-messaging.workspace = true
+ely-misc.workspace = true
+ely-onboarding.workspace = true
+ely-project.workspace = true
+ely-rendering.workspace = true
+ely-settings.workspace = true
+ely-terminal.workspace = true
+ely-tooling.workspace = true
+anyhow.workspace = true
+gpui.workspace = true
+
+[dev-dependencies]
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+
+[lints]
+workspace = true
 
 # The web gallery: small over fast, one unit so LTO sees everything.
 [profile.web]
@@ -109,43 +156,3 @@ inherits = "release"
 opt-level = "z"
 lto = true
 codegen-units = 1
-
-[[example]]
-name = "gallery"
-path = "examples/gallery/main.rs"
-
-[[example]]
-name = "docs_hello"
-path = "examples/docs/hello.rs"
-
-[[example]]
-name = "docs_start"
-path = "examples/docs/start.rs"
-
-[[example]]
-name = "docs_theme"
-path = "examples/docs/theme.rs"
-
-[[example]]
-name = "docs_focus"
-path = "examples/docs/focus.rs"
-
-[[example]]
-name = "docs_motion"
-path = "examples/docs/motion.rs"
-
-[[example]]
-name = "docs_icons"
-path = "examples/docs/icons.rs"
-
-[[example]]
-name = "docs_overlays"
-path = "examples/docs/overlays.rs"
-
-[[example]]
-name = "docs_i18n"
-path = "examples/docs/i18n.rs"
-
-[[example]]
-name = "docs_render"
-path = "examples/docs/render.rs"
