@@ -246,6 +246,9 @@ impl Render for CodeEditor {
             }
         };
         let line = (pixels * LEADING).round();
+        // The horizontal scrollbar is an overlay with a 2×-thickness hit track.
+        // Reserve that much vertical room so the last row stays selectable above it.
+        let scrollbar_clearance = theme.scrollbar_thickness().to_pixels(window.rem_size()) * 2.0;
         let lightweight = self.lightweight();
         let found = if lightweight {
             Vec::new()
@@ -311,6 +314,7 @@ impl Render for CodeEditor {
         )
         .track_scroll(&self.scroll)
         .h_full()
+        .pb(scrollbar_clearance)
         .min_w(content_width);
         let (top, focus, input) = (cx.entity(), self.focus.clone(), cx.entity());
         let unlock = cx.entity();

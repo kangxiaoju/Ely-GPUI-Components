@@ -209,6 +209,7 @@ impl RenderOnce for Scrollbar {
             });
         let track = div()
             .id(self.id)
+            .debug_selector(move || format!("scrollbar-track-{axis:?}"))
             .absolute()
             .opacity(presence)
             // Nothing beneath sees its presses.

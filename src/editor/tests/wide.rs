@@ -144,6 +144,33 @@ fn a_vertical_wheel_does_not_shift_a_long_line_sideways(cx: &mut TestAppContext)
 }
 
 #[gpui::test]
+fn the_last_line_stays_above_the_horizontal_scrollbar(cx: &mut TestAppContext) {
+    let text = (0..40)
+        .map(|ix| format!("line {ix} {}", "x".repeat(400)))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let last = text.len();
+    let (editor, cx) = editor(&text, cx);
+    cx.simulate_resize(gpui::size(px(800.0), px(92.0)));
+    editor.update(cx, |editor, cx| {
+        editor.select([last..last], cx);
+        editor.reveal(true, cx);
+    });
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+
+    let line = cx.debug_bounds("editor-line-39").expect("last line is drawn");
+    let track = cx
+        .debug_bounds("scrollbar-track-Horizontal")
+        .expect("horizontal scrollbar track is drawn");
+    assert!(
+        line.bottom() <= track.top(),
+        "last line must clear the horizontal scrollbar track: line={line:?}, track={track:?}"
+    );
+}
+
+#[gpui::test]
 fn a_large_minified_file_uses_lightweight_rendering(cx: &mut TestAppContext) {
     let text = "x".repeat(128 * 1024);
     let (editor, _) = editor(&text, cx);
