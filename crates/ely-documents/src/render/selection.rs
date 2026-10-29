@@ -13,8 +13,8 @@ actions!(selectable_markdown, [Copy, SelectAll]);
 
 pub(crate) fn bind_keys(cx: &mut App) {
     cx.bind_keys([
-        KeyBinding::new("secondary-c", Copy, Some(CONTEXT)),
-        KeyBinding::new("secondary-a", SelectAll, Some(CONTEXT)),
+        KeyBinding::new(ely_core::secondary!("c"), Copy, Some(CONTEXT)),
+        KeyBinding::new(ely_core::secondary!("a"), SelectAll, Some(CONTEXT)),
     ]);
 }
 
