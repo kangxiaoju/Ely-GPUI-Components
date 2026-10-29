@@ -110,6 +110,40 @@ fn a_long_line_scrolls_horizontally(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_vertical_wheel_does_not_shift_a_long_line_sideways(cx: &mut TestAppContext) {
+    let text = "const value = ".to_string() + &"x".repeat(400);
+    let (editor, cx) = editor(&text, cx);
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    let end = text.encode_utf16().count();
+    let before = editor.update_in(cx, |editor, window, cx| {
+        editor
+            .bounds_for_range(end..end, Bounds::default(), window, cx)
+            .expect("the line end is laid out")
+            .origin
+            .x
+    });
+
+    cx.simulate_event(ScrollWheelEvent {
+        position: point(px(200.0), px(100.0)),
+        delta: ScrollDelta::Pixels(point(px(0.0), px(-240.0))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    cx.run_until_parked();
+
+    let after = editor.update_in(cx, |editor, window, cx| {
+        editor
+            .bounds_for_range(end..end, Bounds::default(), window, cx)
+            .expect("the line end stays laid out")
+            .origin
+            .x
+    });
+    assert_eq!(after, before, "vertical wheel must not shift a long line sideways");
+}
+
+#[gpui::test]
 fn a_large_minified_file_uses_lightweight_rendering(cx: &mut TestAppContext) {
     let text = "x".repeat(128 * 1024);
     let (editor, _) = editor(&text, cx);

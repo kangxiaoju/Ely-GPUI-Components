@@ -15,7 +15,7 @@ use super::{
     syntax::{self, Bracket, brackets, folds},
 };
 use crate::{
-    layout::Scrollbar,
+    layout::{Scrollbar, on_axis},
     theme::{ActiveTheme, TextSize},
 };
 
@@ -326,7 +326,7 @@ impl Render for CodeEditor {
                 })
             })
         });
-        let body = div()
+        let body = on_axis(div())
             .id(("editor-horizontal", cx.entity_id().as_u64()))
             .relative()
             .flex_1()
