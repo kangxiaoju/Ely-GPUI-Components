@@ -30,6 +30,7 @@ pub(crate) type OnSecondary = Rc<dyn Fn(Point<Pixels>, &mut Window, &mut App)>;
 pub struct ListItem {
     id: ElementId,
     title: SharedString,
+    accessible_label: Option<SharedString>,
     /// A field drawn in the title's place.
     editor: Option<AnyElement>,
     description: Option<SharedString>,
@@ -56,6 +57,7 @@ impl ListItem {
         Self {
             id: id.into(),
             title: title.into(),
+            accessible_label: None,
             editor: None,
             description: None,
             accessible_description: None,
@@ -102,6 +104,12 @@ impl ListItem {
     /// A tip shown on hover, as a row whose title is cut off has its whole name.
     pub fn tooltip(mut self, text: impl Into<SharedString>) -> Self {
         self.tooltip = Some(text.into());
+        self
+    }
+
+    /// Extra context assistive technology reads instead of the visual title; nothing is drawn.
+    pub fn accessible_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.accessible_label = Some(label.into());
         self
     }
 
@@ -205,7 +213,7 @@ impl RenderOnce for ListItem {
             .id(self.id)
             .when_some(self.tooltip, |row, text| row.tooltip(Tooltip::text(text)))
             .role(Role::ListItem)
-            .aria_label(self.title.clone())
+            .aria_label(self.accessible_label.unwrap_or_else(|| self.title.clone()))
             .aria_selected(self.selected)
             .when(self.current, |row| row.aria_active_descendant())
             .when_some(

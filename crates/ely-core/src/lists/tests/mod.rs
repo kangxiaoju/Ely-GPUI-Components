@@ -39,7 +39,7 @@ fn settle(cx: &mut VisualTestContext) {
     }
 }
 
-type CapturedListItemNodes = Arc<Mutex<Option<[accesskit::Node; 2]>>>;
+type CapturedListItemNodes = Arc<Mutex<Option<[accesskit::Node; 3]>>>;
 
 struct AccessibleListItems {
     captured: CapturedListItemNodes,
@@ -61,10 +61,12 @@ impl Render for AccessibleListItems {
                     *captured.lock().expect("list item nodes") = Some([
                         node(
                             ListItem::new("invoice-a11y", "Invoice")
+                                .accessible_label("Invoice, due Friday, overdue")
                                 .description("Due Friday")
                                 .accessible_description("Payment is overdue"),
                         ),
                         node(ListItem::new("fallback", "Invoice").description("Due Friday")),
+                        node(ListItem::new("title-fallback", "Receipt")),
                     ]);
                 },
                 |_, _, _, _| {},
@@ -93,12 +95,11 @@ fn an_accessible_description_overrides_a_list_items_visual_description(
     cx: &mut TestAppContext,
 ) {
     let (captured, cx) = accessible_list_items(cx);
-    let [item, _] = captured
+    let [item, _, _] = captured
         .lock()
         .expect("list item nodes")
         .take()
         .expect("drawn");
-    assert_eq!(item.label(), Some("Invoice"));
     assert_eq!(item.description(), Some("Payment is overdue"));
     assert!(
         cx.debug_bounds("item-description-Due Friday").is_some(),
@@ -107,20 +108,33 @@ fn an_accessible_description_overrides_a_list_items_visual_description(
 }
 
 #[gpui::test]
-fn a_list_items_visual_description_is_its_accessible_fallback(cx: &mut TestAppContext) {
+fn an_accessible_label_overrides_a_list_items_title(cx: &mut TestAppContext) {
     let (captured, _) = accessible_list_items(cx);
-    let [_, item] = captured
+    let [item, _, _] = captured
+        .lock()
+        .expect("list item nodes")
+        .take()
+        .expect("drawn");
+    assert_eq!(item.label(), Some("Invoice, due Friday, overdue"));
+}
+
+#[gpui::test]
+fn a_list_item_uses_its_title_as_the_accessible_label_fallback(cx: &mut TestAppContext) {
+    let (captured, _) = accessible_list_items(cx);
+    let [_, item, title] = captured
         .lock()
         .expect("list item nodes")
         .take()
         .expect("drawn");
     assert_eq!(item.description(), Some("Due Friday"));
+    assert_eq!(title.label(), Some("Receipt"));
 }
 
 const NAMES: [&str; 4] = ["a", "b", "c", "d"];
 
-/// A multiple-choice list of four rows, one maybe disabled, maybe reversed, that keeps what it reports and what was opened.
+/// A multiple-choice list of four rows, one maybe disabled, maybe reversed, that keeps what it reports, presses, and opens.
 struct Picks(
+    Vec<SharedString>,
     Vec<SharedString>,
     Vec<SharedString>,
     Option<&'static str>,
@@ -130,7 +144,7 @@ struct Picks(
 impl Render for Picks {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let (view, opened) = (cx.entity(), cx.entity());
-        let names: Vec<&&str> = if self.3 {
+        let names: Vec<&&str> = if self.4 {
             NAMES.iter().rev().collect()
         } else {
             NAMES.iter().collect()
@@ -140,12 +154,16 @@ impl Render for Picks {
             .fold(SelectableList::new("picks").multiple(), |list, name| {
                 list.row(
                     *name,
-                    ListItem::new(*name, *name).disabled(self.2 == Some(*name)),
+                    ListItem::new(*name, *name).disabled(self.3 == Some(*name)),
                 )
             })
             .selected(self.0.clone())
             .on_change(move |keys, _, cx| view.update(cx, |picks, _| picks.0 = keys.to_vec()))
-            .on_activate(move |key, _, cx| opened.update(cx, |picks, _| picks.1.push(key.clone())))
+            .on_press({
+                let pressed = cx.entity();
+                move |key, _, cx| pressed.update(cx, |picks, _| picks.1.push(key.clone()))
+            })
+            .on_activate(move |key, _, cx| opened.update(cx, |picks, _| picks.2.push(key.clone())))
             .w(px(240.0))
             .h(px(200.0))
     }
@@ -157,6 +175,18 @@ fn picks(view: &Entity<Picks>, cx: &mut VisualTestContext) -> Vec<String> {
     })
 }
 
+fn pressed(view: &Entity<Picks>, cx: &mut VisualTestContext) -> Vec<String> {
+    view.read_with(cx, |picks, _| {
+        picks.1.iter().map(|key| key.to_string()).collect()
+    })
+}
+
+fn opened(view: &Entity<Picks>, cx: &mut VisualTestContext) -> Vec<String> {
+    view.read_with(cx, |picks, _| {
+        picks.2.iter().map(|key| key.to_string()).collect()
+    })
+}
+
 /// Row `ix`'s left padding: rows are 32 tall with 2 between.
 fn row(ix: usize) -> Point<Pixels> {
     point(px(6.0), px(16.0 + 34.0 * ix as f32))
@@ -165,11 +195,14 @@ fn row(ix: usize) -> Point<Pixels> {
 #[gpui::test]
 fn presses_pick_one_toggle_with_cmd_and_range_with_shift(cx: &mut TestAppContext) {
     setup(cx);
-    let (view, cx) = cx.add_window_view(|_, _| Picks(Vec::new(), Vec::new(), None, false));
+    let (view, cx) = cx.add_window_view(|_, _| {
+        Picks(Vec::new(), Vec::new(), Vec::new(), None, false)
+    });
     settle(cx);
     cx.simulate_click(row(0), Modifiers::none());
     settle(cx);
     assert_eq!(picks(&view, cx), ["a"]);
+    assert_eq!(pressed(&view, cx), ["a"]);
     cx.simulate_click(
         row(2),
         Modifiers {
@@ -179,6 +212,7 @@ fn presses_pick_one_toggle_with_cmd_and_range_with_shift(cx: &mut TestAppContext
     );
     settle(cx);
     assert_eq!(picks(&view, cx), ["a", "b", "c"]);
+    assert_eq!(pressed(&view, cx), ["a"], "a range press does not press");
     cx.simulate_click(
         row(1),
         Modifiers {
@@ -188,6 +222,7 @@ fn presses_pick_one_toggle_with_cmd_and_range_with_shift(cx: &mut TestAppContext
     );
     settle(cx);
     assert_eq!(picks(&view, cx), ["a", "c"]);
+    assert_eq!(pressed(&view, cx), ["a"], "a toggle press does not press");
     cx.simulate_keystrokes("down shift-down");
     settle(cx);
     assert_eq!(
@@ -203,7 +238,9 @@ fn presses_pick_one_toggle_with_cmd_and_range_with_shift(cx: &mut TestAppContext
 #[gpui::test]
 fn the_cursor_starts_on_the_first_selected_row(cx: &mut TestAppContext) {
     setup(cx);
-    let (view, cx) = cx.add_window_view(|_, _| Picks(vec!["c".into()], Vec::new(), None, false));
+    let (view, cx) = cx.add_window_view(|_, _| {
+        Picks(vec!["c".into()], Vec::new(), Vec::new(), None, false)
+    });
     settle(cx);
     cx.update(|window, cx| window.focus_next(cx));
     cx.simulate_keystrokes("down");
@@ -214,7 +251,9 @@ fn the_cursor_starts_on_the_first_selected_row(cx: &mut TestAppContext) {
 #[gpui::test]
 fn a_selection_from_the_owner_moves_the_cursor_and_an_echo_does_not(cx: &mut TestAppContext) {
     setup(cx);
-    let (view, cx) = cx.add_window_view(|_, _| Picks(vec!["a".into()], Vec::new(), None, false));
+    let (view, cx) = cx.add_window_view(|_, _| {
+        Picks(vec!["a".into()], Vec::new(), Vec::new(), None, false)
+    });
     settle(cx);
     view.update(cx, |picks, _| picks.0 = vec!["b".into()]);
     settle(cx);
@@ -417,7 +456,9 @@ fn enter(cx: &mut VisualTestContext) {
 #[gpui::test]
 fn enter_or_a_double_press_opens_a_row(cx: &mut TestAppContext) {
     setup(cx);
-    let (view, cx) = cx.add_window_view(|_, _| Picks(Vec::new(), Vec::new(), None, false));
+    let (view, cx) = cx.add_window_view(|_, _| {
+        Picks(Vec::new(), Vec::new(), Vec::new(), None, false)
+    });
     settle(cx);
     cx.simulate_click(row(1), Modifiers::none());
     settle(cx);
@@ -439,16 +480,20 @@ fn enter_or_a_double_press_opens_a_row(cx: &mut TestAppContext) {
         });
     }
     settle(cx);
-    let opened: Vec<String> = view.read_with(cx, |picks, _| {
-        picks.1.iter().map(|key| key.to_string()).collect()
-    });
-    assert_eq!(opened, ["b", "d"]);
+    assert_eq!(opened(&view, cx), ["b", "d"]);
+    assert_eq!(
+        pressed(&view, cx),
+        ["b", "d"],
+        "Enter and the second click do not press"
+    );
 }
 
 #[gpui::test]
 fn keys_pass_over_a_disabled_row_and_never_pick_or_open_it(cx: &mut TestAppContext) {
     setup(cx);
-    let (view, cx) = cx.add_window_view(|_, _| Picks(Vec::new(), Vec::new(), Some("b"), false));
+    let (view, cx) = cx.add_window_view(|_, _| {
+        Picks(Vec::new(), Vec::new(), Vec::new(), Some("b"), false)
+    });
     settle(cx);
     cx.simulate_click(row(0), Modifiers::none());
     settle(cx);
@@ -464,9 +509,7 @@ fn keys_pass_over_a_disabled_row_and_never_pick_or_open_it(cx: &mut TestAppConte
         ["a", "c", "d"],
         "all leaves the disabled row out"
     );
-    let opened: Vec<String> = view.read_with(cx, |picks, _| {
-        picks.1.iter().map(|key| key.to_string()).collect()
-    });
+    let opened = opened(&view, cx);
     assert_eq!(
         opened,
         ["a"],
@@ -477,21 +520,21 @@ fn keys_pass_over_a_disabled_row_and_never_pick_or_open_it(cx: &mut TestAppConte
 #[gpui::test]
 fn the_cursor_stays_on_its_row_when_the_rows_reorder(cx: &mut TestAppContext) {
     setup(cx);
-    let (view, cx) = cx.add_window_view(|_, _| Picks(Vec::new(), Vec::new(), None, false));
+    let (view, cx) = cx.add_window_view(|_, _| {
+        Picks(Vec::new(), Vec::new(), Vec::new(), None, false)
+    });
     settle(cx);
     cx.simulate_click(row(0), Modifiers::none());
     settle(cx);
     view.update(cx, |picks, cx| {
-        picks.3 = true;
+        picks.4 = true;
         cx.notify();
     });
     settle(cx);
     enter(cx);
     cx.simulate_keystrokes("up");
     settle(cx);
-    let opened: Vec<String> = view.read_with(cx, |picks, _| {
-        picks.1.iter().map(|key| key.to_string()).collect()
-    });
+    let opened = opened(&view, cx);
     assert_eq!(opened, ["a"], "enter opens the row the cursor was on");
     assert_eq!(picks(&view, cx), ["b"], "up moves from where that row went");
 }

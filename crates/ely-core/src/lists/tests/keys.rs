@@ -99,13 +99,16 @@ fn a_release_that_began_elsewhere_opens_nothing(cx: &mut TestAppContext) {
 #[gpui::test]
 fn letters_move_to_the_row_that_starts_with_them(cx: &mut TestAppContext) {
     setup(cx);
-    let (view, cx) = cx.add_window_view(|_, _| Picks(Vec::new(), Vec::new(), None, false));
+    let (view, cx) = cx.add_window_view(|_, _| {
+        Picks(Vec::new(), Vec::new(), Vec::new(), None, false)
+    });
     settle(cx);
     cx.simulate_click(row(0), Modifiers::none());
     settle(cx);
     cx.simulate_input("c");
     settle(cx);
     assert_eq!(picks(&view, cx), ["c"]);
+    assert_eq!(super::pressed(&view, cx), ["a"], "typeahead does not press");
     cx.executor().advance_clock(Duration::from_secs(1));
     cx.simulate_input("b");
     settle(cx);
@@ -120,7 +123,9 @@ fn letters_move_to_the_row_that_starts_with_them(cx: &mut TestAppContext) {
 #[gpui::test]
 fn a_letter_with_command_stays_a_shortcut(cx: &mut TestAppContext) {
     setup(cx);
-    let (view, cx) = cx.add_window_view(|_, _| Picks(Vec::new(), Vec::new(), None, false));
+    let (view, cx) = cx.add_window_view(|_, _| {
+        Picks(Vec::new(), Vec::new(), Vec::new(), None, false)
+    });
     settle(cx);
     cx.simulate_click(row(1), Modifiers::none());
     settle(cx);
@@ -135,4 +140,18 @@ fn a_letter_with_command_stays_a_shortcut(cx: &mut TestAppContext) {
     });
     settle(cx);
     assert_eq!(picks(&view, cx), ["a", "b", "c", "d"]);
+}
+
+/// Arrow and Space selection are keyboard changes, not pointer presses.
+#[gpui::test]
+fn keyboard_selection_does_not_press_a_row(cx: &mut TestAppContext) {
+    setup(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        Picks(Vec::new(), Vec::new(), Vec::new(), None, false)
+    });
+    settle(cx);
+    cx.update(|window, cx| window.focus_next(cx));
+    cx.simulate_keystrokes("down space");
+    settle(cx);
+    assert!(super::pressed(&view, cx).is_empty());
 }

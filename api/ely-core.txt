@@ -4042,6 +4042,7 @@ pub fn ely_core::lists::List::into_any_element(self) -> gpui::element::AnyElemen
 pub fn ely_core::lists::List::into_element(self) -> Self::Element
 pub fn ely_core::lists::List::new() -> Self
 pub fn ely_core::lists::List::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_core::lists::ListItem::accessible_label(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::lists::ListItem::accessible_description(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::lists::ListItem::current(self, bool) -> Self
 pub fn ely_core::lists::ListItem::description(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
@@ -4076,6 +4077,7 @@ pub fn ely_core::lists::SelectableList::multiple(self) -> Self
 pub fn ely_core::lists::SelectableList::new(impl core::convert::Into<gpui::window::ElementId>) -> Self
 pub fn ely_core::lists::SelectableList::on_activate(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::SelectableList::on_change(self, impl core::ops::function::Fn(&[gpui_shared_string::SharedString], &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
+pub fn ely_core::lists::SelectableList::on_press(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::SelectableList::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_core::lists::SelectableList::row(self, impl core::convert::Into<gpui_shared_string::SharedString>, ely_core::lists::ListItem) -> Self
 pub fn ely_core::lists::SelectableList::selected(self, impl core::iter::traits::collect::IntoIterator<Item = impl core::convert::Into<gpui_shared_string::SharedString>>) -> Self

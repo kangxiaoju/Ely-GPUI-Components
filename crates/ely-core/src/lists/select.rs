@@ -78,6 +78,7 @@ pub(crate) fn typed_to(
 
 type OnSelect = Rc<dyn Fn(&[SharedString], &mut Window, &mut App)>;
 type OnActivate = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
+type OnPress = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
 type Picker = Rc<dyn Fn(usize, Pick, &mut Window, &mut App)>;
 
 /// Rows you select. A press picks one; with `multiple`, Cmd-press adds or drops one and Shift-press takes the range from the last pick. Up and Down move, Shift with them extends, Space toggles, Cmd-A takes all, typing a row's first letters moves to it, and Enter activates the row on its release, so an activation that moves focus leaves the release nothing to press. Keys pass over disabled rows, and no pick adds one.
@@ -101,6 +102,7 @@ pub struct SelectableList {
     label: Option<SharedString>,
     on_change: Option<OnSelect>,
     on_activate: Option<OnActivate>,
+    on_press: Option<OnPress>,
 }
 
 impl SelectableList {
@@ -115,6 +117,7 @@ impl SelectableList {
             label: None,
             on_change: None,
             on_activate: None,
+            on_press: None,
         }
     }
 
@@ -139,6 +142,15 @@ impl SelectableList {
     /// Lets more than one row be chosen.
     pub fn multiple(mut self) -> Self {
         self.multiple = true;
+        self
+    }
+
+    /// An unmodified single left press on a row, after it becomes selected.
+    pub fn on_press(
+        mut self,
+        handler: impl Fn(&SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_press = Some(Rc::new(handler));
         self
     }
 
@@ -267,12 +279,14 @@ impl RenderOnce for SelectableList {
                 }
             })
         };
+        let press = self.on_press;
         let rows: Vec<_> = self
             .rows
             .into_iter()
             .enumerate()
             .map(|(ix, (key, item))| {
-                let (pick, focus, activate) = (pick.clone(), focus.clone(), activate.clone());
+                let (pick, focus, activate, press) =
+                    (pick.clone(), focus.clone(), activate.clone(), press.clone());
                 item.selected(selected.contains(&key))
                     .place(ix + 1, count)
                     .current(focused && ix == at)
@@ -285,7 +299,11 @@ impl RenderOnce for SelectableList {
                         };
                         window.focus(&focus, cx);
                         pick(ix, how, window, cx);
-                        if event.click_count() == 2 {
+                        if !held.modified() && event.click_count() == 1 {
+                            if let Some(press) = &press {
+                                press(&key, window, cx);
+                            }
+                        } else if event.click_count() == 2 {
                             activate(&key, window, cx);
                         }
                     })
