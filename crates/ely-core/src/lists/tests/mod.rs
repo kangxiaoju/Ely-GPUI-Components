@@ -1,12 +1,14 @@
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 use gpui::{
-    Context, Entity, InteractiveElement, IntoElement, Modifiers, ParentElement, Pixels, Point,
-    Render, ScrollDelta, ScrollEvent, SharedString, StatefulInteractiveElement, Styled,
-    TestAppContext, TouchPhase, VisualTestContext, Window, div, point, px,
+    Context, Element as _, Entity, InteractiveElement, IntoElement, Modifiers, ParentElement,
+    Pixels, Point, Render, RenderOnce, ScrollDelta, ScrollEvent, SharedString,
+    StatefulInteractiveElement, Styled, TestAppContext, TouchPhase, VisualTestContext, Window,
+    accesskit, canvas, div, point, px,
 };
 
 use super::{
@@ -35,6 +37,84 @@ fn settle(cx: &mut VisualTestContext) {
         cx.update(|window, _| window.refresh());
         cx.run_until_parked();
     }
+}
+
+type CapturedListItemNodes = Arc<Mutex<Option<[accesskit::Node; 2]>>>;
+
+struct AccessibleListItems {
+    captured: CapturedListItemNodes,
+}
+
+impl Render for AccessibleListItems {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let captured = self.captured.clone();
+        div()
+            .child(canvas(
+                move |_, window, cx| {
+                    let mut node = |item: ListItem| {
+                        let mut node = accesskit::Node::new(accesskit::Role::ListItem);
+                        item.render(window, cx)
+                            .into_element()
+                            .write_a11y_info(&mut node);
+                        node
+                    };
+                    *captured.lock().expect("list item nodes") = Some([
+                        node(
+                            ListItem::new("invoice-a11y", "Invoice")
+                                .description("Due Friday")
+                                .accessible_description("Payment is overdue"),
+                        ),
+                        node(ListItem::new("fallback", "Invoice").description("Due Friday")),
+                    ]);
+                },
+                |_, _, _, _| {},
+            ))
+            .child(
+                ListItem::new("invoice-visual", "Invoice")
+                    .description("Due Friday")
+                    .accessible_description("Payment is overdue"),
+            )
+    }
+}
+
+fn accessible_list_items(
+    cx: &mut TestAppContext,
+) -> (CapturedListItemNodes, &mut VisualTestContext) {
+    cx.update(Theme::init);
+    let captured: CapturedListItemNodes = Arc::new(Mutex::new(None));
+    let result = captured.clone();
+    let (_, cx) = cx.add_window_view(move |_, _| AccessibleListItems { captured });
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    (result, cx)
+}
+
+#[gpui::test]
+fn an_accessible_description_overrides_a_list_items_visual_description(
+    cx: &mut TestAppContext,
+) {
+    let (captured, cx) = accessible_list_items(cx);
+    let [item, _] = captured
+        .lock()
+        .expect("list item nodes")
+        .take()
+        .expect("drawn");
+    assert_eq!(item.label(), Some("Invoice"));
+    assert_eq!(item.description(), Some("Payment is overdue"));
+    assert!(
+        cx.debug_bounds("item-description-Due Friday").is_some(),
+        "the visual description stays drawn"
+    );
+}
+
+#[gpui::test]
+fn a_list_items_visual_description_is_its_accessible_fallback(cx: &mut TestAppContext) {
+    let (captured, _) = accessible_list_items(cx);
+    let [_, item] = captured
+        .lock()
+        .expect("list item nodes")
+        .take()
+        .expect("drawn");
+    assert_eq!(item.description(), Some("Due Friday"));
 }
 
 const NAMES: [&str; 4] = ["a", "b", "c", "d"];

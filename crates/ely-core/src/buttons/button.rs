@@ -152,6 +152,7 @@ pub struct Button {
     id: ElementId,
     label: SharedString,
     name: Option<SharedString>,
+    accessible_description: Option<SharedString>,
     icon: Option<IconName>,
     trailing_icon: Option<IconName>,
     shortcut: Option<SharedString>,
@@ -172,6 +173,7 @@ impl Button {
             id: id.into(),
             label: label.into(),
             name: None,
+            accessible_description: None,
             icon: None,
             trailing_icon: None,
             shortcut: None,
@@ -212,6 +214,12 @@ impl Button {
     /// The name assistive technology reads for a button that draws no label; nothing is drawn.
     pub fn name(mut self, name: impl Into<SharedString>) -> Self {
         self.name = Some(name.into());
+        self
+    }
+
+    /// Extra context assistive technology reads after the button's name; nothing is drawn.
+    pub fn accessible_description(mut self, description: impl Into<SharedString>) -> Self {
+        self.accessible_description = Some(description.into());
         self
     }
 
@@ -277,6 +285,15 @@ impl RenderOnce for Button {
             (label, Some(name)) if label.is_empty() => name.clone(),
             (label, _) => label.clone(),
         };
+        let description = match (self.accessible_description, self.disabled) {
+            (Some(description), true) => SharedString::from(format!(
+                "{description}. {}",
+                i18n::text(cx, "state.unavailable", &[])
+            )),
+            (Some(description), false) => description,
+            (None, true) => i18n::text(cx, "state.unavailable", &[]),
+            (None, false) => SharedString::default(),
+        };
         let parts = div()
             .flex()
             .min_w_0()
@@ -301,6 +318,7 @@ impl RenderOnce for Button {
             .id(self.id)
             .role(Role::Button)
             .when(!name.is_empty(), |el| el.aria_label(name))
+            .when(!description.is_empty(), |el| el.aria_description(description))
             .flex()
             // Never grows; shrinks only when a row cannot wrap.
             .flex_grow_0()
@@ -340,10 +358,7 @@ impl RenderOnce for Button {
             })
             .map(|el| {
                 if self.disabled {
-                    return el
-                        .aria_description(i18n::text(cx, "state.unavailable", &[]))
-                        .opacity(0.45)
-                        .cursor_not_allowed();
+                    return el.opacity(0.45).cursor_not_allowed();
                 }
                 let el = match &self.focus {
                     Some(handle) => el.track_focus(handle),

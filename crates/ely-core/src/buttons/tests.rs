@@ -1,6 +1,9 @@
+use std::sync::{Arc, Mutex};
+
 use gpui::{
-    Context, FocusHandle, IntoElement, KeyBinding, KeyUpEvent, Keystroke, Modifiers, ParentElement,
-    Render, Styled, TestAppContext, VisualTestContext, Window, div, point, px,
+    Context, Element as _, FocusHandle, IntoElement, KeyBinding, KeyUpEvent, Keystroke, Modifiers,
+    ParentElement, Render, RenderOnce, Styled, TestAppContext, VisualTestContext, Window, accesskit,
+    canvas, div, point, px,
 };
 
 use super::{Button, SegmentedControl, ToggleButton, ToggleGroup, ToggleItem};
@@ -37,6 +40,67 @@ fn press(key: &str, cx: &mut VisualTestContext) {
         .expect("a key"),
     });
     cx.run_until_parked();
+}
+
+type CapturedButtonNodes = Arc<Mutex<Option<[accesskit::Node; 2]>>>;
+
+struct AccessibleButtons {
+    captured: CapturedButtonNodes,
+}
+
+impl Render for AccessibleButtons {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let captured = self.captured.clone();
+        canvas(
+            move |_, window, cx| {
+                let mut node = |button: Button| {
+                    let mut node = accesskit::Node::new(accesskit::Role::Button);
+                    button
+                        .render(window, cx)
+                        .into_element()
+                        .write_a11y_info(&mut node);
+                    node
+                };
+                *captured.lock().expect("button nodes") = Some([
+                    node(Button::new("save", "Save").accessible_description("Saves this draft")),
+                    node(
+                        Button::new("publish", "Publish")
+                            .accessible_description("Requires approval")
+                            .disabled(true),
+                    ),
+                ]);
+            },
+            |_, _, _, _| {},
+        )
+    }
+}
+
+#[gpui::test]
+fn a_button_exposes_its_name_and_accessible_description(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let captured: CapturedButtonNodes = Arc::new(Mutex::new(None));
+    let result = captured.clone();
+    let (_, cx) = cx.add_window_view(move |_, _| AccessibleButtons { captured });
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    let [button, _] = result.lock().expect("button nodes").take().expect("drawn");
+    assert_eq!(button.label(), Some("Save"));
+    assert_eq!(button.description(), Some("Saves this draft"));
+}
+
+#[gpui::test]
+fn a_disabled_button_keeps_its_accessible_description_and_unavailable_state(
+    cx: &mut TestAppContext,
+) {
+    cx.update(Theme::init);
+    let unavailable = cx.update(|cx| crate::i18n::text(cx, "state.unavailable", &[]).to_string());
+    let captured: CapturedButtonNodes = Arc::new(Mutex::new(None));
+    let result = captured.clone();
+    let (_, cx) = cx.add_window_view(move |_, _| AccessibleButtons { captured });
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    let [_, button] = result.lock().expect("button nodes").take().expect("drawn");
+    let description = button.description().expect("a description");
+    assert!(description.contains("Requires approval"), "{description}");
+    assert!(description.contains(&unavailable), "{description}");
 }
 
 #[gpui::test]

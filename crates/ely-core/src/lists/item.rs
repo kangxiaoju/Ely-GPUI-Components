@@ -33,6 +33,7 @@ pub struct ListItem {
     /// A field drawn in the title's place.
     editor: Option<AnyElement>,
     description: Option<SharedString>,
+    accessible_description: Option<SharedString>,
     detail: Option<SharedString>,
     leading: Option<AnyElement>,
     trailing: Option<AnyElement>,
@@ -57,6 +58,7 @@ impl ListItem {
             title: title.into(),
             editor: None,
             description: None,
+            accessible_description: None,
             detail: None,
             leading: None,
             trailing: None,
@@ -106,6 +108,12 @@ impl ListItem {
     /// A second line, quieter than the title.
     pub fn description(mut self, text: impl Into<SharedString>) -> Self {
         self.description = Some(text.into());
+        self
+    }
+
+    /// Extra context assistive technology reads instead of the visual description; nothing is drawn.
+    pub fn accessible_description(mut self, description: impl Into<SharedString>) -> Self {
+        self.accessible_description = Some(description.into());
         self
     }
 
@@ -200,9 +208,10 @@ impl RenderOnce for ListItem {
             .aria_label(self.title.clone())
             .aria_selected(self.selected)
             .when(self.current, |row| row.aria_active_descendant())
-            .when_some(self.description.clone(), |row, text| {
-                row.aria_description(text)
-            })
+            .when_some(
+                self.accessible_description.or_else(|| self.description.clone()),
+                |row, text| row.aria_description(text),
+            )
             .when_some(self.place, |row, (at, of)| {
                 row.aria_position_in_set(at).aria_size_of_set(of)
             })
