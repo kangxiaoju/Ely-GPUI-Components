@@ -35,6 +35,7 @@ pub(super) const TABLE: &[(&str, &str)] = &[
     ("sheet.name", "פעולות"),
     ("dialog.close", "סגירה"),
     ("state.unavailable", "לא זמין"),
+    ("state.described_unavailable", "{description}. {state}"),
     ("templates.find", "חיפוש תבנית"),
     ("templates.all", "הכול"),
     ("templates.list", "תבניות"),

@@ -32,6 +32,7 @@ pub(super) const TABLE: &[(&str, &str)] = &[
     ("sheet.name", "操作"),
     ("dialog.close", "关闭"),
     ("state.unavailable", "不可用"),
+    ("state.described_unavailable", "{description}。{state}"),
     ("templates.find", "查找模板"),
     ("templates.all", "全部"),
     ("templates.list", "模板"),

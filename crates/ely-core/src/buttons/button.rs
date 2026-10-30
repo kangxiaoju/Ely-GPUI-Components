@@ -286,10 +286,17 @@ impl RenderOnce for Button {
             (label, _) => label.clone(),
         };
         let description = match (self.accessible_description, self.disabled) {
-            (Some(description), true) => SharedString::from(format!(
-                "{description}. {}",
-                i18n::text(cx, "state.unavailable", &[])
-            )),
+            (Some(description), true) => {
+                let unavailable = i18n::text(cx, "state.unavailable", &[]);
+                i18n::text(
+                    cx,
+                    "state.described_unavailable",
+                    &[
+                        ("description", description.as_ref()),
+                        ("state", unavailable.as_ref()),
+                    ],
+                )
+            }
             (Some(description), false) => description,
             (None, true) => i18n::text(cx, "state.unavailable", &[]),
             (None, false) => SharedString::default(),

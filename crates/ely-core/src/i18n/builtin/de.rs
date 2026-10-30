@@ -38,6 +38,7 @@ pub(super) const TABLE: &[(&str, &str)] = &[
     ("sheet.name", "Aktionen"),
     ("dialog.close", "Schließen"),
     ("state.unavailable", "Nicht verfügbar"),
+    ("state.described_unavailable", "{description}. {state}"),
     ("templates.find", "Vorlage suchen"),
     ("templates.all", "Alle"),
     ("templates.list", "Vorlagen"),

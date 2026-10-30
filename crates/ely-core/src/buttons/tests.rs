@@ -8,6 +8,7 @@ use gpui::{
 
 use super::{Button, SegmentedControl, ToggleButton, ToggleGroup, ToggleItem};
 use crate::{
+    i18n::I18n,
     primitives::{FocusNext, FocusScope, IconName},
     theme::Theme,
 };
@@ -92,15 +93,38 @@ fn a_disabled_button_keeps_its_accessible_description_and_unavailable_state(
     cx: &mut TestAppContext,
 ) {
     cx.update(Theme::init);
-    let unavailable = cx.update(|cx| crate::i18n::text(cx, "state.unavailable", &[]).to_string());
+    let expected = cx.update(|cx| {
+        let unavailable = crate::i18n::text(cx, "state.unavailable", &[]);
+        crate::i18n::text(
+            cx,
+            "state.described_unavailable",
+            &[
+                ("description", "Requires approval"),
+                ("state", unavailable.as_ref()),
+            ],
+        )
+        .to_string()
+    });
     let captured: CapturedButtonNodes = Arc::new(Mutex::new(None));
     let result = captured.clone();
     let (_, cx) = cx.add_window_view(move |_, _| AccessibleButtons { captured });
     cx.update(|window, cx| window.draw(cx).clear(cx));
     let [_, button] = result.lock().expect("button nodes").take().expect("drawn");
-    let description = button.description().expect("a description");
-    assert!(description.contains("Requires approval"), "{description}");
-    assert!(description.contains(&unavailable), "{description}");
+    assert_eq!(button.description(), Some(expected.as_str()));
+}
+
+#[gpui::test]
+fn a_disabled_button_localizes_its_combined_description(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        Theme::init(cx);
+        cx.set_global(I18n::new("zh-CN"));
+    });
+    let captured: CapturedButtonNodes = Arc::new(Mutex::new(None));
+    let result = captured.clone();
+    let (_, cx) = cx.add_window_view(move |_, _| AccessibleButtons { captured });
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    let [_, button] = result.lock().expect("button nodes").take().expect("drawn");
+    assert_eq!(button.description(), Some("Requires approval。不可用"));
 }
 
 #[gpui::test]

@@ -44,6 +44,7 @@ pub(super) const TABLE: &[(&str, &str)] = &[
     ("sheet.name", "アクション"),
     ("dialog.close", "閉じる"),
     ("state.unavailable", "利用できません"),
+    ("state.described_unavailable", "{description}。{state}"),
     ("templates.find", "テンプレートを検索"),
     ("templates.all", "すべて"),
     ("templates.list", "テンプレート"),
