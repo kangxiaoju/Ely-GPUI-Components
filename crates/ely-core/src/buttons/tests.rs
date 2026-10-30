@@ -93,24 +93,13 @@ fn a_disabled_button_keeps_its_accessible_description_and_unavailable_state(
     cx: &mut TestAppContext,
 ) {
     cx.update(Theme::init);
-    let expected = cx.update(|cx| {
-        let unavailable = crate::i18n::text(cx, "state.unavailable", &[]);
-        crate::i18n::text(
-            cx,
-            "state.described_unavailable",
-            &[
-                ("description", "Requires approval"),
-                ("state", unavailable.as_ref()),
-            ],
-        )
-        .to_string()
-    });
+    let expected = "Requires approval. Unavailable";
     let captured: CapturedButtonNodes = Arc::new(Mutex::new(None));
     let result = captured.clone();
     let (_, cx) = cx.add_window_view(move |_, _| AccessibleButtons { captured });
     cx.update(|window, cx| window.draw(cx).clear(cx));
     let [_, button] = result.lock().expect("button nodes").take().expect("drawn");
-    assert_eq!(button.description(), Some(expected.as_str()));
+    assert_eq!(button.description(), Some(expected));
 }
 
 #[gpui::test]
