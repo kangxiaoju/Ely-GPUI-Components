@@ -107,6 +107,32 @@ impl TrayIcon {
         })
     }
 
+    /// A literal menu-bar wordmark on macOS and a supplied PNG on other desktops.
+    ///
+    /// Unlike `new`, this does not interpret `label` as an SF Symbol name.
+    pub fn new_text(
+        label: &str,
+        png: &'static [u8],
+        name: SharedString,
+        items: Vec<TrayItem>,
+        on_pick: impl Fn(usize, &mut App) + 'static,
+        cx: &mut App,
+    ) -> anyhow::Result<Self> {
+        anyhow::ensure!(!label.trim().is_empty(), "tray label is empty");
+        #[cfg(target_os = "macos")]
+        {
+            let entries: Vec<_> = items.iter().map(|item| match item {
+                TrayItem::Action(label) => Some(label.as_ref()),
+                TrayItem::Separator => None,
+            }).collect();
+            let route = Route { app: cx.to_async(), on_pick: Rc::new(on_pick) };
+            let _ = png;
+            Ok(Self { inner: Inner::new_text(label, &name, &entries, Box::new(move |index| route.pick(index)))? })
+        }
+        #[cfg(not(target_os = "macos"))]
+        Self::new(TrayLook { symbol: "", png, name }, items, on_pick, cx)
+    }
+
     /// Chooses item `index` as a click would.
     pub fn pick(&self, index: usize) {
         self.inner.pick(index);
