@@ -30,6 +30,7 @@ pub struct Brush {
 pub(super) enum Gesture {
     #[default]
     Idle,
+    Erasing { keys: Vec<SharedString> },
     Rotating { key: SharedString, center: (f32,f32), start: f32, from: (f32,f32), to: (f32,f32) },
     Marquee {
         from: (f32, f32),
@@ -145,6 +146,11 @@ pub(super) fn commit(
     cx: &mut App,
 ) {
     match gesture {
+        Gesture::Erasing { keys } => {
+            if !keys.is_empty() {
+                if let Some(delete) = &handlers.on_delete { delete(&keys, window, cx); }
+            }
+        }
         Gesture::Rotating { key, center, start, from, to } => {
             let angle = start + (to.1-center.1).atan2(to.0-center.0) - (from.1-center.1).atan2(from.0-center.0);
             if let Some(on_rotate) = &handlers.on_rotate { on_rotate(&key, angle, window, cx); }

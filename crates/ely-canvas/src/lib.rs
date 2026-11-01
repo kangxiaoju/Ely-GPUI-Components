@@ -25,6 +25,8 @@
 //! with exporters: clockwise, unclosed canvas points, radius capped at 12 units.
 //! Inspector Standard/Hand-drawn geometry changes roughness only (0 / 1.2), retaining
 //! fonts and colors; choosing Hand-drawn again preserves an existing roughness.
+//! Eraser strokes accumulate unique unlocked targets and call `ToolLayer::on_delete`
+//! once after release, so owners can confirm one batch without interrupting the drag.
 #![deny(missing_docs)]
 
 use ely_core::{buttons, feedback, forms, i18n, layout, lists, overlays, primitives, shell, theme};

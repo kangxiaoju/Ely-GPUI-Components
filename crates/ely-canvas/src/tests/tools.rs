@@ -208,3 +208,53 @@ fn the_palette_wraps_inside_a_narrow_box(cx: &mut TestAppContext) {
         );
     }
 }
+
+fn eraser(_: &Stage, owner: Entity<Stage>) -> AnyElement {
+    let view = Viewport::new(0.0, 0.0, 1.0);
+    let deleted = owner.clone();
+    InfiniteCanvas::new("plane", view).shapes(pair()).layer(
+        ToolLayer::new("layer", Tool::Eraser, view, pair())
+            .on_delete(move |keys, _, cx| say(&deleted, format!("erase {keys:?}"), cx)),
+    ).into_any_element()
+}
+
+#[gpui::test]
+fn eraser_finishes_one_batch_after_release_instead_of_interrupting_the_drag(cx: &mut TestAppContext) {
+    let (host, cx) = stage(eraser, cx);
+    cx.simulate_mouse_down(at(50.0, 50.0), MouseButton::Left, Modifiers::none());
+    settle(cx);
+    assert!(said(&host, cx).is_empty(), "a delete dialog must not interrupt the held pointer");
+    cx.simulate_mouse_move(at(250.0, 50.0), Some(MouseButton::Left), Modifiers::none());
+    settle(cx);
+    cx.simulate_mouse_move(at(270.0, 50.0), Some(MouseButton::Left), Modifiers::none());
+    settle(cx);
+    assert!(said(&host, cx).is_empty(), "dragging accumulates targets without repeat requests");
+    cx.simulate_mouse_up(at(270.0, 50.0), MouseButton::Left, Modifiers::none());
+    settle(cx);
+    assert_eq!(said(&host, cx), ["erase [\"a\", \"b\"]"]);
+}
+
+#[gpui::test]
+fn eraser_click_also_commits_once_on_release(cx: &mut TestAppContext) {
+    let (host, cx) = stage(eraser, cx);
+    press(50.0, 50.0, 1, cx);
+    assert_eq!(said(&host, cx), ["erase [\"a\"]"]);
+}
+
+fn protected_eraser(_: &Stage, owner: Entity<Stage>) -> AnyElement {
+    let view=Viewport::new(0.0,0.0,1.0);
+    let mut shapes=pair();
+    shapes[0].locked=true;shapes[1].hidden=true;
+    InfiniteCanvas::new("plane",view).shapes(shapes.clone()).layer(
+        ToolLayer::new("layer",Tool::Eraser,view,shapes)
+            .on_delete(move |keys,_,cx|say(&owner,format!("erase {keys:?}"),cx)),
+    ).into_any_element()
+}
+
+#[gpui::test]
+fn eraser_ignores_locked_hidden_and_empty_space(cx: &mut TestAppContext) {
+    let (host,cx)=stage(protected_eraser,cx);
+    drag((50.0,50.0),(250.0,50.0),cx);
+    press(350.0,150.0,1,cx);
+    assert!(said(&host,cx).is_empty());
+}

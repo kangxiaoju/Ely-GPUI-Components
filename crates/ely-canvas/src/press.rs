@@ -41,12 +41,9 @@ pub(super) fn pressed(
     };
     match press.tool {
         Tool::Eraser => {
-            if let Some(ix) = hit(&scene.shapes, at, REACH / view.zoom) {
-                if let Some(delete) = &handlers.on_delete {
-                    delete(&[scene.shapes[ix].key.clone()], window, cx);
-                }
-            }
-            Gesture::Idle
+            let keys = hit(&scene.shapes, at, REACH / view.zoom)
+                .map(|ix| vec![scene.shapes[ix].key.clone()]).unwrap_or_default();
+            Gesture::Erasing { keys }
         }
         Tool::Hand => Gesture::Idle,
         Tool::Select => {

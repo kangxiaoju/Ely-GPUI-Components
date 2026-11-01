@@ -153,7 +153,7 @@ impl ToolLayer {
         self
     }
 
-    /// Gets the selected keys when Delete or Backspace is pressed on the layer.
+    /// Gets unique eraser targets once on release, or the selection on Delete/Backspace.
     pub fn on_delete(
         mut self,
         handler: impl Fn(&[SharedString], &mut Window, &mut App) + 'static,
@@ -378,11 +378,10 @@ impl RenderOnce for ToolLayer {
             view,
         });
         let handlers = Rc::new(handlers);
-        let select_on_up = handlers.on_select.clone();
+        let (select_on_up, release_scene, release_handlers) = (handlers.on_select.clone(), scene.clone(), handlers.clone());
         let (press_scene, press_handlers, press_editing) =
             (scene.clone(), handlers.clone(), editing.clone());
         let erasing_scene = press_scene.clone();
-        let erasing_handlers = press_handlers.clone();
         let brush = self.brush;
         let (out_hand, out_scene, out_handlers) = (hand.clone(), scene.clone(), handlers.clone());
         let measured = hand.clone();
@@ -446,22 +445,21 @@ impl RenderOnce for ToolLayer {
                 });
             })
             .on_drag(Tracing { owner }, |_, _, _, cx| cx.new(|_| EmptyView))
-            .on_drag_move::<Tracing>(move |event, window, cx| {
+            .on_drag_move::<Tracing>(move |event, _window, cx| {
                 if event.drag(cx).owner != owner {
                     return;
                 }
                 let bounds = moved.read(cx).bounds;
                 let at = point_of(event.event.position, bounds);
-                if tool == Tool::Eraser {
-                    if let Some(ix) = super::edit::hit(&erasing_scene.shapes, at, REACH / view.zoom) {
-                        if let Some(delete) = &erasing_handlers.on_delete {
-                            delete(&[erasing_scene.shapes[ix].key.clone()], window, cx);
-                        }
-                    }
-                }
                 moved.update(cx, |hand, cx| {
                     hand.square = event.event.modifiers.shift;
                     match &mut hand.gesture {
+                        Gesture::Erasing { keys } => {
+                            if let Some(ix) = super::edit::hit(&erasing_scene.shapes, at, REACH / view.zoom) {
+                                let key = &erasing_scene.shapes[ix].key;
+                                if !keys.contains(key) { keys.push(key.clone()); }
+                            }
+                        }
                         Gesture::Marquee { to, .. }
                         | Gesture::Moving { to, .. }
                         | Gesture::Rotating { to, .. }
@@ -503,6 +501,8 @@ impl RenderOnce for ToolLayer {
                     if let Some(on_select) = &select_on_up {
                         on_select(&[], window, cx);
                     }
+                } else if matches!(gesture, Gesture::Erasing { .. }) {
+                    commit(gesture, false, &release_scene, &release_handlers, brush, window, cx);
                 }
             })
             .child(
