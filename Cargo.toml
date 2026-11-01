@@ -24,7 +24,7 @@ ely-account = { path = "crates/ely-account", version = "0.1.1" }
 ely-settings = { path = "crates/ely-settings", version = "0.1.1" }
 ely-dashboard = { path = "crates/ely-dashboard", version = "0.1.1" }
 ely-devtools = { path = "crates/ely-devtools", version = "0.1.1" }
-ely-canvas = { path = "crates/ely-canvas", version = "0.2.0" }
+ely-canvas = { path = "crates/ely-canvas", version = "0.3.0" }
 ely-project = { path = "crates/ely-project", version = "0.1.1" }
 ely-calendar = { path = "crates/ely-calendar", version = "0.1.1" }
 ely-mail = { path = "crates/ely-mail", version = "0.1.1" }

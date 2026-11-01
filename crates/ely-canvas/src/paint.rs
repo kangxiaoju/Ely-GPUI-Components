@@ -89,6 +89,10 @@ pub(crate) fn paint_shape(
             vec![(frame.x, frame.y), (frame.right(), frame.y),
                 (frame.right(), frame.bottom()), (frame.x, frame.bottom())]
         }
+        ShapeKind::RoundedRect => {
+            closed = true;
+            super::rounded_rectangle_outline(frame)
+        }
         ShapeKind::Ellipse | ShapeKind::Polygon(_) | ShapeKind::Diamond => {
             closed = true;
             let sides = match shape.kind { ShapeKind::Polygon(n) => n, ShapeKind::Diamond => 4, _ => 64 };

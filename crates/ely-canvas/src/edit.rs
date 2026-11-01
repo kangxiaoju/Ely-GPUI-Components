@@ -14,6 +14,8 @@ pub enum Tool {
     Hand,
     /// Draws a rectangle.
     Rect,
+    /// Draws a rounded rectangle.
+    RoundedRect,
     /// Draws an ellipse.
     Ellipse,
     /// Draws a diamond.
@@ -40,10 +42,11 @@ pub enum Tool {
 
 impl Tool {
     /// Every tool, in the palette's order.
-    pub const ALL: [Tool; 14] = [
+    pub const ALL: [Tool; 15] = [
         Tool::Select,
         Tool::Hand,
         Tool::Rect,
+        Tool::RoundedRect,
         Tool::Ellipse,
         Tool::Polygon,
         Tool::Diamond,
@@ -63,6 +66,7 @@ impl Tool {
             Tool::Select => "select",
             Tool::Hand => "hand",
             Tool::Rect => "rect",
+            Tool::RoundedRect => "rounded_rect",
             Tool::Ellipse => "ellipse",
             Tool::Diamond => "diamond",
             Tool::Eraser => "eraser",
@@ -88,6 +92,7 @@ impl Tool {
             Tool::Select => "v",
             Tool::Hand => "h",
             Tool::Rect => "r",
+            Tool::RoundedRect => "u",
             Tool::Ellipse => "o",
             Tool::Diamond => "d",
             Tool::Eraser => "e",
@@ -106,6 +111,7 @@ impl Tool {
     pub(crate) fn draws(self) -> Option<ShapeKind> {
         match self {
             Tool::Rect => Some(ShapeKind::Rect),
+            Tool::RoundedRect => Some(ShapeKind::RoundedRect),
             Tool::Ellipse => Some(ShapeKind::Ellipse),
             Tool::Diamond => Some(ShapeKind::Diamond),
             Tool::Polygon => Some(ShapeKind::Polygon(6)),
@@ -182,6 +188,13 @@ pub(crate) fn hit(shapes: &[Shape], at: (f32, f32), reach: f32) -> Option<usize>
             }
             ShapeKind::Path {points,..} | ShapeKind::Polyline {points,..} => {
                 points.windows(2).any(|p| distance_to_segment(at,(frame.x+p[0].0,frame.y+p[0].1),(frame.x+p[1].0,frame.y+p[1].1)) <= reach + shape.appearance.map_or(2.0,|s|s.stroke_width/2.0))
+            }
+            ShapeKind::RoundedRect => {
+                let radius = super::rounded::radius(frame);
+                let (cx, cy) = frame.center();
+                let x = ((at.0 - cx).abs() - (frame.w / 2.0 - radius)).max(0.0);
+                let y = ((at.1 - cy).abs() - (frame.h / 2.0 - radius)).max(0.0);
+                x.hypot(y) <= radius + reach
             }
             ShapeKind::Diamond => {
                 let (cx, cy) = frame.center();
@@ -413,5 +426,20 @@ mod tests {
         assert_eq!(frame, Frame::new(40.0, 100.0, 60.0, 60.0));
         let (_, square) = drawn(ShapeKind::Rect, (0.0, 0.0), (30.0, -80.0), true);
         assert_eq!(square, Frame::new(0.0, -80.0, 80.0, 80.0));
+    }
+
+    #[test]
+    fn rounded_tool_draws_resizes_writes_and_hits_real_corners() {
+        let kind = super::Tool::RoundedRect.draws().unwrap();
+        let (kind, frame) = drawn(kind, (40.0, 40.0), (0.0, 0.0), false);
+        let shape = Shape::new("round", "Round", kind, frame).written("Words");
+        assert_eq!(shape.words().map(|s| s.as_ref()), Some("Words"));
+        assert_eq!(hit(std::slice::from_ref(&shape), (0.0, 0.0), 0.0), None);
+        assert_eq!(hit(std::slice::from_ref(&shape), (10.0, 0.0), 0.0), Some(0));
+        let rotated = shape.clone().rotation(std::f32::consts::FRAC_PI_4);
+        assert_eq!(hit(std::slice::from_ref(&rotated), rotated.rotate_point((0.0, 0.0), rotated.rotation), 0.0), None);
+        let next = super::resized_shape(&shape, Handle::SouthEast, (40.0, 40.0), (80.0, 60.0), 1.0, false);
+        assert_eq!(next, Frame::new(0.0, 0.0, 80.0, 60.0));
+        assert_eq!(inside(&[shape], &frame), [gpui::SharedString::from("round")]);
     }
 }

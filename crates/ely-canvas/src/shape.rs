@@ -9,6 +9,8 @@ use crate::primitives::IconName;
 pub enum ShapeKind {
     /// A rectangle.
     Rect,
+    /// A rectangle with radius `min(12, min(width, height) * 0.25)` canvas units.
+    RoundedRect,
     /// A diamond with vertices at the frame's side centers.
     Diamond,
     /// An embedded image; the host retains this shared resource between renders.
@@ -46,6 +48,7 @@ impl ShapeKind {
     pub(crate) fn icon(&self) -> IconName {
         match self {
             ShapeKind::Rect => IconName::Square,
+            ShapeKind::RoundedRect => IconName::SquareRoundCorner,
             ShapeKind::Diamond => IconName::Hexagon,
             ShapeKind::Image(_) => IconName::Square,
             ShapeKind::Polyline { .. } => IconName::Spline,
@@ -63,6 +66,7 @@ impl ShapeKind {
     pub fn word(&self) -> &'static str {
         match self {
             ShapeKind::Rect => "Rectangle",
+            ShapeKind::RoundedRect => "Rounded rectangle",
             ShapeKind::Diamond => "Diamond",
             ShapeKind::Image(_) => "Image",
             ShapeKind::Polyline { .. } => "Polyline",
@@ -79,7 +83,7 @@ impl ShapeKind {
     /// Its localized type name, without changing the user's layer name or text.
     pub fn words(&self, cx: &gpui::App) -> SharedString {
         let key = match self {
-            Self::Rect => "rect", Self::Diamond => "diamond", Self::Image(_) => "image",
+            Self::Rect => "rect", Self::RoundedRect => "rounded_rect", Self::Diamond => "diamond", Self::Image(_) => "image",
             Self::Polyline { .. } => "polyline", Self::Ellipse => "ellipse",
             Self::Polygon(_) => "polygon", Self::Line(_) => "line", Self::Arrow(_) => "arrow",
             Self::Text(_) => "text", Self::Path { .. } => "path", Self::Note(_) => "note",
@@ -266,6 +270,19 @@ impl Shape {
         let (dx,dy) = (local.0-cx,local.1-cy);
         let (rx,ry) = ((self.frame.w/2.0).max(0.001),(self.frame.h/2.0).max(0.001));
         if dx.hypot(dy) < 0.000001 { return self.rotate_point((cx+rx,cy),self.rotation); }
+        if matches!(self.kind, ShapeKind::RoundedRect) {
+            let scale = 1.0 / (dx.abs() / rx).max(dy.abs() / ry);
+            let radius = super::rounded::radius(&self.frame);
+            let (x, y) = (dx.abs() * scale, dy.abs() * scale);
+            if x > rx - radius && y > ry - radius {
+                let (ox, oy) = (rx - radius, ry - radius);
+                let a = dx * dx + dy * dy;
+                let b = dx.abs() * ox + dy.abs() * oy;
+                let c = ox * ox + oy * oy - radius * radius;
+                let t = (b + (b * b - a * c).max(0.0).sqrt()) / a;
+                return self.rotate_point((cx + dx * t, cy + dy * t), self.rotation);
+            }
+        }
         let divisor = match self.kind {
             ShapeKind::Ellipse => ((dx/rx).powi(2)+(dy/ry).powi(2)).sqrt(),
             ShapeKind::Diamond => (dx/rx).abs()+(dy/ry).abs(),

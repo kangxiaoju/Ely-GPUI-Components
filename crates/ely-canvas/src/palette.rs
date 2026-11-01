@@ -22,6 +22,7 @@ fn icon(tool: Tool) -> IconName {
         Tool::Select => IconName::MousePointer2,
         Tool::Hand => IconName::Hand,
         Tool::Rect => IconName::Square,
+        Tool::RoundedRect => IconName::SquareRoundCorner,
         Tool::Ellipse => IconName::Circle,
         Tool::Diamond => IconName::Hexagon,
         Tool::Eraser => IconName::Eraser,

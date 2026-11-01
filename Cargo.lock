@@ -1735,8 +1735,9 @@ dependencies = [
 
 [[package]]
 name = "ely-canvas"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
+ "base64",
  "ely-core",
  "gpui-pre",
  "log",

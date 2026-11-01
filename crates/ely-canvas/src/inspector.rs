@@ -118,6 +118,12 @@ impl RenderOnce for InspectorPanel {
         let opacity = editing("inspector", shape, on_change, |s, v:f64| s.appearance.get_or_insert_with(Default::default).opacity = v as f32);
         let width = editing("inspector", shape, on_change, |s, v:f64| s.appearance.get_or_insert_with(Default::default).stroke_width = v as f32);
         let roughness = editing("inspector", shape, on_change, |s, v:f64| s.appearance.get_or_insert_with(Default::default).roughness = v as f32);
+        let geometry = editing("inspector", shape, on_change, |s, value: SharedString| {
+            let hue = s.hue;
+            let style = s.appearance.get_or_insert_with(|| super::ShapeAppearance { stroke: hue, ..Default::default() });
+            if value.as_ref() == "standard" { style.roughness = 0.0; }
+            else if style.roughness <= 0.0 { style.roughness = 1.2; }
+        });
         let font = editing("inspector", shape, on_change, |s, v:f64| s.appearance.get_or_insert_with(Default::default).font_size = v as f32);
         let rotate = editing("inspector", shape, on_change, |s, v:f64| s.rotation = (v as f32).to_radians());
         let filled = editing("inspector", shape, on_change, |s, v:bool| { let hue=s.hue; s.appearance.get_or_insert_with(Default::default).fill = v.then_some(hue); });
@@ -172,6 +178,11 @@ impl RenderOnce for InspectorPanel {
                 ),
             )
             .child(div().flex().flex_col().gap_2().child(caption(word("canvas.appearance"),cx))
+                .child(caption(word("canvas.geometry"),cx))
+                .child(crate::buttons::SegmentedControl::new((id.clone(), "geometry-mode"), if appearance.roughness > 0.0 { "handdrawn" } else { "standard" })
+                    .segment("standard",word("canvas.geometry.standard"),None)
+                    .segment("handdrawn",word("canvas.geometry.handdrawn"),None)
+                    .on_change(move |value,window,cx| geometry(value.clone(),window,cx)))
                 .child(ScrubInput::new((id.clone(), "rotation"), word("canvas.rotation"), shape.rotation.to_degrees() as f64).range(-360.0,360.0).on_change(rotate))
                 .child(ScrubInput::new((id.clone(), "width"), word("canvas.stroke_width"), appearance.stroke_width as f64).range(0.1,100.0).on_change(width))
                 .child(ScrubInput::new((id.clone(), "opacity"), word("canvas.opacity"), appearance.opacity as f64).range(0.0,1.0).precision(2).on_change(opacity))

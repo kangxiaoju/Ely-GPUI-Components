@@ -20,6 +20,11 @@
 //! Native and export outlines share `sketch_outline` and `sketch_seed`; a second trace
 //! uses `seed ^ 0x9e3779b97f4a7c15`, width × 0.65 and opacity × 0.45.
 //! `LinkAnimation::glow` adds a theme-hue particle with a 35% inter-pass gap.
+//!
+//! `ShapeKind::RoundedRect` and `Tool::RoundedRect` share `rounded_rectangle_outline`
+//! with exporters: clockwise, unclosed canvas points, radius capped at 12 units.
+//! Inspector Standard/Hand-drawn geometry changes roughness only (0 / 1.2), retaining
+//! fonts and colors; choosing Hand-drawn again preserves an existing roughness.
 #![deny(missing_docs)]
 
 use ely_core::{buttons, feedback, forms, i18n, layout, lists, overlays, primitives, shell, theme};
@@ -48,6 +53,7 @@ mod palette;
 mod panel;
 mod plane;
 mod press;
+mod rounded;
 mod shape;
 mod sketch;
 mod style;
@@ -86,6 +92,7 @@ pub use palette::{BrushSettings, ToolPalette};
 pub use panel::{OnEdit, caption, color_well, editing};
 pub use plane::InfiniteCanvas;
 pub use shape::{Artboard, CanvasFont, Corner, Guide, Shape, ShapeKind, ShapeAppearance};
+pub use rounded::rounded_rectangle_outline;
 pub use sketch::{sketch_outline, sketch_seed};
 pub use style::{Border, BorderEditor, ColorPanel, Dash, Shadow, ShadowEditor};
 pub use tools::ToolLayer;

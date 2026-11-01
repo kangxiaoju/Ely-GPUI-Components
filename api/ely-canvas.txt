@@ -266,7 +266,7 @@ pub const ely_canvas::Dash::ALL: [ely_canvas::Dash; 3]
 pub const ely_canvas::ExportFormat::ALL: [ely_canvas::ExportFormat; 4]
 pub const ely_canvas::Handle::ALL: [ely_canvas::Handle; 8]
 pub const ely_canvas::Pin::ALL: [ely_canvas::Pin; 5]
-pub const ely_canvas::Tool::ALL: [ely_canvas::Tool; 12]
+pub const ely_canvas::Tool::ALL: [ely_canvas::Tool; 15]
 pub const ely_canvas::Viewport::ZOOMS: (f32, f32)
 pub ely_canvas::Align::Bottom
 pub ely_canvas::Align::Center
@@ -372,6 +372,7 @@ pub ely_canvas::ShapeKind::Path::points: alloc::vec::Vec<(f32, f32)>
 pub ely_canvas::ShapeKind::Path::width: f32
 pub ely_canvas::ShapeKind::Polygon(u8)
 pub ely_canvas::ShapeKind::Rect
+pub ely_canvas::ShapeKind::RoundedRect
 pub ely_canvas::ShapeKind::Text(gpui_shared_string::SharedString)
 pub ely_canvas::Step::frame: ely_canvas::Frame
 pub ely_canvas::Step::key: gpui_shared_string::SharedString
@@ -390,6 +391,7 @@ pub ely_canvas::Tool::Note
 pub ely_canvas::Tool::Pen
 pub ely_canvas::Tool::Polygon
 pub ely_canvas::Tool::Rect
+pub ely_canvas::Tool::RoundedRect
 pub ely_canvas::Tool::Select
 pub ely_canvas::Tool::Text
 pub ely_canvas::Topic::children: alloc::vec::Vec<ely_canvas::Topic>
@@ -727,6 +729,7 @@ pub fn ely_canvas::ZoomIndicator::on_zoom(self, impl core::ops::function::Fn(f32
 pub fn ely_canvas::ZoomIndicator::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_canvas::aligned(&[ely_canvas::Frame], ely_canvas::Align) -> alloc::vec::Vec<ely_canvas::Frame>
 pub fn ely_canvas::export_files(&str, &[ely_canvas::ExportSetting]) -> alloc::vec::Vec<alloc::string::String>
+pub fn ely_canvas::rounded_rectangle_outline(&ely_canvas::Frame) -> alloc::vec::Vec<(f32, f32)>
 pub mod ely_canvas
 pub struct ely_canvas::AlignmentToolbar
 pub struct ely_canvas::Artboard
@@ -859,3 +862,4 @@ pub use ely_canvas::ZoomControls = ely_canvas::zoom::ZoomControls
 pub use ely_canvas::ZoomIndicator = ely_canvas::zoom::ZoomIndicator
 pub use ely_canvas::aligned = ely_canvas::align::aligned
 pub use ely_canvas::export_files = ely_canvas::export::export_files
+pub use ely_canvas::rounded_rectangle_outline = ely_canvas::rounded::rounded_rectangle_outline

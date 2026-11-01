@@ -32,11 +32,12 @@ pub struct Board {
 }
 
 /// The tools a whiteboard offers, in the palette's order.
-const TOOLS: [Tool; 10] = [
+const TOOLS: [Tool; 11] = [
     Tool::Select,
     Tool::Hand,
     Tool::Note,
     Tool::Rect,
+    Tool::RoundedRect,
     Tool::Ellipse,
     Tool::Arrow,
     Tool::Connector,
