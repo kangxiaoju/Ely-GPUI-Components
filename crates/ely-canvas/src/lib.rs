@@ -11,6 +11,14 @@
 //! fills. Shape rotation and `ToolLayer::on_rotate` use radians. Diamond, embedded Image
 //! and frame-relative Polyline extend the same production painter and hit-testing path.
 //! Tool previews use `appearance` and preserve committed rotation/style during transforms.
+//!
+//! `ShapeKind::words(cx)` localizes the type without rewriting user names. Use
+//! `InspectorPanel::defaults` to edit a new-shape appearance with no selection.
+//! `CanvasFont::Handwritten` uses the host-registered `Xiaolai` family; hosts register
+//! the same font bytes with their SVG exporter. UI fonts are never replaced.
+//! Native and export outlines share `sketch_outline` and `sketch_seed`; a second trace
+//! uses `seed ^ 0x9e3779b97f4a7c15`, width × 0.65 and opacity × 0.45.
+//! `LinkAnimation::glow` adds a theme-hue particle with a 35% inter-pass gap.
 #![deny(missing_docs)]
 
 use ely_core::{buttons, feedback, forms, i18n, layout, lists, overlays, primitives, shell, theme};
@@ -40,6 +48,7 @@ mod panel;
 mod plane;
 mod press;
 mod shape;
+mod sketch;
 mod style;
 mod tools;
 mod typography;
@@ -74,7 +83,8 @@ pub use paint::{at, finish, outline};
 pub use palette::{BrushSettings, ToolPalette};
 pub use panel::{OnEdit, caption, color_well, editing};
 pub use plane::InfiniteCanvas;
-pub use shape::{Artboard, Corner, Guide, Shape, ShapeKind, ShapeAppearance};
+pub use shape::{Artboard, CanvasFont, Corner, Guide, Shape, ShapeKind, ShapeAppearance};
+pub use sketch::{sketch_outline, sketch_seed};
 pub use style::{Border, BorderEditor, ColorPanel, Dash, Shadow, ShadowEditor};
 pub use tools::ToolLayer;
 pub use typography::{TypeStyle, TypographyPanel};

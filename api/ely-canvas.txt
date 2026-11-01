@@ -4,6 +4,7 @@ impl core::clone::Clone for ely_canvas::AutoLayout
 impl core::clone::Clone for ely_canvas::Board
 impl core::clone::Clone for ely_canvas::Border
 impl core::clone::Clone for ely_canvas::Brush
+impl core::clone::Clone for ely_canvas::CanvasFont
 impl core::clone::Clone for ely_canvas::Constraints
 impl core::clone::Clone for ely_canvas::Corner
 impl core::clone::Clone for ely_canvas::Dash
@@ -30,6 +31,7 @@ impl core::clone::Clone for ely_canvas::TypeStyle
 impl core::clone::Clone for ely_canvas::Viewport
 impl core::cmp::Eq for ely_canvas::Align
 impl core::cmp::Eq for ely_canvas::Constraints
+impl core::cmp::Eq for ely_canvas::CanvasFont
 impl core::cmp::Eq for ely_canvas::Corner
 impl core::cmp::Eq for ely_canvas::Dash
 impl core::cmp::Eq for ely_canvas::Edge
@@ -46,6 +48,7 @@ impl core::cmp::PartialEq for ely_canvas::AutoLayout
 impl core::cmp::PartialEq for ely_canvas::Board
 impl core::cmp::PartialEq for ely_canvas::Border
 impl core::cmp::PartialEq for ely_canvas::Brush
+impl core::cmp::PartialEq for ely_canvas::CanvasFont
 impl core::cmp::PartialEq for ely_canvas::Constraints
 impl core::cmp::PartialEq for ely_canvas::Corner
 impl core::cmp::PartialEq for ely_canvas::Dash
@@ -71,6 +74,7 @@ impl core::cmp::PartialEq for ely_canvas::Topic
 impl core::cmp::PartialEq for ely_canvas::TypeStyle
 impl core::cmp::PartialEq for ely_canvas::Viewport
 impl core::default::Default for ely_canvas::Board
+impl core::default::Default for ely_canvas::CanvasFont
 impl core::default::Default for ely_canvas::Frame
 impl core::fmt::Debug for ely_canvas::Align
 impl core::fmt::Debug for ely_canvas::Artboard
@@ -78,6 +82,7 @@ impl core::fmt::Debug for ely_canvas::AutoLayout
 impl core::fmt::Debug for ely_canvas::Board
 impl core::fmt::Debug for ely_canvas::Border
 impl core::fmt::Debug for ely_canvas::Brush
+impl core::fmt::Debug for ely_canvas::CanvasFont
 impl core::fmt::Debug for ely_canvas::Constraints
 impl core::fmt::Debug for ely_canvas::Corner
 impl core::fmt::Debug for ely_canvas::Dash
@@ -106,6 +111,7 @@ impl core::marker::Copy for ely_canvas::Align
 impl core::marker::Copy for ely_canvas::AutoLayout
 impl core::marker::Copy for ely_canvas::Border
 impl core::marker::Copy for ely_canvas::Brush
+impl core::marker::Copy for ely_canvas::CanvasFont
 impl core::marker::Copy for ely_canvas::Constraints
 impl core::marker::Copy for ely_canvas::Corner
 impl core::marker::Copy for ely_canvas::Dash
@@ -126,6 +132,7 @@ impl core::marker::StructuralPartialEq for ely_canvas::Artboard
 impl core::marker::StructuralPartialEq for ely_canvas::AutoLayout
 impl core::marker::StructuralPartialEq for ely_canvas::Board
 impl core::marker::StructuralPartialEq for ely_canvas::Border
+impl core::marker::StructuralPartialEq for ely_canvas::CanvasFont
 impl core::marker::StructuralPartialEq for ely_canvas::Brush
 impl core::marker::StructuralPartialEq for ely_canvas::Constraints
 impl core::marker::StructuralPartialEq for ely_canvas::Corner
@@ -158,6 +165,7 @@ impl ely_canvas::AssetPanel
 impl ely_canvas::AutoLayout
 impl ely_canvas::AutoLayoutControls
 impl ely_canvas::BorderEditor
+impl ely_canvas::CanvasFont
 impl ely_canvas::BrushSettings
 impl ely_canvas::ColorPanel
 impl ely_canvas::Constraints
@@ -292,6 +300,9 @@ pub ely_canvas::Corner::TopRight
 pub ely_canvas::Dash::Dashed
 pub ely_canvas::Dash::Dotted
 pub ely_canvas::Dash::Solid
+pub ely_canvas::CanvasFont::Default
+pub ely_canvas::CanvasFont::Handwritten
+pub ely_canvas::CanvasFont::Monospace
 pub ely_canvas::Edge::from: (gpui_shared_string::SharedString, gpui_shared_string::SharedString)
 pub ely_canvas::Edge::to: (gpui_shared_string::SharedString, gpui_shared_string::SharedString)
 pub ely_canvas::ExportFormat::Jpg
@@ -321,6 +332,7 @@ pub ely_canvas::Link::from: gpui_shared_string::SharedString
 pub ely_canvas::Link::key: gpui_shared_string::SharedString
 pub ely_canvas::Link::label: core::option::Option<gpui_shared_string::SharedString>
 pub ely_canvas::Link::to: gpui_shared_string::SharedString
+pub ely_canvas::LinkAnimation::glow: bool
 pub ely_canvas::Node::at: (f32, f32)
 pub ely_canvas::Node::inputs: alloc::vec::Vec<ely_canvas::Port>
 pub ely_canvas::Node::key: gpui_shared_string::SharedString
@@ -350,6 +362,7 @@ pub ely_canvas::Shape::kind: ely_canvas::ShapeKind
 pub ely_canvas::Shape::label: core::option::Option<gpui_shared_string::SharedString>
 pub ely_canvas::Shape::locked: bool
 pub ely_canvas::Shape::name: gpui_shared_string::SharedString
+pub ely_canvas::ShapeAppearance::font: ely_canvas::CanvasFont
 pub ely_canvas::ShapeKind::Arrow(ely_canvas::Corner)
 pub ely_canvas::ShapeKind::Ellipse
 pub ely_canvas::ShapeKind::Line(ely_canvas::Corner)
@@ -536,6 +549,7 @@ pub fn ely_canvas::InfiniteCanvas::rulers(self) -> Self
 pub fn ely_canvas::InfiniteCanvas::shapes(self, impl core::iter::traits::collect::IntoIterator<Item = ely_canvas::Shape>) -> Self
 pub fn ely_canvas::InspectorPanel::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_canvas::InspectorPanel::into_element(self) -> Self::Element
+pub fn ely_canvas::InspectorPanel::defaults(self, ely_canvas::ShapeAppearance, impl core::ops::function::Fn(ely_canvas::ShapeAppearance, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_canvas::InspectorPanel::new(impl core::convert::Into<gpui::window::ElementId>, impl core::iter::traits::collect::IntoIterator<Item = ely_canvas::Shape>, impl core::ops::function::Fn(ely_canvas::Shape, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_canvas::InspectorPanel::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_canvas::LayerPanel::into_any_element(self) -> gpui::element::AnyElement
@@ -578,6 +592,14 @@ pub fn ely_canvas::NodeGraph::fixed_wires(self) -> Self
 pub fn ely_canvas::NodeGraph::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_canvas::NodeGraph::into_element(self) -> Self::Element
 pub fn ely_canvas::NodeGraph::new(impl core::convert::Into<gpui::window::ElementId>, ely_canvas::Viewport, impl core::iter::traits::collect::IntoIterator<Item = ely_canvas::Node>, impl core::iter::traits::collect::IntoIterator<Item = ely_canvas::Edge>) -> Self
+pub fn ely_canvas::ShapeKind::words(&self, &gpui::app::App) -> gpui_shared_string::SharedString
+pub fn ely_canvas::sketch_outline(&[(f32, f32)], bool, f32, u64) -> alloc::vec::Vec<(f32, f32)>
+pub fn ely_canvas::sketch_seed(&str) -> u64
+pub fn ely_canvas::ShapeKind::word(&self) -> &'static str
+pub fn ely_canvas::CanvasFont::clone(&self) -> Self
+pub fn ely_canvas::CanvasFont::default() -> Self
+pub fn ely_canvas::CanvasFont::eq(&self, &Self) -> bool
+pub fn ely_canvas::CanvasFont::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn ely_canvas::NodeGraph::on_connect(self, impl core::ops::function::Fn(&ely_canvas::Edge, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_canvas::NodeGraph::on_disconnect(self, impl core::ops::function::Fn(&ely_canvas::Edge, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_canvas::NodeGraph::on_move(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, (f32, f32), &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self

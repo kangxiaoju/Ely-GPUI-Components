@@ -170,10 +170,7 @@ impl RenderOnce for BrushSettings {
             });
         let hues = ColorPalette::new(
             (self.id.clone(), "hue"),
-            HUE_NAMES
-                .iter()
-                .zip(chart)
-                .map(|(name, color)| (*name, color)),
+            HUE_NAMES.iter().enumerate().map(|(ix,_)| (i18n::text(cx,&format!("canvas.hue.{ix}"),&[]),chart[ix])),
         )
         .columns(8)
         .selected(chart[brush.hue])

@@ -98,14 +98,10 @@ pub(crate) fn paint_shape(
         ShapeKind::Path { points, .. } | ShapeKind::Polyline { points, .. } => points.iter().map(|(x,y)| (frame.x + x, frame.y + y)).collect(),
         ShapeKind::Text(_) | ShapeKind::Image(_) => return,
     };
-    for (ix, point) in points.iter_mut().enumerate() {
-        if let Some(style) = style {
-            let noise = ((ix as f32 + 1.0) * 12.9898).sin();
-            point.0 += noise * style.roughness;
-            point.1 += (noise * 7.1).sin() * style.roughness;
-        }
-        *point = view.to_view(shape.rotate_point(*point, shape.rotation));
-    }
+    let roughness = style.map_or(0.0, |style| style.roughness);
+    let second = (roughness > 0.0).then(|| super::sketch_outline(&points,closed,roughness,super::sketch_seed(&shape.key)^0x9e3779b97f4a7c15));
+    points = super::sketch_outline(&points,closed,roughness,super::sketch_seed(&shape.key));
+    for point in &mut points { *point = view.to_view(shape.rotate_point(*point,shape.rotation)); }
     if closed {
         if let Some(wash) = wash { finish(solid(&points, origin), wash, window); }
     }
@@ -115,6 +111,10 @@ pub(crate) fn paint_shape(
     };
     let dash = style.map_or(super::style::Dash::Solid, |s| s.dash);
     patterned(&points, origin, width, closed, dash, 0.0, ink, window);
+    if let Some(mut second) = second {
+        for point in &mut second { *point = view.to_view(shape.rotate_point(*point,shape.rotation)); }
+        patterned(&second,origin,width*0.65,closed,dash,0.0,ink.opacity(0.45),window);
+    }
     if matches!(shape.kind, ShapeKind::Arrow(_) | ShapeKind::Polyline { arrow: true, .. }) && points.len() >= 2 {
         finish(solid(&head(points[points.len()-2], points[points.len()-1], width), origin), ink, window);
     }

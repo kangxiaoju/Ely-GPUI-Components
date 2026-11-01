@@ -288,6 +288,21 @@ impl RenderOnce for ToolLayer {
             Some(gpui::img(image.clone()).absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y))
                 .w(Pixels::from(frame.w)).h(Pixels::from(frame.h)).opacity(shape.appearance.map_or(1.0,|s|s.opacity)))
         }).collect();
+        let text_preview:Vec<_>=preview.iter().filter_map(|shape| {
+            let text=shape.words()?;
+            let frame=in_view(&view,&shape.frame);
+            let style=shape.appearance.unwrap_or_default();
+            let family=style.font.family(cx);
+            if shape.rotation != 0.0 {
+                let escaped=|text:&str|text.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;").replace('"',"&quot;").replace('\'',"&apos;");
+                let spans=text.lines().enumerate().map(|(ix,line)|format!("<tspan x='0' y='{}'>{}</tspan>",style.font_size*(1.0+ix as f32*1.3),escaped(line))).collect::<String>();
+                let svg=format!("<svg xmlns='http://www.w3.org/2000/svg' width='{}' height='{}'><text font-family='{}' font-size='{}'>{}</text></svg>",shape.frame.w,shape.frame.h,escaped(&family),style.font_size,spans);
+                return Some(gpui::svg().data(svg.as_bytes()).with_transformation(gpui::Transformation::rotate(gpui::radians(shape.rotation)))
+                    .absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y)).w(Pixels::from(frame.w)).h(Pixels::from(frame.h)).text_color(palette.fg).opacity(style.opacity).into_any_element());
+            }
+            Some(placed(&frame).overflow_hidden().font_family(family).text_size(Pixels::from(style.font_size*view.zoom)).line_height(Pixels::from(style.font_size*view.zoom*1.3))
+                .text_color(palette.fg).opacity(style.opacity).child(text.to_string()).into_any_element())
+        }).collect();
         let marquee = match &gesture {
             Gesture::Marquee { from, to } => Some(SelectionBox::new(in_view(
                 &view,
@@ -317,7 +332,7 @@ impl RenderOnce for ToolLayer {
         let field = writing_on
             .as_ref()
             .and_then(|key| shapes.iter().find(|shape| shape.key == *key))
-            .and_then(|shape| writing::field(&editing, in_view(&view, &shape.frame), cx));
+            .and_then(|shape| writing::field(&editing, in_view(&view, &shape.frame), shape.appearance.unwrap_or_default(),view.zoom,cx));
         if field.is_none() && writing_on.is_some() && editing.read(cx).field().is_some() {
             let closing = editing.clone();
             log::info!("tool layer: the shape written on left the canvas");
@@ -512,6 +527,7 @@ impl RenderOnce for ToolLayer {
             .children(marquee)
             .children(handles)
             .children(image_preview)
+            .children(text_preview)
             .children(rotation_handle)
             .children(outline)
             .children(field)

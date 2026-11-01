@@ -116,7 +116,7 @@ impl LayerPanel {
 }
 
 impl RenderOnce for LayerPanel {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let order: Vec<SharedString> = self.shapes.iter().map(|shape| shape.key.clone()).collect();
         let shown: Vec<SharedString> = self
             .shapes
@@ -127,7 +127,7 @@ impl RenderOnce for LayerPanel {
         let nodes = self.shapes.iter().rev().map(|shape| {
             let node = TreeNode::new(shape.key.clone(), shape.name.clone()).icon(shape.kind.icon());
             if shape.locked {
-                node.note("Locked")
+                node.note(crate::i18n::text(cx,"canvas.locked",&[]))
             } else {
                 node
             }

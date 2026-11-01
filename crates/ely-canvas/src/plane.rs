@@ -176,7 +176,6 @@ impl RenderOnce for InfiniteCanvas {
         let (colors, sizes) = (theme.colors.clone(), theme.canvas());
         let rem = window.rem_size();
         let base_text_size = theme.text_size(TextSize::Base).to_pixels(rem);
-        let font_family = theme.font_family.clone();
         let xs_text_size = theme.text_size(TextSize::Xs);
         let (dot, hairline, stroke) = (sizes.dot, sizes.hairline, sizes.stroke.to_pixels(rem));
         let (ruler, side) = (sizes.ruler.to_pixels(rem), sizes.side.to_pixels(rem));
@@ -217,7 +216,7 @@ impl RenderOnce for InfiniteCanvas {
                 .reduce(|a,b| a.union(&b))?;
             if bounds.right() < 0.0 || bounds.bottom() < 0.0 || bounds.x > w || bounds.y > h { return None; }
             let animation = self.link_animations.iter().find(|a| a.key == link.key).cloned()
-                .or_else(|| self.link_hues.get(&link.key).map(|hue| LinkAnimation { key:link.key.clone(), mode:FlowMode::Dashes, direction:FlowDirection::Forward, speed:0.0, paused:true, hue:*hue }));
+                .or_else(|| self.link_hues.get(&link.key).map(|hue| LinkAnimation { key:link.key.clone(), mode:FlowMode::Dashes, direction:FlowDirection::Forward, speed:0.0, paused:true, hue:*hue, glow:false }));
             Some((points, link.label.clone(), animation))
         }).collect();
         let flowing = self.animations_active && !self.reduced_motion && !theme.reduced_motion && routes.iter().any(|(_,_,a)| a.as_ref().is_some_and(|a| !a.paused && a.speed > 0.0));
@@ -259,13 +258,13 @@ impl RenderOnce for InfiniteCanvas {
         });
         surface.update(cx, |surface, _| {
             let elapsed = surface.started.elapsed().as_secs_f32();
+            let previous = std::mem::take(&mut surface.lines);
             surface.lines = lines.into_iter().map(|(points,_,animation)| {
-                let phase = animation.as_ref().map_or(0.0, |a| {
-                    let sign = if a.direction == FlowDirection::Forward {1.0} else {-1.0};
-                    elapsed*a.speed*view.zoom*sign
-                });
+                let phase = animation.as_ref().and_then(|next| previous.iter().find(|(_,old,_)| old.as_ref().is_some_and(|old| old.key == next.key)))
+                    .map_or(0.0, |(_,old,phase)| super::link_surface::advanced_phase(*phase,elapsed,old.as_ref(),surface.active,surface.zoom));
                 (points,animation,phase)
             }).collect();
+            surface.started=Instant::now();
             surface.palette=colors.clone(); surface.stroke=stroke; surface.zoom=view.zoom; surface.active=flowing;
         });
         let texts: Vec<AnyElement> = scene.shapes
@@ -275,10 +274,11 @@ impl RenderOnce for InfiniteCanvas {
             .filter_map(|shape| {
                 let frame = in_view(&view, &shape.frame);
                 let size = shape.appearance.map_or(base_text_size, |s| Pixels::from(s.font_size)) * view.zoom;
+                let font_family = shape.appearance.map_or(super::CanvasFont::Default,|style|style.font).family(cx);
                 if shape.rotation != 0.0 && !matches!(shape.kind, ShapeKind::Image(_)) {
                     if let Some(text) = shape.words() {
                         let font_size = shape.appearance.map_or(16.0, |s| s.font_size);
-                        let escaped = |s:&str| s.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;").replace('"',"&quot;");
+                        let escaped = |s:&str| s.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;").replace('"',"&quot;").replace('\'',"&apos;");
                         let spans = text.lines().enumerate().map(|(ix,line)| format!("<tspan x='0' y='{}'>{}</tspan>", font_size*(1.0+ix as f32*1.3),escaped(line))).collect::<String>();
                         let data = format!("<svg xmlns='http://www.w3.org/2000/svg' width='{}' height='{}'><text font-family='{}' font-size='{}'>{}</text></svg>",shape.frame.w,shape.frame.h,escaped(&font_family),font_size,spans);
                         return Some(gpui::svg().data(data.as_bytes()).with_transformation(gpui::Transformation::rotate(gpui::radians(shape.rotation)))
@@ -295,6 +295,7 @@ impl RenderOnce for InfiniteCanvas {
                         .h(Pixels::from(frame.h))
                         .overflow_hidden()
                         .text_size(size)
+                        .font_family(font_family.clone())
                         .line_height(size * 1.3)
                         .opacity(shape.appearance.map_or(1.0, |s| s.opacity))
                         .child(text.to_string())

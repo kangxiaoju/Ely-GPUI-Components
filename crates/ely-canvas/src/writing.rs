@@ -6,7 +6,7 @@ use gpui::{
 };
 
 use super::{gesture::OnPair, view::Frame};
-use crate::forms::{Editing, Input};
+use crate::forms::Editing;
 
 /// Opens a field on the words of what `key` names. Enter or leaving hands them to the owner; Escape drops them. Enter and Escape hand focus back to `back`.
 pub(super) fn begin(
@@ -34,7 +34,7 @@ pub(super) fn begin(
 }
 
 /// The open field over `frame`, in view pixels.
-pub(super) fn field(editing: &Entity<Editing>, frame: Frame, cx: &App) -> Option<AnyElement> {
+pub(super) fn field(editing: &Entity<Editing>, frame: Frame, appearance: super::ShapeAppearance, zoom: f32, cx: &App) -> Option<AnyElement> {
     let field = editing.read(cx).field()?;
     let (closing, keeping) = (editing.clone(), editing.clone());
     Some(
@@ -43,6 +43,8 @@ pub(super) fn field(editing: &Entity<Editing>, frame: Frame, cx: &App) -> Option
             .left(Pixels::from(frame.x))
             .top(Pixels::from(frame.y))
             .w(Pixels::from(frame.w))
+            .font_family(appearance.font.family(cx))
+            .text_size(Pixels::from(appearance.font_size*zoom))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_key_down(move |event, window, cx| {
                 if event.keystroke.key == "escape" {
@@ -62,7 +64,7 @@ pub(super) fn field(editing: &Entity<Editing>, frame: Frame, cx: &App) -> Option
                     });
                 }
             })
-            .child(Input::new(&field))
+            .child(field)
             .into_any_element(),
     )
 }

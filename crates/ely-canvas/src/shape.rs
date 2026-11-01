@@ -60,7 +60,7 @@ impl ShapeKind {
     }
 
     /// What it is, in a word.
-    pub(crate) fn word(&self) -> &'static str {
+    pub fn word(&self) -> &'static str {
         match self {
             ShapeKind::Rect => "Rectangle",
             ShapeKind::Diamond => "Diamond",
@@ -74,6 +74,17 @@ impl ShapeKind {
             ShapeKind::Path { .. } => "Path",
             ShapeKind::Note(_) => "Note",
         }
+    }
+
+    /// Its localized type name, without changing the user's layer name or text.
+    pub fn words(&self, cx: &gpui::App) -> SharedString {
+        let key = match self {
+            Self::Rect => "rect", Self::Diamond => "diamond", Self::Image(_) => "image",
+            Self::Polyline { .. } => "polyline", Self::Ellipse => "ellipse",
+            Self::Polygon(_) => "polygon", Self::Line(_) => "line", Self::Arrow(_) => "arrow",
+            Self::Text(_) => "text", Self::Path { .. } => "path", Self::Note(_) => "note",
+        };
+        crate::i18n::text(cx, &format!("canvas.kind.{key}"), &[])
     }
 }
 
@@ -111,6 +122,29 @@ impl Corner {
     }
 }
 
+/// Font choice for canvas content, independent of the application's UI font.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CanvasFont {
+    /// The theme's proportional font.
+    #[default]
+    Default,
+    /// The host-provided Xiaolai Chinese and Latin handwritten font.
+    Handwritten,
+    /// The theme's monospace font.
+    Monospace,
+}
+
+impl CanvasFont {
+    pub(crate) fn family(self, cx: &gpui::App) -> SharedString {
+        use crate::theme::ActiveTheme;
+        match self {
+            Self::Default => cx.theme().font_family.clone(),
+            Self::Handwritten => "Xiaolai".into(),
+            Self::Monospace => cx.theme().mono_family.clone(),
+        }
+    }
+}
+
 /// Theme-relative appearance shared by committed shapes and tool previews.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ShapeAppearance {
@@ -128,12 +162,14 @@ pub struct ShapeAppearance {
     pub dash: super::style::Dash,
     /// Font size in canvas units.
     pub font_size: f32,
+    /// Font family used by shape text, labels and writing previews.
+    pub font: CanvasFont,
 }
 
 impl Default for ShapeAppearance {
     fn default() -> Self {
         Self { stroke: 0, fill: None, stroke_width: 2.0, opacity: 1.0,
-            roughness: 0.0, dash: super::style::Dash::Solid, font_size: 16.0 }
+            roughness: 0.0, dash: super::style::Dash::Solid, font_size: 16.0, font: CanvasFont::Default }
     }
 }
 

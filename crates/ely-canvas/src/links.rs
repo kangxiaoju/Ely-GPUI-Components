@@ -82,6 +82,8 @@ pub struct LinkAnimation {
     pub paused: bool,
     /// Stroke hue slot.
     pub hue: usize,
+    /// Paints an intermittent luminous particle traveling along the entire route.
+    pub glow: bool,
 }
 
 /// Immutable shared scene. Indexing and binding routes are computed once per content revision,

@@ -4,6 +4,7 @@ What changes for an app built on Ely, newest first. An entry names the crates it
 
 ## Unreleased
 
+- `ely-canvas`, `ely-core`: localize canvas inspectors, type names, layers and zoom; separate stroke and background fill; reuse inspector appearance controls for new-shape defaults. `ShapeAppearance.font` selects standard, host-bundled Xiaolai handwriting or monospace without changing UI fonts. Shared seeded `sketch_outline` geometry produces bowed double-traced edges in native and export renderers. `LinkAnimation.glow` adds an intermittent route-length particle on the isolated visible-link surface; pause, hidden tabs and reduced motion retain phase without continuous frames.
 - `ely-documents`: a `TemplatePicker` as narrow as a `Dialog` gives its list at most half, so the preview's name and Use button both show; narrower still, the name is cut with an ellipsis, never the button. The button had been squeezed over the name.
 - `ely-documents`: in `MarkdownDocument`'s visual view, a drag or Shift+Up/Down past the open block opens the blocks it crosses as one field, selected across them; copy, cut, delete and typing take the whole selection, written back as one undo step. A drag past the view's top or bottom scrolls it.
 - `ely-documents`: bold, italic, strikethrough, underline and inline code over a selection that crosses blocks apply in each paragraph, heading or cell it touches; when all are styled, all lose it. Link and picture still refuse with `EditRefusal::Across`.
