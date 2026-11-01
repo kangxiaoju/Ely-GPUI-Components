@@ -71,6 +71,7 @@ pub struct ToggleItem {
     label: Option<SharedString>,
     icon: Option<IconName>,
     tooltip: Option<SharedString>,
+    disabled: bool,
 }
 
 impl ToggleItem {
@@ -81,6 +82,7 @@ impl ToggleItem {
             label: None,
             icon: None,
             tooltip: None,
+            disabled: false,
         }
     }
 
@@ -99,6 +101,12 @@ impl ToggleItem {
     /// The tip it shows on hover.
     pub fn tooltip(mut self, text: impl Into<SharedString>) -> Self {
         self.tooltip = Some(text.into());
+        self
+    }
+
+    /// Shows the item without accepting pointer or keyboard presses.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 }
@@ -359,7 +367,7 @@ impl RenderOnce for ToggleGroup {
                     on,
                     self.size,
                     compact,
-                    Some(press),
+                    (!item.disabled).then_some(press),
                     cx,
                 )
             })

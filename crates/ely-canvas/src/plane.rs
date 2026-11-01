@@ -175,6 +175,9 @@ impl RenderOnce for InfiniteCanvas {
         let theme = cx.theme();
         let (colors, sizes) = (theme.colors.clone(), theme.canvas());
         let rem = window.rem_size();
+        let base_text_size = theme.text_size(TextSize::Base).to_pixels(rem);
+        let font_family = theme.font_family.clone();
+        let xs_text_size = theme.text_size(TextSize::Xs);
         let (dot, hairline, stroke) = (sizes.dot, sizes.hairline, sizes.stroke.to_pixels(rem));
         let (ruler, side) = (sizes.ruler.to_pixels(rem), sizes.side.to_pixels(rem));
         let grid = step(view.zoom, f32::from(sizes.grid.to_pixels(rem)));
@@ -192,7 +195,7 @@ impl RenderOnce for InfiniteCanvas {
             div()
                 .absolute()
                 .whitespace_nowrap()
-                .text_size(theme.text_size(TextSize::Xs))
+                .text_size(xs_text_size)
                 .text_color(color)
                 .child(text)
         };
@@ -271,13 +274,13 @@ impl RenderOnce for InfiniteCanvas {
             .filter(|shape| { let frame=in_view(&view,&shape.bounds()); frame.right()>=0.0 && frame.bottom()>=0.0 && frame.x<=w && frame.y<=h })
             .filter_map(|shape| {
                 let frame = in_view(&view, &shape.frame);
-                let size = shape.appearance.map_or(theme.text_size(TextSize::Base).to_pixels(rem), |s| Pixels::from(s.font_size)) * view.zoom;
+                let size = shape.appearance.map_or(base_text_size, |s| Pixels::from(s.font_size)) * view.zoom;
                 if shape.rotation != 0.0 && !matches!(shape.kind, ShapeKind::Image(_)) {
                     if let Some(text) = shape.words() {
                         let font_size = shape.appearance.map_or(16.0, |s| s.font_size);
                         let escaped = |s:&str| s.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;").replace('"',"&quot;");
                         let spans = text.lines().enumerate().map(|(ix,line)| format!("<tspan x='0' y='{}'>{}</tspan>", font_size*(1.0+ix as f32*1.3),escaped(line))).collect::<String>();
-                        let data = format!("<svg xmlns='http://www.w3.org/2000/svg' width='{}' height='{}'><text font-family='{}' font-size='{}'>{}</text></svg>",shape.frame.w,shape.frame.h,escaped(&theme.font_family),font_size,spans);
+                        let data = format!("<svg xmlns='http://www.w3.org/2000/svg' width='{}' height='{}'><text font-family='{}' font-size='{}'>{}</text></svg>",shape.frame.w,shape.frame.h,escaped(&font_family),font_size,spans);
                         return Some(gpui::svg().data(data.as_bytes()).with_transformation(gpui::Transformation::rotate(gpui::radians(shape.rotation)))
                             .absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y)).w(Pixels::from(frame.w)).h(Pixels::from(frame.h))
                             .text_color(colors.fg).opacity(shape.appearance.map_or(1.0,|s|s.opacity)).into_any_element());
