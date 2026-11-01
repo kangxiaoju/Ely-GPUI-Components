@@ -281,7 +281,7 @@ impl RenderOnce for InfiniteCanvas {
                         let escaped = |s:&str| s.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;").replace('"',"&quot;").replace('\'',"&apos;");
                         let spans = text.lines().enumerate().map(|(ix,line)| format!("<tspan x='0' y='{}'>{}</tspan>", font_size*(1.0+ix as f32*1.3),escaped(line))).collect::<String>();
                         let data = format!("<svg xmlns='http://www.w3.org/2000/svg' width='{}' height='{}'><text font-family='{}' font-size='{}'>{}</text></svg>",shape.frame.w,shape.frame.h,escaped(&font_family),font_size,spans);
-                        return Some(gpui::svg().data(data.as_bytes()).with_transformation(gpui::Transformation::rotate(gpui::radians(shape.rotation)))
+                        return Some(gpui::svg().data(&super::text_outline::outlined(&data,cx)).with_transformation(gpui::Transformation::rotate(gpui::radians(shape.rotation)))
                             .absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y)).w(Pixels::from(frame.w)).h(Pixels::from(frame.h))
                             .text_color(colors.fg).opacity(shape.appearance.map_or(1.0,|s|s.opacity)).into_any_element());
                     }

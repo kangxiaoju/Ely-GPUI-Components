@@ -297,7 +297,7 @@ impl RenderOnce for ToolLayer {
                 let escaped=|text:&str|text.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;").replace('"',"&quot;").replace('\'',"&apos;");
                 let spans=text.lines().enumerate().map(|(ix,line)|format!("<tspan x='0' y='{}'>{}</tspan>",style.font_size*(1.0+ix as f32*1.3),escaped(line))).collect::<String>();
                 let svg=format!("<svg xmlns='http://www.w3.org/2000/svg' width='{}' height='{}'><text font-family='{}' font-size='{}'>{}</text></svg>",shape.frame.w,shape.frame.h,escaped(&family),style.font_size,spans);
-                return Some(gpui::svg().data(svg.as_bytes()).with_transformation(gpui::Transformation::rotate(gpui::radians(shape.rotation)))
+                return Some(gpui::svg().data(&super::text_outline::outlined(&svg,cx)).with_transformation(gpui::Transformation::rotate(gpui::radians(shape.rotation)))
                     .absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y)).w(Pixels::from(frame.w)).h(Pixels::from(frame.h)).text_color(palette.fg).opacity(style.opacity).into_any_element());
             }
             Some(placed(&frame).overflow_hidden().font_family(family).text_size(Pixels::from(style.font_size*view.zoom)).line_height(Pixels::from(style.font_size*view.zoom*1.3))

@@ -15,7 +15,8 @@
 //! `ShapeKind::words(cx)` localizes the type without rewriting user names. Use
 //! `InspectorPanel::defaults` to edit a new-shape appearance with no selection.
 //! `CanvasFont::Handwritten` uses the host-registered `Xiaolai` family; hosts register
-//! the same font bytes with their SVG exporter. UI fonts are never replaced.
+//! the same font bytes with their SVG exporter and `register_canvas_text_outliner`.
+//! Outlined SVGs are cached by source text, font and geometry, independent of viewport.
 //! Native and export outlines share `sketch_outline` and `sketch_seed`; a second trace
 //! uses `seed ^ 0x9e3779b97f4a7c15`, width × 0.65 and opacity × 0.45.
 //! `LinkAnimation::glow` adds a theme-hue particle with a 35% inter-pass gap.
@@ -50,6 +51,7 @@ mod press;
 mod shape;
 mod sketch;
 mod style;
+mod text_outline;
 mod tools;
 mod typography;
 mod view;
@@ -87,6 +89,7 @@ pub use shape::{Artboard, CanvasFont, Corner, Guide, Shape, ShapeKind, ShapeAppe
 pub use sketch::{sketch_outline, sketch_seed};
 pub use style::{Border, BorderEditor, ColorPanel, Dash, Shadow, ShadowEditor};
 pub use tools::ToolLayer;
+pub use text_outline::register_canvas_text_outliner;
 pub use typography::{TypeStyle, TypographyPanel};
 pub use view::{Frame, Viewport};
 pub use whiteboard::{Board, Whiteboard};
