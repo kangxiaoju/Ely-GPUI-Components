@@ -33,6 +33,7 @@ pub struct InspectorPanel {
     id: ElementId,
     selection: Vec<Shape>,
     on_change: OnEdit<Shape>,
+    read_only: bool,
 }
 
 impl InspectorPanel {
@@ -46,8 +47,12 @@ impl InspectorPanel {
             id: id.into(),
             selection: selection.into_iter().collect(),
             on_change: Rc::new(on_change),
+            read_only: false,
         }
     }
+
+    /// Shows non-editable property values for a read-only document.
+    pub fn read_only(mut self, read_only: bool) -> Self { self.read_only=read_only; self }
 }
 
 impl RenderOnce for InspectorPanel {
@@ -63,6 +68,11 @@ impl RenderOnce for InspectorPanel {
                 .body("Select one layer to see its properties.")
                 .into_any_element();
         };
+        if self.read_only {
+            return div().flex().flex_col().gap_2().child(caption(crate::i18n::text(cx,"canvas.read_only",&[]),cx))
+                .child(caption(shape.name.clone(),cx))
+                .child(caption(format!("{} · {} × {} · {}°",shape.kind.word(),shape.frame.w,shape.frame.h,shape.rotation.to_degrees()),cx)).into_any_element();
+        }
         let on_change = &on_change;
         let at = |edit: fn(&mut Shape, f64)| editing("inspector", shape, on_change, edit);
         let scrub = |name: &'static str, value: f32, least: f64| {
@@ -81,6 +91,7 @@ impl RenderOnce for InspectorPanel {
                 .iter()
                 .position(|hue| *hue == color)
                 .expect("the fill is a chart hue");
+            if let Some(style) = &mut shape.appearance { style.stroke = shape.hue; }
         });
         let shown = editing("inspector", shape, on_change, |shape, on: bool| {
             shape.hidden = !on
@@ -88,7 +99,19 @@ impl RenderOnce for InspectorPanel {
         let locked = editing("inspector", shape, on_change, |shape, on: bool| {
             shape.locked = on
         });
+        let appearance = shape.appearance.unwrap_or_default();
+        let opacity = editing("inspector", shape, on_change, |s, v:f64| s.appearance.get_or_insert_with(Default::default).opacity = v as f32);
+        let width = editing("inspector", shape, on_change, |s, v:f64| s.appearance.get_or_insert_with(Default::default).stroke_width = v as f32);
+        let roughness = editing("inspector", shape, on_change, |s, v:f64| s.appearance.get_or_insert_with(Default::default).roughness = v as f32);
+        let font = editing("inspector", shape, on_change, |s, v:f64| s.appearance.get_or_insert_with(Default::default).font_size = v as f32);
+        let rotate = editing("inspector", shape, on_change, |s, v:f64| s.rotation = (v as f32).to_radians());
+        let filled = editing("inspector", shape, on_change, |s, v:bool| { let hue=s.hue; s.appearance.get_or_insert_with(Default::default).fill = v.then_some(hue); });
+        let fill_hue = editing("inspector", shape, on_change, move |s, color:Hsla| { s.appearance.get_or_insert_with(Default::default).fill = chart.iter().position(|h| *h == color); });
+        let dash = editing("inspector", shape, on_change, |s, value:SharedString| {
+            s.appearance.get_or_insert_with(Default::default).dash = match value.as_ref() { "dashed" => super::style::Dash::Dashed, "dotted" => super::style::Dash::Dotted, _ => super::style::Dash::Solid };
+        });
         let part = |title: &'static str| div().flex().flex_col().gap_2().child(caption(title, cx));
+        let word = |key:&str| crate::i18n::text(cx,key,&[]);
         div()
             .flex()
             .flex_col()
@@ -130,6 +153,16 @@ impl RenderOnce for InspectorPanel {
                         .on_change(hue),
                 ),
             )
+            .child(div().flex().flex_col().gap_2().child(caption(word("canvas.appearance"),cx))
+                .child(ScrubInput::new((id.clone(), "rotation"), word("canvas.rotation"), shape.rotation.to_degrees() as f64).range(-360.0,360.0).on_change(rotate))
+                .child(ScrubInput::new((id.clone(), "width"), word("canvas.stroke_width"), appearance.stroke_width as f64).range(0.1,100.0).on_change(width))
+                .child(ScrubInput::new((id.clone(), "opacity"), word("canvas.opacity"), appearance.opacity as f64).range(0.0,1.0).precision(2).on_change(opacity))
+                .child(ScrubInput::new((id.clone(), "roughness"), word("canvas.roughness"), appearance.roughness as f64).range(0.0,10.0).on_change(roughness))
+                .child(ScrubInput::new((id.clone(), "font"), word("canvas.font_size"), appearance.font_size as f64).range(1.0,512.0).on_change(font))
+                .child(Switch::new((id.clone(), "filled"), appearance.fill.is_some()).label(word("canvas.fill")).on_change(filled))
+                .child(ColorPalette::new((id.clone(), "fill-hue"), HUE_NAMES.iter().copied().zip(chart)).on_change(fill_hue))
+                .child(crate::buttons::SegmentedControl::new((id.clone(), "dash"), match appearance.dash { super::style::Dash::Solid => "solid", super::style::Dash::Dashed => "dashed", super::style::Dash::Dotted => "dotted" })
+                    .segment("solid", word("canvas.solid"), None).segment("dashed", word("canvas.dashed"), None).segment("dotted", word("canvas.dotted"), None).on_change(move |value,window,cx| dash(value.clone(),window,cx))))
             .child(
                 div()
                     .flex()

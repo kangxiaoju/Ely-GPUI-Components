@@ -59,13 +59,17 @@ impl RenderOnce for SelectionBox {
 #[derive(IntoElement)]
 pub struct TransformHandles {
     frame: Frame,
+    rotation: f32,
 }
 
 impl TransformHandles {
     /// Handles around `frame`, in view pixels.
     pub fn new(frame: Frame) -> Self {
-        Self { frame }
+        Self { frame, rotation: 0.0 }
     }
+
+    /// Rotates handle positions around the selection center, in radians.
+    pub fn rotation(mut self, radians:f32) -> Self { self.rotation=radians; self }
 }
 
 /// Where each handle's square sits, in view pixels, for a frame and a handle `side` wide.
@@ -91,6 +95,10 @@ impl RenderOnce for TransformHandles {
         let squares = handle_boxes(&self.frame, side)
             .into_iter()
             .map(move |(handle, frame)| {
+                let (cx,cy)=self.frame.center();
+                let (x,y)=frame.center();
+                let (s,c)=self.rotation.sin_cos();
+                let frame=Frame::new(cx+(x-cx)*c-(y-cy)*s-side/2.0,cy+(x-cx)*s+(y-cy)*c-side/2.0,side,side);
                 placed(&frame)
                     .bg(surface)
                     .border_1()

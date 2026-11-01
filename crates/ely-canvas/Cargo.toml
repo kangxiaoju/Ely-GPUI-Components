@@ -18,6 +18,7 @@ test-support = ["ely-core/test-support", "gpui/test-support", "gpui/leak-detecti
 ely-core.workspace = true
 gpui.workspace = true
 log.workspace = true
+base64 = "0.22"
 
 [lints]
 workspace = true

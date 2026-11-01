@@ -40,14 +40,32 @@ pub(super) fn pressed(
         }
     };
     match press.tool {
+        Tool::Eraser => {
+            if let Some(ix) = hit(&scene.shapes, at, REACH / view.zoom) {
+                if let Some(delete) = &handlers.on_delete {
+                    delete(&[scene.shapes[ix].key.clone()], window, cx);
+                }
+            }
+            Gesture::Idle
+        }
+        Tool::Hand => Gesture::Idle,
         Tool::Select => {
+            if scene.selected.len() == 1 {
+                if let Some(shape) = scene.shapes.iter().find(|s| s.key == scene.selected[0]) {
+                    let knob = shape.rotate_point((shape.frame.x + shape.frame.w/2.0, shape.frame.y - 24.0/view.zoom), shape.rotation);
+                    if (at.0-knob.0).hypot(at.1-knob.1) <= press.side / view.zoom {
+                        return Gesture::Rotating { key: shape.key.clone(), center: shape.frame.center(), start: shape.rotation, from: at, to: at };
+                    }
+                }
+            }
             let held = (scene.selected.len() == 1)
                 .then(|| spanned(&scene.shapes, &scene.selected))
                 .flatten()
                 .and_then(|frame| {
+                    let unrotated = scene.shapes.iter().find(|s| s.key == scene.selected[0]).map_or(press.view_at, |s| view.to_view(s.rotate_point(at,-s.rotation)));
                     handle_boxes(&in_view(&view, &frame), press.side)
                         .into_iter()
-                        .find(|(_, square)| square.contains(press.view_at))
+                        .find(|(_, square)| square.contains(unrotated))
                 });
             match (held, hit(&scene.shapes, at, REACH / view.zoom)) {
                 (Some((handle, _)), _) => Gesture::Resizing {
