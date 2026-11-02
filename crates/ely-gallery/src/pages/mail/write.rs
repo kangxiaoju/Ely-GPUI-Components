@@ -1,6 +1,6 @@
 use ely_gpui_component::{
     chat::Attachment,
-    forms::{Input, TextInput},
+    documents::email::{EmailDocument, EmailEditorView, HtmlEmailEditor},
     mail::{Contact, MailComposer, ScheduleSend, SignatureEditor},
     theme::{ActiveTheme, Radius},
 };
@@ -61,9 +61,7 @@ pub fn composer(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
         writing,
     );
     let words = window.use_keyed_state(("mail-words", now.round), cx, |window, cx| {
-        TextInput::new(window, cx)
-            .multi_line(6, 16)
-            .placeholder("Write your message")
+        HtmlEmailEditor::new(EmailDocument::default(), window, cx)
     });
     let theme = cx.theme();
     let frame = div()
@@ -73,7 +71,7 @@ pub fn composer(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
         .border_color(theme.colors.border)
         .rounded(theme.radius(Radius::Lg))
         .child(
-            MailComposer::new(("mail-composer", now.round), Input::new(&words))
+            MailComposer::new(("mail-composer", now.round), div().h_64().w_full().child(EmailEditorView::new("mail-html-editor", &words)))
                 .contacts(contacts())
                 .signature(SIGNATURE)
                 .files(now.files.clone())
@@ -108,8 +106,8 @@ pub fn composer(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
                 }),
         );
     section(
-        "MailComposer / RecipientInput → TagInput",
-        "To, and Cc and Bcc once asked for, suggest people as you type and mark what is not an address. Then the subject, the words, the files and the signature. Send wakes once there is someone to send to, now or at a time; Discard lets the draft go.",
+        "MailComposer / HtmlEmailEditor / EmailEditorView",
+        "A native HTML message: format visible text, insert tables and pictures, and keep one selection and undo history across the body. Recipients, subject, attachments and sending remain in MailComposer.",
         cx,
     )
     .child(probe(
