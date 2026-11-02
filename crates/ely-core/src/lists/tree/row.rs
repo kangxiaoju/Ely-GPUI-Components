@@ -37,6 +37,7 @@ pub(super) struct Rows {
     pub activate: OnRow,
     pub on_move: Option<OnMove>,
     pub on_context: Option<OnContext>,
+    pub content: Option<super::OnContent>,
 }
 
 pub(super) fn draw(
@@ -101,6 +102,7 @@ fn row(rows: &Rows, ix: usize, window: &mut Window, cx: &mut App) -> AnyElement 
         .filter(|(target, _)| *target == key)
         .map(|(_, at)| *at);
     let field = renaming.then(|| rows.editing.read(cx).field()).flatten();
+    let custom = rows.content.as_ref().map(|render| render(&key, open, window, cx));
     let theme = cx.theme();
     let colors = &theme.colors;
     let indent = theme.tree_indent();
@@ -153,6 +155,7 @@ fn row(rows: &Rows, ix: usize, window: &mut Window, cx: &mut App) -> AnyElement 
                 .child(Input::new(&field).size(ControlSize::Sm))
                 .into_any_element()
         }
+        None if custom.is_some() => custom.expect("custom row content"),
         None => div()
             .flex_1()
             .min_w_0()
@@ -209,7 +212,7 @@ fn row(rows: &Rows, ix: usize, window: &mut Window, cx: &mut App) -> AnyElement 
                         .child(check_mark(state, false, false, turns, cx))
                 }),
         )
-        .children(icon.map(|icon| Icon::new(icon).size(IconSize::Sm).color(colors.fg_muted)))
+        .children(icon.filter(|_| rows.content.is_none()).map(|icon| Icon::new(icon).size(IconSize::Sm).color(colors.fg_muted)))
         .child(body)
         .children(note.map(|note| {
             div()

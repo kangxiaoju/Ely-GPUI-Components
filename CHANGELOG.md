@@ -4,6 +4,7 @@ What changes for an app built on Ely, newest first. An entry names the crates it
 
 ## Unreleased
 
+- `ely-core`: `Avatar::muted` keeps a subtle name-colored background with normal theme text. `Tree::on_open` reports expansion for host state and lazy loading; `row_content` composes file-type icons and host editing fields inside native tree interaction.
 - `ely-core`: `ListItem::compact` uses smaller theme typography and spacing for dense navigation without changing other rows.
 - `ely-core`: `Avatar::solid` renders a name's full theme-chart background with contrasting theme text, for app and project letter marks; existing subtle avatars stay unchanged.
 - `ely-core`: top-level raised overlays namespace their descendants by owner, preventing sibling accessible labels and keyed state from sharing identities.

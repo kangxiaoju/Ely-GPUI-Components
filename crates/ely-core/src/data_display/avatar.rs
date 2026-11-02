@@ -98,6 +98,7 @@ pub struct Avatar {
     square: bool,
     ring: bool,
     solid: bool,
+    muted: bool,
     ring_color: Option<Hsla>,
     presence: Option<Presence>,
 }
@@ -114,6 +115,7 @@ impl Avatar {
             square: false,
             ring: false,
             solid: false,
+            muted: false,
             ring_color: None,
             presence: None,
         }
@@ -152,6 +154,14 @@ impl Avatar {
     /// Useful for app and project marks; the default remains a subtle tint.
     pub fn solid(mut self) -> Self {
         self.solid = true;
+        self.muted = false;
+        self
+    }
+
+    /// A subtle name-colored background with the theme's normal foreground text.
+    pub fn muted(mut self) -> Self {
+        self.solid = false;
+        self.muted = true;
         self
     }
 
@@ -189,6 +199,7 @@ impl RenderOnce for Avatar {
         };
         let tone = tint(&self.name, colors);
         let (background, foreground) = face_colors(tone, colors, self.solid);
+        let foreground = if self.muted { colors.fg } else { foreground };
         let text = match self.size {
             AvatarSize::Xs | AvatarSize::Sm => TextSize::Xs,
             AvatarSize::Md => TextSize::Sm,

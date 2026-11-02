@@ -13,6 +13,7 @@ struct Explorer {
     selected: Vec<SharedString>,
     checked: Option<Vec<SharedString>>,
     heard: Vec<String>,
+    opened: Vec<String>,
 }
 
 impl Render for Explorer {
@@ -45,8 +46,14 @@ impl Render for Explorer {
             heard(&cx.entity()),
         );
         let context = heard(&cx.entity());
+        let opened = cx.entity();
         let tree = Tree::new("tree", all)
             .open(["src"])
+            .on_open(move |key, open, cx| opened.update(cx, |view, _| view.opened.push(format!("open {key} {open}"))))
+            .row_content(|key, _, _, _| {
+                use gpui::ParentElement;
+                gpui::div().flex_1().child(key.clone()).into_any_element()
+            })
             .selected(self.selected.clone())
             .on_select(move |keys, _, cx| {
                 select.update(cx, |explorer, _| explorer.selected = keys.to_vec())
@@ -252,4 +259,16 @@ fn a_right_press_names_its_row_and_keeps_the_selection(cx: &mut TestAppContext) 
     let heard = read(&view, cx, |explorer| explorer.heard.clone());
     assert!(heard.contains(&"context lib".to_string()), "{heard:?}");
     assert!(read(&view, cx, |explorer| explorer.selected.is_empty()));
+}
+
+#[gpui::test]
+fn custom_row_content_preserves_keyboard_expansion_notifications(cx: &mut TestAppContext) {
+    let (view, cx) = explorer(false, cx);
+    cx.simulate_click(row(0), Modifiers::none());
+    settle(cx);
+    cx.simulate_keystrokes("left right");
+    settle(cx);
+    let heard = read(&view, cx, |explorer| explorer.opened.clone());
+    assert!(heard.contains(&"open src false".to_owned()), "{heard:?}");
+    assert!(heard.contains(&"open src true".to_owned()), "{heard:?}");
 }

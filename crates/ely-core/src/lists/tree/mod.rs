@@ -31,6 +31,8 @@ type OnRow = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 type OnPick = Rc<dyn Fn(usize, Pick, &mut Window, &mut App)>;
 type OnToggle = Rc<dyn Fn(&SharedString, bool, &mut App)>;
 type OnContext = Rc<dyn Fn(&SharedString, Point<Pixels>, &mut Window, &mut App)>;
+type OnContent = Rc<dyn Fn(&SharedString, bool, &mut Window, &mut App) -> gpui::AnyElement>;
+type OnOpen = Rc<dyn Fn(&SharedString, bool, &mut App)>;
 
 /// The keyboard's row, where a Shift range starts, the scroll that follows, pending nodes already asked for, where a drag would land, and the node being renamed.
 #[derive(Default)]
@@ -77,6 +79,8 @@ pub struct Tree {
     on_rename: Option<OnRename>,
     on_move: Option<OnMove>,
     on_context: Option<OnContext>,
+    on_open: Option<OnOpen>,
+    content: Option<OnContent>,
 }
 
 impl Tree {
@@ -97,12 +101,26 @@ impl Tree {
             on_rename: None,
             on_move: None,
             on_context: None,
+            on_open: None,
+            content: None,
         }
     }
 
     /// The nodes open at first; a new list from the owner replaces what was opened since.
     pub fn open(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
         self.open = keys.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Reports opening and closing so the owner can preserve state and load children.
+    pub fn on_open(mut self, handler: impl Fn(&SharedString, bool, &mut App) + 'static) -> Self {
+        self.on_open = Some(Rc::new(handler));
+        self
+    }
+
+    /// Replaces only a row's icon and label; tree disclosure, selection and keys stay native.
+    pub fn row_content(mut self, handler: impl Fn(&SharedString, bool, &mut Window, &mut App) -> gpui::AnyElement + 'static) -> Self {
+        self.content = Some(Rc::new(handler));
         self
     }
 
@@ -234,7 +252,7 @@ impl RenderOnce for Tree {
         let selected = Rc::new(self.selected);
         let (multiple, checked) = (self.multiple, self.checked.map(Rc::new));
         let toggle: OnToggle = {
-            let (opened, id) = (opened.clone(), id.clone());
+            let (opened, id, on_open) = (opened.clone(), id.clone(), self.on_open);
             Rc::new(move |key, open, cx| {
                 log::info!(
                     "tree {id:?}: {} {key}",
@@ -246,7 +264,8 @@ impl RenderOnce for Tree {
                         seeded.value.push(key.clone());
                     }
                     cx.notify();
-                })
+                });
+                if let Some(on_open) = &on_open { on_open(key, open, cx); }
             })
         };
         let pick: OnPick = {
@@ -343,6 +362,7 @@ impl RenderOnce for Tree {
             activate: activate.clone(),
             on_move: self.on_move,
             on_context: self.on_context,
+            content: self.content,
         };
         let list = uniform_list((id.clone(), "rows"), count, move |range, window, cx| {
             draw(&data, range, window, cx)
