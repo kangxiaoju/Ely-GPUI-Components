@@ -5,7 +5,7 @@ use gpui::{
 
 use crate::{
     primitives::{Icon, IconName, Image},
-    theme::{ActiveTheme, AvatarSize, IconSize, Palette, Radius, TextSize},
+    theme::{ActiveTheme, AvatarSize, IconSize, Mix, Palette, Radius, TextSize},
 };
 
 /// Whether someone is around.
@@ -199,7 +199,17 @@ impl RenderOnce for Avatar {
         };
         let tone = tint(&self.name, colors);
         let (background, foreground) = face_colors(tone, colors, self.solid);
-        let foreground = if self.muted { colors.fg } else { foreground };
+        let (background, foreground) = if self.muted {
+            let mut background = colors.bg;
+            for step in (1..=8).rev() {
+                let candidate = colors.bg.mix(&tone, step as f32 * 0.01);
+                if crate::theme::contrast(colors.fg, candidate) >= 4.5 {
+                    background = candidate;
+                    break;
+                }
+            }
+            (background, colors.fg)
+        } else { (background, foreground) };
         let text = match self.size {
             AvatarSize::Xs | AvatarSize::Sm => TextSize::Xs,
             AvatarSize::Md => TextSize::Sm,
