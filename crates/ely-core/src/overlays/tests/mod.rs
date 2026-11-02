@@ -320,6 +320,8 @@ fn the_scrim_closes_a_dialog_but_not_an_alert(cx: &mut TestAppContext) {
 fn confirm_runs_from_the_keyboard(cx: &mut TestAppContext) {
     let (view, cx) = stage(cx);
     show(&view, Open::Confirm, cx);
+    cx.update(|window, cx| window.simulate_next_frame(cx));
+    settle(cx);
     press("tab", cx);
     press("tab", cx);
     press("enter", cx);
@@ -368,9 +370,9 @@ fn a_dialog_focuses_its_first_control_a_frame_after_it_opens(cx: &mut TestAppCon
     press("enter", cx);
     assert!(
         before_focused(&view, cx),
-        "Enter pressed Cancel, which closed it"
+        "Enter pressed the first control, Close"
     );
-    assert!(log(&view, cx).is_empty(), "Cancel, not Delete");
+    assert!(log(&view, cx).is_empty(), "Close, not Delete");
 }
 
 #[gpui::test]

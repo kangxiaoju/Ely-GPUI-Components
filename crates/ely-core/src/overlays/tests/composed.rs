@@ -67,8 +67,9 @@ fn assert_long_titles_fit(cx: &mut TestAppContext, fullscreen: bool) {
         });
         settle(cx);
         let single_line = cx.debug_bounds("dialog-title").unwrap().size.height;
+        // Test fonts give Chinese and Latin characters the same fixed advance.
         for title in [
-            "# **协作记录反馈：很长的中文标题应当在弹窗内部自动换行，保留完整内容，同时不能把关闭按钮挤出窗口或覆盖下方说明文字**",
+            "# **协作记录反馈：很长的中文标题应当在弹窗内部自动换行，保留完整内容，同时不能把关闭按钮挤出窗口或覆盖下方说明文字；即使桌面窗口更宽，这段足够长的协作记录标题也应继续换行，完整显示需求背景、用户反馈和后续处理说明，不截断任何文字**",
             "# **Collaboration record feedback: a long English Markdown-like title must wrap inside the modal without pushing its close button outside the viewport**",
         ] {
             view.update(cx, |view, cx| {
@@ -86,7 +87,7 @@ fn assert_long_titles_fit(cx: &mut TestAppContext, fullscreen: bool) {
                 cx.theme().control_height(ControlSize::Md).to_pixels(window.rem_size())
             });
             assert!(card.left() >= px(0.0) && card.right() <= px(width));
-            assert!(title.size.height > single_line, "the title wraps");
+            assert!(title.size.height > single_line, "the title wraps: viewport={width}, fullscreen={fullscreen}, single_line={single_line:?}, title={title:?}, heading={heading:?}, card={card:?}, close={close:?}");
             assert!(title.left() >= card.left() && title.right() <= close.left());
             assert!(title.bottom() <= detail.top(), "wrapped text does not overlap detail");
             assert!(detail.right() <= close.left() && detail.bottom() <= heading.bottom());
