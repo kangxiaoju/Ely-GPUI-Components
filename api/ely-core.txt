@@ -4046,6 +4046,7 @@ pub fn ely_core::lists::List::new() -> Self
 pub fn ely_core::lists::List::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_core::lists::ListItem::accessible_label(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::lists::ListItem::accessible_description(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
+pub fn ely_core::lists::ListItem::compact(self) -> Self
 pub fn ely_core::lists::ListItem::current(self, bool) -> Self
 pub fn ely_core::lists::ListItem::description(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::lists::ListItem::detail(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
