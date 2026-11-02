@@ -4,6 +4,7 @@ What changes for an app built on Ely, newest first. An entry names the crates it
 
 ## Unreleased
 
+- `ely-core`: `Avatar::solid` renders a name's full theme-chart background with contrasting theme text, for app and project letter marks; existing subtle avatars stay unchanged.
 - `ely-core`: top-level raised overlays namespace their descendants by owner, preventing sibling accessible labels and keyed state from sharing identities.
 - `ely-documents`, `ely-core`: pending Markdown pictures show a localized loading label instead of their potentially large data address; preview-only images no longer copy addresses for unused point handlers.
 - `ely-core`: `Dialog::height` keeps asynchronous loading and ready content in the same viewport-capped modal frame.

@@ -2693,6 +2693,7 @@ pub fn ely_core::data_display::Avatar::render(self, &mut gpui::window::Window, &
 pub fn ely_core::data_display::Avatar::ring(self) -> Self
 pub fn ely_core::data_display::Avatar::ring_color(self, gpui::color::Hsla) -> Self
 pub fn ely_core::data_display::Avatar::size(self, ely_core::theme::AvatarSize) -> Self
+pub fn ely_core::data_display::Avatar::solid(self) -> Self
 pub fn ely_core::data_display::Avatar::square(self) -> Self
 pub fn ely_core::data_display::AvatarGroup::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_core::data_display::AvatarGroup::into_element(self) -> Self::Element

@@ -129,6 +129,7 @@ pub fn avatars(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
             .child(specimen("away", Avatar::new("avatar-away", "Lucía Romero").size(AvatarSize::Lg).presence(Presence::Away), cx))
             .child(specimen("busy", Avatar::new("avatar-busy", "Ben Carter").size(AvatarSize::Lg).presence(Presence::Busy), cx))
             .child(specimen("team", Avatar::new("avatar-team", "Studio North").size(AvatarSize::Lg).square(), cx))
+            .child(specimen("project", Avatar::new("avatar-project", "Project").size(AvatarSize::Lg).square().solid(), cx))
             .child(specimen("bot", Avatar::new("avatar-bot", "Build bot").icon(IconName::Bot).size(AvatarSize::Lg), cx))
             .child(specimen(
                 "upload",
