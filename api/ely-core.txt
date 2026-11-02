@@ -4527,6 +4527,7 @@ pub fn ely_core::overlays::Dialog::action<E: gpui::element::IntoElement>(self, i
 pub fn ely_core::overlays::Dialog::detail(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::overlays::Dialog::extend(&mut self, impl core::iter::traits::collect::IntoIterator<Item = gpui::element::AnyElement>)
 pub fn ely_core::overlays::Dialog::fullscreen(self) -> Self
+pub fn ely_core::overlays::Dialog::height(self, gpui::geometry::Pixels) -> Self
 pub fn ely_core::overlays::Dialog::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_core::overlays::Dialog::into_element(self) -> Self::Element
 pub fn ely_core::overlays::Dialog::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>, impl core::ops::function::Fn(&mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self

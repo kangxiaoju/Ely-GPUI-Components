@@ -227,7 +227,7 @@ fn picture(shown: Picture, window: &mut Window, cx: &mut App) -> AnyElement {
             let svg = held.format == ImageFormat::Svg;
             let image = |loaded: &Result<Arc<RenderImage>, _>| loaded.as_ref().ok().cloned();
             let loaded = hold::<Holder>(id, &held, image, window, cx);
-            return drawn(loaded, svg, alt, url, cx);
+            return drawn(loaded, svg, alt, cx);
         }
         Some(Err(why)) => Origin::Bad(why),
         None => origin(url, base.as_deref()),
@@ -261,7 +261,7 @@ fn picture(shown: Picture, window: &mut Window, cx: &mut App) -> AnyElement {
         }
         Origin::Bad(why) => return note(alt, why, colors.danger, cx),
     };
-    drawn(loaded, svg, alt, url, cx)
+    drawn(loaded, svg, alt, cx)
 }
 
 /// A loaded picture at its own width, or why not.
@@ -269,7 +269,6 @@ fn drawn(
     loaded: Option<Result<Arc<RenderImage>, SharedString>>,
     svg: bool,
     alt: &str,
-    url: &str,
     cx: &App,
 ) -> AnyElement {
     let colors = cx.theme().colors.clone();
@@ -290,7 +289,12 @@ fn drawn(
             log::warn!("markdown: a picture did not load");
             note(alt, why, colors.danger, cx)
         }
-        None => note(alt, url.to_string().into(), colors.fg_subtle, cx),
+        None => note(
+            alt,
+            i18n::text(cx, "markdown.picture.loading", &[]),
+            colors.fg_subtle,
+            cx,
+        ),
     }
 }
 

@@ -197,6 +197,9 @@ impl Draw<'_> {
         url: &str,
         link: &Option<String>,
     ) -> AnyElement {
+        if self.hooks.on_point.is_none() {
+            return element;
+        }
         let (url, link) = (url.to_string(), link.clone());
         self.pointable(element, move |_| Pointed {
             image: Some(url.clone()),

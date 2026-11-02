@@ -9,6 +9,7 @@ use gpui::{
 
 mod guides;
 mod composed;
+mod stable_height;
 
 use super::{AlertDialog, ConfirmDialog, Dialog, HoverCard, Popover, PromptDialog};
 use crate::{

@@ -52,6 +52,7 @@ pub(super) const TABLE: &[(&str, &str)] = &[
     ("templates.none", "Aucun modèle ne correspond"),
     ("markdown.picture.web", "Non chargée depuis le Web"),
     ("markdown.picture.folder", "Aucun dossier où la trouver"),
+    ("markdown.picture.loading", "Chargement de l’image…"),
     ("comments.reply", "Répondre"),
     ("update.title", "Mise à jour logicielle"),
     ("update.available", "La version {version} est disponible."),

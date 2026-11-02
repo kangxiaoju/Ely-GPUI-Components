@@ -49,6 +49,7 @@ pub(super) const TABLE: &[(&str, &str)] = &[
         "markdown.picture.folder",
         "Kein Ordner, in dem es zu finden wäre",
     ),
+    ("markdown.picture.loading", "Bild wird geladen…"),
     ("comments.reply", "Antworten"),
     ("update.title", "Softwareaktualisierung"),
     ("update.available", "Version {version} ist verfügbar."),

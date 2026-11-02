@@ -40,6 +40,7 @@ pub(super) const TABLE: &[(&str, &str)] = &[
     ("templates.none", "没有匹配的模板"),
     ("markdown.picture.web", "未从网络载入"),
     ("markdown.picture.folder", "没有可找的文件夹"),
+    ("markdown.picture.loading", "正在载入图片…"),
     ("comments.reply", "回复"),
     ("update.title", "软件更新"),
     ("update.available", "{version} 版可以更新。"),

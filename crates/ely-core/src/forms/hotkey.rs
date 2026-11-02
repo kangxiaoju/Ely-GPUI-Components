@@ -216,7 +216,7 @@ mod tests {
     fn press(key: &str, cx: &mut VisualTestContext) {
         cx.simulate_keystrokes(key);
         cx.simulate_event(KeyUpEvent {
-            keystroke: Keystroke::parse(key).expect("a key"),
+            keystroke: Keystroke::parse(key.to_owned()).expect("a key"),
         });
         cx.run_until_parked();
     }

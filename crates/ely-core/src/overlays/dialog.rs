@@ -48,6 +48,7 @@ pub struct Dialog {
     fullscreen: bool,
     first: Option<FocusHandle>,
     width: Option<gpui::DefiniteLength>,
+    height: Option<Pixels>,
     on_close: Run,
 }
 
@@ -69,6 +70,7 @@ impl Dialog {
             fullscreen: false,
             first: None,
             width: None,
+            height: None,
             on_close: Rc::new(on_close),
         }
     }
@@ -76,6 +78,12 @@ impl Dialog {
     /// Override the card's width; defaults to the theme's `dialog_width`, capped to fit the window.
     pub fn width(mut self, width: impl Into<gpui::DefiniteLength>) -> Self {
         self.width = Some(width.into());
+        self
+    }
+
+    /// Keeps the modal's height stable while asynchronous content arrives, capped to the window.
+    pub fn height(mut self, height: Pixels) -> Self {
+        self.height = Some(height);
         self
     }
 
@@ -259,6 +267,7 @@ impl RenderOnce for Dialog {
                 div()
                     .id((self.id.clone(), "body"))
                     .min_h_0()
+                    .when(self.height.is_some(), |body| body.flex_1())
                     .overflow_y_scroll()
                     .child(div().flex().flex_col().flex_none().gap_5().children(self.body))
             });
@@ -271,6 +280,7 @@ impl RenderOnce for Dialog {
                 .w(self.width.unwrap_or_else(|| theme.dialog_width().into()))
                 .max_w((window.viewport_size().width - margin * 2.0).max(Pixels::ZERO))
                 .max_h(window.viewport_size().height - margin * 2.0)
+                .when_some(self.height, |card, height| card.h(height))
                 .p_6()
                 .rounded(theme.radius(Radius::Xl))
                 .bg(colors.overlay)

@@ -52,6 +52,7 @@ pub(super) const TABLE: &[(&str, &str)] = &[
     ("templates.none", "一致するテンプレートはありません"),
     ("markdown.picture.web", "Web から読み込まれていません"),
     ("markdown.picture.folder", "検索するフォルダーがありません"),
+    ("markdown.picture.loading", "画像を読み込み中…"),
     ("comments.reply", "返信"),
     ("update.title", "ソフトウェア・アップデート"),
     ("update.available", "バージョン {version} を利用できます。"),

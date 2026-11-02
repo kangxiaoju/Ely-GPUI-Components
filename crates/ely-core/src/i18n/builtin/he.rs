@@ -43,6 +43,7 @@ pub(super) const TABLE: &[(&str, &str)] = &[
     ("templates.none", "אין תבנית מתאימה"),
     ("markdown.picture.web", "לא נטען מהרשת"),
     ("markdown.picture.folder", "אין תיקייה למצוא אותה בה"),
+    ("markdown.picture.loading", "התמונה נטענת…"),
     ("comments.reply", "תגובה"),
     ("update.title", "עדכון תוכנה"),
     ("update.available", "גרסה {version} זמינה."),
