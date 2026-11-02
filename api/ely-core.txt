@@ -3172,6 +3172,7 @@ pub fn ely_core::forms::Cut::partial_eq(&self, &dyn gpui::action::Action) -> boo
 pub fn ely_core::forms::DatePicker::disabled(self, bool) -> Self
 pub fn ely_core::forms::DatePicker::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_core::forms::DatePicker::into_element(self) -> Self::Element
+pub fn ely_core::forms::DatePicker::iso(self) -> Self
 pub fn ely_core::forms::DatePicker::new(impl core::convert::Into<gpui::window::ElementId>, core::option::Option<jiff::civil::date::Date>) -> Self
 pub fn ely_core::forms::DatePicker::on_change(self, impl core::ops::function::Fn(jiff::civil::date::Date, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::forms::DatePicker::placeholder(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self

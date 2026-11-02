@@ -250,7 +250,7 @@ impl RenderOnce for Dialog {
                     .id((self.id.clone(), "body"))
                     .min_h_0()
                     .overflow_y_scroll()
-                    .child(div().flex().flex_col().gap_5().children(self.body))
+                    .child(div().flex().flex_col().flex_none().gap_5().children(self.body))
             });
             div()
                 .id(self.id.clone())
@@ -267,6 +267,7 @@ impl RenderOnce for Dialog {
                 .shadow(theme.elevation(Elevation::Modal))
                 .child(
                     div()
+                        .flex_none()
                         .flex()
                         .items_center()
                         .justify_between()
