@@ -1,6 +1,8 @@
 //! Folding sections, and a right press on a box.
 
-use gpui::{Entity, IntoElement, Modifiers, MouseButton, TestAppContext};
+use gpui::{
+    Entity, InteractiveElement, IntoElement, Modifiers, MouseButton, ParentElement, TestAppContext,
+};
 
 use super::{Mailing, heard, mailing, note, press, tab_to};
 use crate::{
@@ -117,4 +119,48 @@ fn a_fixed_section_shows_no_fold(cx: &mut TestAppContext) {
     );
     assert!(cx.debug_bounds("fold Unified").is_none());
     assert!(cx.debug_bounds("fold ann@example.com").is_some());
+}
+
+#[gpui::test]
+fn a_section_action_opens_its_menu_without_folding_or_losing_unread(cx: &mut TestAppContext) {
+    let (host, cx) = mailing(
+        |owner| {
+            let fold = owner.clone();
+            let menu = crate::menus::Menu::new().item(
+                crate::menus::MenuItem::new("Add mailbox")
+                    .on_click(move |_, cx| note(&owner, "add mailbox".into(), cx)),
+            );
+            MailboxList::new("boxes")
+                .section(
+                    "Mailboxes",
+                    [Mailbox::new("inbox", "Inbox", IconName::Inbox).unread(4)],
+                )
+                .section_action(
+                    gpui::div()
+                        .debug_selector(|| "section-action".into())
+                        .child(
+                            crate::menus::OverflowMenu::new("box-actions", menu)
+                                .icon(IconName::Plus),
+                        ),
+                )
+                .open("inbox")
+                .folded(["Mailboxes"])
+                .on_fold(move |title, _, _, cx| note(&fold, format!("fold {title}"), cx))
+                .into_any_element()
+        },
+        cx,
+    );
+    let action = cx.debug_bounds("section-action").expect("section action");
+    let title = cx.debug_bounds("fold Mailboxes").expect("section title");
+    assert!(action.top() < title.bottom() && title.top() < action.bottom());
+    cx.simulate_click(action.center(), Modifiers::none());
+    cx.run_until_parked();
+    let add = cx
+        .debug_bounds("menu-row-Add mailbox")
+        .expect("action menu");
+    cx.simulate_click(add.center(), Modifiers::none());
+    cx.run_until_parked();
+    assert_eq!(heard(&host, cx), ["add mailbox"]);
+    assert!(cx.debug_bounds("folded-unread Mailboxes").is_some());
+    assert!(cx.debug_bounds("item-selected-Inbox").is_none());
 }

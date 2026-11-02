@@ -87,6 +87,8 @@ pub enum Node {
         head: Vec<Vec<Node>>,
         /// The body rows' cells.
         rows: Vec<Vec<Vec<Node>>>,
+        /// Head first: positive spans count columns, zero hides covered cells; empty means one each.
+        spans: Vec<Vec<usize>>,
     },
     /// A rule.
     Rule,
@@ -333,6 +335,7 @@ impl<'a> Reader<'a> {
                     aligns: table.align.clone(),
                     head,
                     rows: rows.collect(),
+                    spans: Vec::new(),
                 });
             }
             mdast::Node::ThematicBreak(_) => out.push(Node::Rule),

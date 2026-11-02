@@ -3,6 +3,8 @@ use gpui::{Context, IntoElement, Render, TestAppContext, Window, div, prelude::*
 use super::{HEAVY, MarkdownRenderer, Style, highlight};
 use crate::theme::{ActiveTheme, TextSize, Theme};
 
+mod table;
+
 /// `source` drawn in a 400-point column.
 struct Page(&'static str);
 

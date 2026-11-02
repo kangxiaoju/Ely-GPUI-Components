@@ -528,6 +528,7 @@ pub ely_documents::MarkdownBlock::Table
 pub ely_documents::MarkdownBlock::Table::aligns: alloc::vec::Vec<ely_documents::AlignKind>
 pub ely_documents::MarkdownBlock::Table::head: alloc::vec::Vec<alloc::vec::Vec<ely_documents::MarkdownBlock>>
 pub ely_documents::MarkdownBlock::Table::rows: alloc::vec::Vec<alloc::vec::Vec<alloc::vec::Vec<ely_documents::MarkdownBlock>>>
+pub ely_documents::MarkdownBlock::Table::spans: alloc::vec::Vec<alloc::vec::Vec<usize>>
 pub ely_documents::MarkdownBlock::Toc(alloc::vec::Vec<ely_documents::DocumentHeading>)
 pub ely_documents::MarkdownMode::Preview
 pub ely_documents::MarkdownMode::Source
