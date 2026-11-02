@@ -4,6 +4,7 @@ What changes for an app built on Ely, newest first. An entry names the crates it
 
 ## Unreleased
 
+- `ely-core`: standard and fullscreen dialogs wrap long titles and descriptions without squeezing or hiding Close. Standard dialog widths, including custom widths, stay inside narrow viewports.
 - `ely-project`: `KanbanColumn::footer` puts controls after the cards without adding move slots, and `total` shows the full count for paged columns. `KanbanBoard::track_scroll` shares its horizontal handle with the host; the board keeps overflow inside its available width. The gallery demonstrates paged columns.
 - `ely-core`: `DatePicker::iso` displays selected dates as YYYY-MM-DD. Standard dialogs keep intrinsic body height when long composed forms overflow, so the body scrolls without compressing hidden controls; the title and actions remain fixed.
 - `ely-canvas` 0.3.0, `ely-core`: add `ShapeKind::RoundedRect` / `Tool::RoundedRect` (breaking exhaustive enum matches), localized rounded-rectangle labels and shared `rounded_rectangle_outline` geometry for native/export rendering. Radius is `min(12, min(width, height) * 0.25)` canvas units; rounded hit testing and rotated connector bindings follow the corners. Inspector Standard/Hand-drawn segments change only roughness (0 / 1.2), preserving fonts, colors and an already-hand-drawn roughness. Only the canvas crate receives a semver bump; other components keep their versions.
