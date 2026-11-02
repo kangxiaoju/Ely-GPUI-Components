@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels, Point, RenderOnce,
-    SharedString, Window, div,
+    AnyElement, App, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels, Point,
+    RenderOnce, SharedString, Styled, Window, div,
 };
 
 use super::labels::hue_dot;
@@ -110,7 +110,7 @@ type OnMenu = Rc<dyn Fn(&SharedString, Point<Pixels>, &mut Window, &mut App)>;
 #[derive(IntoElement)]
 pub struct MailboxList {
     id: ElementId,
-    sections: Vec<(SharedString, Vec<Mailbox>, bool)>,
+    sections: Vec<(SharedString, Vec<Mailbox>, bool, Option<AnyElement>)>,
     open: Option<SharedString>,
     on_open: Option<OnValue>,
     folded: Vec<SharedString>,
@@ -158,18 +158,29 @@ impl MailboxList {
     ) -> Self {
         let boxes: Vec<Mailbox> = boxes.into_iter().collect();
         assert!(!boxes.is_empty(), "section {title} holds no mailbox");
-        let named = self.sections.iter().any(|(other, _, _)| *other == title);
+        let named = self.sections.iter().any(|(other, _, _, _)| *other == title);
         assert!(!named, "section {title} twice");
         for (ix, mailbox) in boxes.iter().enumerate() {
             let seen = self
                 .sections
                 .iter()
-                .flat_map(|(_, boxes, _)| boxes)
+                .flat_map(|(_, boxes, _, _)| boxes)
                 .chain(&boxes[..ix])
                 .any(|other| other.key == mailbox.key);
             assert!(!seen, "mailbox {} twice", mailbox.key);
         }
-        self.sections.push((title, boxes, fixed));
+        self.sections.push((title, boxes, fixed, None));
+        self
+    }
+
+    /// An action beside the last section's title, separate from its fold control.
+    /// It stays visible when folded, alongside any unread count.
+    pub fn section_action(mut self, action: impl IntoElement) -> Self {
+        let section = self
+            .sections
+            .last_mut()
+            .expect("an action follows a section");
+        section.3 = Some(action.into_any_element());
         self
     }
 
@@ -214,12 +225,12 @@ impl MailboxList {
 }
 
 impl RenderOnce for MailboxList {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         if let Some(open) = &self.open {
             let listed = self
                 .sections
                 .iter()
-                .flat_map(|(_, boxes, _)| boxes)
+                .flat_map(|(_, boxes, _, _)| boxes)
                 .any(|mailbox| mailbox.key == *open);
             if !listed {
                 log::error!("mailbox list: no mailbox {open}; none open");
@@ -234,9 +245,9 @@ impl RenderOnce for MailboxList {
                 }
             })
         };
-        let sections = self.sections.iter().fold(
+        let sections = self.sections.iter_mut().fold(
             Sections::new(self.id.clone()),
-            |sections, (title, boxes, fixed)| {
+            |sections, (title, boxes, fixed, action)| {
                 let rows = boxes
                     .iter()
                     .map(|mailbox| {
@@ -254,7 +265,7 @@ impl RenderOnce for MailboxList {
                 let sections = sections.section(title.clone(), rows);
                 let sections = if *fixed { sections.fixed() } else { sections };
                 let unread: u32 = boxes.iter().map(|mailbox| mailbox.unread).sum();
-                match self.folded.contains(title) && unread > 0 {
+                let badge = match self.folded.contains(title) && unread > 0 {
                     true => {
                         let named = title.clone();
                         let badge = CountBadge::new(
@@ -265,9 +276,21 @@ impl RenderOnce for MailboxList {
                         let badge = div()
                             .debug_selector(move || format!("folded-unread {named}"))
                             .child(badge);
-                        sections.badge(badge.into_any_element())
+                        Some(badge.into_any_element())
                     }
-                    false => sections,
+                    false => None,
+                };
+                match (badge, action.take()) {
+                    (None, None) => sections,
+                    (badge, action) => sections.badge(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .children(badge)
+                            .children(action)
+                            .into_any_element(),
+                    ),
                 }
             },
         );

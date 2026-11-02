@@ -35,7 +35,7 @@ ely-generative = { path = "crates/ely-generative", version = "0.1.1" }
 ely-agent = { path = "crates/ely-agent", version = "0.1.1" }
 ely-chat = { path = "crates/ely-chat", version = "0.1.1" }
 ely-collab = { path = "crates/ely-collab", version = "0.1.1" }
-ely-documents = { path = "crates/ely-documents", version = "0.1.1" }
+ely-documents = { path = "crates/ely-documents", version = "0.2.0" }
 ely-debug = { path = "crates/ely-debug", version = "0.1.1" }
 ely-git = { path = "crates/ely-git", version = "0.1.1" }
 ely-terminal = { path = "crates/ely-terminal", version = "0.1.1" }

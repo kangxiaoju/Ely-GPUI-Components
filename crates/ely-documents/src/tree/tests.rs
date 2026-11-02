@@ -183,10 +183,16 @@ fn display_math_stands_alone() {
 #[test]
 fn tables_keep_their_cells_and_alignment() {
     let nodes = parse("| Name | Lift |\n|:--|--:|\n| accent | 0.5 |\n");
-    let Node::Table { aligns, head, rows } = &nodes[0] else {
+    let Node::Table {
+        aligns,
+        head,
+        rows,
+        spans,
+    } = &nodes[0] else {
         panic!("a table, not {:?}", nodes[0])
     };
     assert_eq!(aligns, &[AlignKind::Left, AlignKind::Right]);
+    assert!(spans.is_empty(), "Markdown cells each occupy one column");
     let text = |cell: &[Node]| match cell {
         [Node::Paragraph(line)] => line.text.clone(),
         other => panic!("one line, not {other:?}"),

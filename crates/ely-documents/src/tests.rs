@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use gpui::{
     App, AppContext as _, Bounds, Context, Entity, Focusable, ImageSource, IntoElement, Modifiers,
-    ParentElement, Pixels, Point, Render, ScrollDelta, ScrollEvent, ScrollWheelEvent, Size, Styled,
+    ParentElement, Pixels, Point, Render, ScrollDelta, ScrollEvent, Size, Styled,
     TestAppContext, TouchPhase, VisualTestContext, Window, div, point, px, size,
 };
 
@@ -367,11 +367,12 @@ fn document_viewer_requests_the_scrolled_thumbnail_viewport(cx: &mut TestAppCont
     settle(cx);
     requests.borrow_mut().clear();
 
-    cx.simulate_event(ScrollWheelEvent {
+    cx.simulate_event(ScrollEvent {
         position: point(px(80.0), px(300.0)),
         delta: ScrollDelta::Pixels(point(px(0.0), px(-100_000.0))),
         modifiers: Modifiers::none(),
         touch_phase: TouchPhase::Moved,
+        source: gpui::ScrollSource::Pointer,
     });
     settle(cx);
     let thumbs: Vec<usize> = requests
