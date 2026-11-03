@@ -1,4 +1,5 @@
 use ely_gpui_component::{
+    buttons::Button,
     mail::Label,
     project::{
         IssueCard, KanbanBoard, KanbanCard, KanbanColumn, LabelManager, Status, Task,
@@ -6,7 +7,7 @@ use ely_gpui_component::{
     },
     theme::{ActiveTheme, Radius},
 };
-use gpui::{App, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
+use gpui::{App, IntoElement, ParentElement, ScrollHandle, SharedString, Styled, Window, div, px};
 
 use super::{board, quiet, studio_labels, team};
 use crate::{
@@ -39,24 +40,34 @@ const LANES: [(&str, &str, Status, &[Status]); 3] = [
 pub fn kanban(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
     let tasks = board(window, cx);
     let listed = tasks.read(cx).clone();
+    let visible = keep("project-board-visible", || [2_usize; 3], window, cx);
+    let limits = *visible.read(cx);
+    let scroll = keep("project-board-scroll", ScrollHandle::new, window, cx);
     let opened = keep(
         "project-opened",
         || Some(SharedString::from("brief")),
         window,
         cx,
     );
-    let columns = LANES.map(|(key, title, _, statuses)| {
-        let cards = listed
-            .iter()
-            .filter(|task| statuses.contains(&task.status))
-            .map(|task| {
-                let face = IssueCard::new(
-                    SharedString::from(format!("project-issue-{}", task.key)),
-                    task.clone(),
-                );
-                KanbanCard::new(task.key.clone(), face).label(task.title.clone())
-            });
-        KanbanColumn::new(key, title).cards(cards)
+    let columns = LANES.into_iter().enumerate().map(|(lane, (key, title, _, statuses))| {
+        let matching = listed.iter().filter(|task| statuses.contains(&task.status));
+        let total = matching.clone().count();
+        let more = visible.clone();
+        let cards = matching.take(limits[lane]).map(|task| {
+            let face = IssueCard::new(
+                SharedString::from(format!("project-issue-{}", task.key)),
+                task.clone(),
+            );
+            KanbanCard::new(task.key.clone(), face).label(task.title.clone())
+        });
+        KanbanColumn::new(key, title)
+            .total(total)
+            .cards(cards)
+            .footer(
+                Button::new(SharedString::from(format!("project-board-more-{key}")), "Show more")
+                    .disabled(limits[lane] >= total)
+                    .on_click(move |_, _, cx| change(&more, cx, |limits| limits[lane] += 2)),
+            )
     });
     let moved = tasks.clone();
     let board = columns
@@ -64,6 +75,7 @@ pub fn kanban(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
         .fold(KanbanBoard::new("project-board"), |board, column| {
             board.column(column)
         })
+        .track_scroll(scroll.read(cx))
         .on_move(move |key, column, index, _, cx| {
             let (_, _, status, statuses) = LANES
                 .into_iter()
@@ -91,7 +103,7 @@ pub fn kanban(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
         .on_open(move |key, _, cx| set(&opened, Some(key.clone()), cx));
     section(
         "KanbanBoard / KanbanColumn / KanbanCard · IssueCard · Sprint Board",
-        "Columns of issue cards for a sprint. A card drags to a place in any column while the others glide aside, Option with an arrow moves the focused one, and a press or Enter opens it in the panel below. Sprint Board is this board.",
+        "Columns of issue cards for a sprint, initially two per column. Headers show the full counts; Show more loads cards from each column's footer, outside the move order. A card drags to a place in any column while the others glide aside, Option with an arrow moves the focused one, and a press or Enter opens it in the panel below. Sprint Board is this board.",
         cx,
     )
     .child(probe("project-board", div().child(board)))

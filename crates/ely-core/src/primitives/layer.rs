@@ -57,8 +57,9 @@ impl Element for Raised {
     type RequestLayoutState = ();
     type PrepaintState = ();
 
+    // The deferred draw captures this scope for top-level overlays too.
     fn id(&self) -> Option<ElementId> {
-        None
+        Some(self.id.clone())
     }
 
     fn source_location(&self) -> Option<&'static Location<'static>> {

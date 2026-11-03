@@ -44,6 +44,7 @@ pub struct ListItem {
     strong: bool,
     quiet: bool,
     struck: bool,
+    compact: bool,
     /// Its place among its list's rows, from one, and their count.
     place: Option<(usize, usize)>,
     tooltip: Option<SharedString>,
@@ -70,11 +71,18 @@ impl ListItem {
             strong: false,
             quiet: false,
             struck: false,
+            compact: false,
             place: None,
             tooltip: None,
             on_click: None,
             on_secondary: None,
         }
+    }
+
+    /// Smaller theme typography and spacing for dense navigation lists.
+    pub fn compact(mut self) -> Self {
+        self.compact = true;
+        self
     }
 
     /// Sets the title in the strong weight, as a channel with unread messages has it.
@@ -225,10 +233,10 @@ impl RenderOnce for ListItem {
             })
             .flex()
             .items_center()
-            .gap_3()
-            .px_3()
-            .py_1p5()
-            .min_h(theme.control_height(ControlSize::Lg))
+            .gap(if self.compact { gpui::rems(0.5) } else { gpui::rems(0.75) })
+            .px(if self.compact { gpui::rems(0.5) } else { gpui::rems(0.75) })
+            .py(if self.compact { gpui::rems(0.25) } else { gpui::rems(0.375) })
+            .min_h(theme.control_height(if self.compact { ControlSize::Md } else { ControlSize::Lg }))
             // Rows in a uniform list fill it.
             .w_full()
             .rounded(theme.radius(Radius::Md))
@@ -267,7 +275,7 @@ impl RenderOnce for ListItem {
                     .child(match self.editor {
                         Some(editor) => div().min_w_0().child(editor).into_any_element(),
                         None => line(self.title)
-                            .text_size(theme.text_size(TextSize::Base))
+                            .text_size(theme.text_size(if self.compact { TextSize::Sm } else { TextSize::Base }))
                             .when(self.strong, |title| title.font_weight(FontWeight::SEMIBOLD))
                             .when(self.struck, |title| title.line_through())
                             .text_color(if self.quiet {
@@ -280,19 +288,19 @@ impl RenderOnce for ListItem {
                     .children(self.description.map(|text| {
                         line(text.clone())
                             .debug_selector(|| format!("item-description-{text}"))
-                            .text_size(theme.text_size(TextSize::Sm))
+                            .text_size(theme.text_size(if self.compact { TextSize::Xs } else { TextSize::Sm }))
                             .text_color(colors.fg_muted)
                     }))
                     .children(self.detail.map(|text| {
                         line(text)
-                            .text_size(theme.text_size(TextSize::Sm))
+                            .text_size(theme.text_size(if self.compact { TextSize::Xs } else { TextSize::Sm }))
                             .text_color(colors.fg_subtle)
                     })),
             )
             .children(self.trailing.map(|trailing| {
                 div()
                     .flex_none()
-                    .text_size(theme.text_size(TextSize::Sm))
+                    .text_size(theme.text_size(if self.compact { TextSize::Xs } else { TextSize::Sm }))
                     .text_color(colors.fg_subtle)
                     .child(trailing)
             }))

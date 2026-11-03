@@ -47,6 +47,8 @@ pub struct KanbanColumn {
     key: SharedString,
     title: SharedString,
     cards: Vec<KanbanCard>,
+    footer: Option<AnyElement>,
+    total: Option<usize>,
 }
 
 impl KanbanColumn {
@@ -56,6 +58,8 @@ impl KanbanColumn {
             key: key.into(),
             title: title.into(),
             cards: Vec::new(),
+            footer: None,
+            total: None,
         }
     }
 
@@ -68,6 +72,18 @@ impl KanbanColumn {
     /// Cards at its end, in order.
     pub fn cards(mut self, cards: impl IntoIterator<Item = KanbanCard>) -> Self {
         self.cards.extend(cards);
+        self
+    }
+
+    /// Content after the cards, outside their drag and keyboard move order.
+    pub fn footer(mut self, footer: impl IntoElement) -> Self {
+        self.footer = Some(footer.into_any_element());
+        self
+    }
+
+    /// The header's count, instead of the number of loaded cards.
+    pub fn total(mut self, total: usize) -> Self {
+        self.total = Some(total);
         self
     }
 }
@@ -125,6 +141,7 @@ fn measure(
 ///
 /// let board = KanbanBoard::new("board")
 ///     .column(KanbanColumn::new("todo", "Todo").card(KanbanCard::new("t1", "Write the brief")))
+///     .column(KanbanColumn::new("backlog", "Backlog").total(12).footer("More records available"))
 ///     .column(KanbanColumn::new("done", "Done"))
 ///     .on_move(|_card, _column, _index, _, _| {});
 /// ```
@@ -132,6 +149,7 @@ fn measure(
 pub struct KanbanBoard {
     id: ElementId,
     columns: Vec<KanbanColumn>,
+    scroll: Option<ScrollHandle>,
     on_move: Option<OnMove>,
     on_open: Option<OnCard>,
 }
@@ -142,6 +160,7 @@ impl KanbanBoard {
         Self {
             id: id.into(),
             columns: Vec::new(),
+            scroll: None,
             on_move: None,
             on_open: None,
         }
@@ -150,6 +169,12 @@ impl KanbanBoard {
     /// A column at its end.
     pub fn column(mut self, column: KanbanColumn) -> Self {
         self.columns.push(column);
+        self
+    }
+
+    /// Shares horizontal scrolling with the owner; otherwise the board keeps a keyed handle.
+    pub fn track_scroll(mut self, handle: &ScrollHandle) -> Self {
+        self.scroll = Some(handle.clone());
         self
     }
 
@@ -189,10 +214,12 @@ impl RenderOnce for KanbanBoard {
         let hold = window.use_keyed_state((id.clone(), "hold"), cx, |_, _| None::<Hold>);
         let measures =
             window.use_keyed_state((id.clone(), "measures"), cx, |_, _| Measures::default());
-        let scroll = window
-            .use_keyed_state((id.clone(), "scroll"), cx, |_, _| ScrollHandle::new())
-            .read(cx)
-            .clone();
+        let scroll = self.scroll.unwrap_or_else(|| {
+            window
+                .use_keyed_state((id.clone(), "scroll"), cx, |_, _| ScrollHandle::new())
+                .read(cx)
+                .clone()
+        });
         let owner = hold.entity_id();
         let stale = hold
             .read(cx)
@@ -249,7 +276,7 @@ impl RenderOnce for KanbanBoard {
         let mut columns = Vec::new();
         for (column_ix, column) in self.columns.into_iter().enumerate() {
             let mut flip = Flip::new((id.clone(), format!("column-{}", column.key)));
-            let count = column.cards.len();
+            let count = column.total.unwrap_or(column.cards.len());
             let mut shown = 0;
             let slot = held
                 .as_ref()
@@ -405,7 +432,8 @@ impl RenderOnce for KanbanBoard {
                         move |measures, bounds| {
                             measures.bodies.insert(body_key.clone(), bounds) != Some(bounds)
                         },
-                    ))),
+                    )))
+                    .children(column.footer),
             );
         }
         let raised = held.as_ref().zip(lifted).map(|(held, content)| {
@@ -427,6 +455,8 @@ impl RenderOnce for KanbanBoard {
             div()
                 .id(id.clone())
                 .debug_selector(|| "kanban-board".into())
+                .w_full()
+                .min_w_0()
                 .track_scroll(&scroll)
                 .overflow_x_scroll(),
         )

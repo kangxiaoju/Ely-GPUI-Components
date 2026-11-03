@@ -221,11 +221,14 @@ pub fn ely_project::KanbanBoard::new(impl core::convert::Into<gpui::window::Elem
 pub fn ely_project::KanbanBoard::on_move(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &gpui_shared_string::SharedString, usize, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_project::KanbanBoard::on_open(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_project::KanbanBoard::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_project::KanbanBoard::track_scroll(self, &gpui::elements::div::ScrollHandle) -> Self
 pub fn ely_project::KanbanCard::label(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_project::KanbanCard::new(impl core::convert::Into<gpui_shared_string::SharedString>, impl gpui::element::IntoElement) -> Self
 pub fn ely_project::KanbanColumn::card(self, ely_project::KanbanCard) -> Self
 pub fn ely_project::KanbanColumn::cards(self, impl core::iter::traits::collect::IntoIterator<Item = ely_project::KanbanCard>) -> Self
+pub fn ely_project::KanbanColumn::footer(self, impl gpui::element::IntoElement) -> Self
 pub fn ely_project::KanbanColumn::new(impl core::convert::Into<gpui_shared_string::SharedString>, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
+pub fn ely_project::KanbanColumn::total(self, usize) -> Self
 pub fn ely_project::LabelManager::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_project::LabelManager::into_element(self) -> Self::Element
 pub fn ely_project::LabelManager::new(impl core::convert::Into<gpui::window::ElementId>, impl core::iter::traits::collect::IntoIterator<Item = ely_mail::labels::Label>) -> Self

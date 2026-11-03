@@ -48,6 +48,7 @@ pub struct Dialog {
     fullscreen: bool,
     first: Option<FocusHandle>,
     width: Option<gpui::DefiniteLength>,
+    height: Option<Pixels>,
     on_close: Run,
 }
 
@@ -69,13 +70,20 @@ impl Dialog {
             fullscreen: false,
             first: None,
             width: None,
+            height: None,
             on_close: Rc::new(on_close),
         }
     }
 
-    /// Override the card's width; defaults to the theme's `dialog_width`.
+    /// Override the card's width; defaults to the theme's `dialog_width`, capped to fit the window.
     pub fn width(mut self, width: impl Into<gpui::DefiniteLength>) -> Self {
         self.width = Some(width.into());
+        self
+    }
+
+    /// Keeps the modal's height stable while asynchronous content arrives, capped to the window.
+    pub fn height(mut self, height: Pixels) -> Self {
+        self.height = Some(height);
         self
     }
 
@@ -159,12 +167,13 @@ impl RenderOnce for Dialog {
         let colors = &theme.colors;
         let (title, description) = (self.title.clone(), self.detail.clone());
         let heading = div()
-            .flex_none()
-            .flex()
-            .flex_col()
-            .gap_1()
+            .debug_selector(|| "dialog-heading".into())
+            .flex_1()
+            .min_w_0()
+            .whitespace_normal()
             .child(
                 div()
+                    .debug_selector(|| "dialog-title".into())
                     .text_size(theme.text_size(TextSize::Lg))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(colors.fg)
@@ -173,6 +182,8 @@ impl RenderOnce for Dialog {
             .when_some(self.detail, |heading, detail| {
                 heading.child(
                     div()
+                        .debug_selector(|| "dialog-detail".into())
+                        .pt_1()
                         .text_size(theme.text_size(TextSize::Sm))
                         .text_color(colors.fg_muted)
                         .child(detail),
@@ -204,12 +215,14 @@ impl RenderOnce for Dialog {
         let card = if fullscreen {
             div()
                 .id(self.id.clone())
+                .debug_selector(|| "dialog-card".into())
                 .flex()
                 .flex_col()
                 .size_full()
                 .bg(colors.bg)
                 .child(
                     div()
+                        .flex_none()
                         .flex()
                         .items_center()
                         .justify_between()
@@ -220,10 +233,15 @@ impl RenderOnce for Dialog {
                         .border_color(colors.border)
                         .child(heading)
                         .child(
-                            IconButton::new((self.id.clone(), "close"), IconName::X)
-                                .variant(ButtonVariant::Ghost)
-                                .tooltip(i18n::text(cx, "dialog.close", &[]))
-                                .on_click(move |_, window, cx| fullscreen_button(window, cx)),
+                            div()
+                                .debug_selector(|| "dialog-close".into())
+                                .flex_none()
+                                .child(
+                                    IconButton::new((self.id.clone(), "close"), IconName::X)
+                                        .variant(ButtonVariant::Ghost)
+                                        .tooltip(i18n::text(cx, "dialog.close", &[]))
+                                        .on_click(move |_, window, cx| fullscreen_button(window, cx)),
+                                ),
                         ),
                 )
                 .child(
@@ -249,16 +267,20 @@ impl RenderOnce for Dialog {
                 div()
                     .id((self.id.clone(), "body"))
                     .min_h_0()
+                    .when(self.height.is_some(), |body| body.flex_1())
                     .overflow_y_scroll()
-                    .child(div().flex().flex_col().gap_5().children(self.body))
+                    .child(div().flex().flex_col().flex_none().gap_5().children(self.body))
             });
             div()
                 .id(self.id.clone())
+                .debug_selector(|| "dialog-card".into())
                 .flex()
                 .flex_col()
                 .gap_5()
                 .w(self.width.unwrap_or_else(|| theme.dialog_width().into()))
+                .max_w((window.viewport_size().width - margin * 2.0).max(Pixels::ZERO))
                 .max_h(window.viewport_size().height - margin * 2.0)
+                .when_some(self.height, |card, height| card.h(height))
                 .p_6()
                 .rounded(theme.radius(Radius::Xl))
                 .bg(colors.overlay)
@@ -267,16 +289,22 @@ impl RenderOnce for Dialog {
                 .shadow(theme.elevation(Elevation::Modal))
                 .child(
                     div()
+                        .flex_none()
                         .flex()
                         .items_center()
                         .justify_between()
                         .gap_4()
                         .child(heading)
                         .child(
-                            IconButton::new((self.id.clone(), "close"), IconName::X)
-                                .variant(ButtonVariant::Ghost)
-                                .tooltip(i18n::text(cx, "dialog.close", &[]))
-                                .on_click(move |_, window, cx| standard_button(window, cx)),
+                            div()
+                                .debug_selector(|| "dialog-close".into())
+                                .flex_none()
+                                .child(
+                                    IconButton::new((self.id.clone(), "close"), IconName::X)
+                                        .variant(ButtonVariant::Ghost)
+                                        .tooltip(i18n::text(cx, "dialog.close", &[]))
+                                        .on_click(move |_, window, cx| standard_button(window, cx)),
+                                ),
                         ),
                 )
                 .children(body)
