@@ -43,11 +43,23 @@ struct Nav {
     renaming: Option<SharedString>,
 }
 
-/// A drag of one tree's node, named by its owner.
-pub(crate) struct TreeDrag {
+/// A dragged tree node; drops past the rows carry it.
+pub struct TreeDrag {
     owner: EntityId,
     key: SharedString,
     label: SharedString,
+}
+
+impl TreeDrag {
+    /// The dragged node's key.
+    pub fn key(&self) -> &SharedString {
+        &self.key
+    }
+
+    /// The dragged node's label.
+    pub fn label(&self) -> &SharedString {
+        &self.label
+    }
 }
 
 /// Nodes that open and close, drawn a row at a time so large trees stay quick. Right and Left open, close and climb; Up and Down walk; Enter opens a node or activates a leaf; F2 renames. With `multiple`, Cmd and Shift widen the pick. With `checked`, boxes check whole branches. Nodes drag before, after or into others. Give it a height.
@@ -77,6 +89,7 @@ pub struct Tree {
     on_rename: Option<OnRename>,
     on_move: Option<OnMove>,
     on_context: Option<OnContext>,
+    on_toggle: Option<OnToggle>,
 }
 
 impl Tree {
@@ -97,6 +110,7 @@ impl Tree {
             on_rename: None,
             on_move: None,
             on_context: None,
+            on_toggle: None,
         }
     }
 
@@ -157,6 +171,12 @@ impl Tree {
         handler: impl Fn(&SharedString, Point<Pixels>, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_context = Some(Rc::new(handler));
+        self
+    }
+
+    /// Hears each node toggled: its key, and whether open.
+    pub fn on_toggle(mut self, handler: impl Fn(&SharedString, bool, &mut App) + 'static) -> Self {
+        self.on_toggle = Some(Rc::new(handler));
         self
     }
 
@@ -234,7 +254,7 @@ impl RenderOnce for Tree {
         let selected = Rc::new(self.selected);
         let (multiple, checked) = (self.multiple, self.checked.map(Rc::new));
         let toggle: OnToggle = {
-            let (opened, id) = (opened.clone(), id.clone());
+            let (opened, id, on_toggle) = (opened.clone(), id.clone(), self.on_toggle);
             Rc::new(move |key, open, cx| {
                 log::info!(
                     "tree {id:?}: {} {key}",
@@ -246,7 +266,10 @@ impl RenderOnce for Tree {
                         seeded.value.push(key.clone());
                     }
                     cx.notify();
-                })
+                });
+                if let Some(on_toggle) = &on_toggle {
+                    on_toggle(key, open, cx);
+                }
             })
         };
         let pick: OnPick = {

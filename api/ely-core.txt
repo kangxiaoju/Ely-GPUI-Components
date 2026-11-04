@@ -720,6 +720,7 @@ impl ely_core::lists::SortableList
 impl ely_core::lists::SwipeAction
 impl ely_core::lists::SwipeableListItem
 impl ely_core::lists::Tree
+impl ely_core::lists::TreeDrag
 impl ely_core::lists::TreeNode
 impl ely_core::lists::TreeSelect
 impl ely_core::lists::VirtualList
@@ -1797,7 +1798,7 @@ impl<const N: usize> ely_core::theme::Mix for [gpui::color::Hsla; N]
 pub const ely_core::forms::COUNTRIES: [(&str, &str, &str, &str); 6]
 pub const ely_core::forms::PICTURES: [&str; 5]
 pub const ely_core::forms::RelativeRange::ALL: [Self; 8]
-pub const ely_core::i18n::LOCALES: [ely_core::i18n::Locale; 7]
+pub const ely_core::i18n::LOCALES: [ely_core::i18n::Locale; 10]
 pub const ely_core::layout::WORKSPACE_VERSION: u32
 pub const ely_core::motion::BASE: core::time::Duration
 pub const ely_core::motion::FAST: core::time::Duration
@@ -2487,6 +2488,7 @@ pub ely_core::theme::Theme::mono_family: gpui_shared_string::SharedString
 pub ely_core::theme::Theme::platform: ely_core::theme::Platform
 pub ely_core::theme::Theme::radius_scale: f32
 pub ely_core::theme::Theme::reduced_motion: bool
+pub ely_core::theme::Theme::scrollbars_shown: bool
 pub ely_core::theme::ToolingSizes::graph: (gpui::geometry::Rems, gpui::geometry::Rems)
 pub ely_core::theme::ToolingSizes::log: gpui::geometry::Rems
 pub ely_core::theme::ToolingSizes::swatch: gpui::geometry::Rems
@@ -2640,6 +2642,7 @@ pub fn ely_core::buttons::SegmentedControl::into_any_element(self) -> gpui::elem
 pub fn ely_core::buttons::SegmentedControl::into_element(self) -> Self::Element
 pub fn ely_core::buttons::SegmentedControl::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::buttons::SegmentedControl::on_change(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
+pub fn ely_core::buttons::SegmentedControl::on_context(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, gpui::geometry::Point<gpui::geometry::Pixels>, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::buttons::SegmentedControl::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_core::buttons::SegmentedControl::segment(self, impl core::convert::Into<gpui_shared_string::SharedString>, impl core::convert::Into<gpui_shared_string::SharedString>, core::option::Option<ely_core::primitives::IconName>) -> Self
 pub fn ely_core::buttons::SegmentedControl::size(self, ely_core::theme::ControlSize) -> Self
@@ -4107,10 +4110,13 @@ pub fn ely_core::lists::Tree::on_load(self, impl core::ops::function::Fn(&gpui_s
 pub fn ely_core::lists::Tree::on_move(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &gpui_shared_string::SharedString, ely_core::lists::DropAt, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::Tree::on_rename(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::Tree::on_select(self, impl core::ops::function::Fn(&[gpui_shared_string::SharedString], &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
+pub fn ely_core::lists::Tree::on_toggle(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, bool, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::Tree::open(self, impl core::iter::traits::collect::IntoIterator<Item = impl core::convert::Into<gpui_shared_string::SharedString>>) -> Self
 pub fn ely_core::lists::Tree::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_core::lists::Tree::selected(self, impl core::iter::traits::collect::IntoIterator<Item = impl core::convert::Into<gpui_shared_string::SharedString>>) -> Self
 pub fn ely_core::lists::Tree::style(&mut self) -> &mut gpui::style::StyleRefinement
+pub fn ely_core::lists::TreeDrag::key(&self) -> &gpui_shared_string::SharedString
+pub fn ely_core::lists::TreeDrag::label(&self) -> &gpui_shared_string::SharedString
 pub fn ely_core::lists::TreeNode::child(self, ely_core::lists::TreeNode) -> Self
 pub fn ely_core::lists::TreeNode::children(self, impl core::iter::traits::collect::IntoIterator<Item = ely_core::lists::TreeNode>) -> Self
 pub fn ely_core::lists::TreeNode::clone(&self) -> Self
@@ -4139,6 +4145,7 @@ pub fn ely_core::menus::ContextMenu::into_any_element(self) -> gpui::element::An
 pub fn ely_core::menus::ContextMenu::into_element(self) -> Self::Element
 pub fn ely_core::menus::ContextMenu::manual(self, core::option::Option<(u64, gpui::geometry::Point<gpui::geometry::Pixels>)>) -> Self
 pub fn ely_core::menus::ContextMenu::new(impl core::convert::Into<gpui::window::ElementId>, ely_core::menus::Menu) -> Self
+pub fn ely_core::menus::ContextMenu::on_close(self, impl core::ops::function::Fn(&mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::menus::ContextMenu::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_core::menus::ContextMenu::style(&mut self) -> &mut gpui::style::StyleRefinement
 pub fn ely_core::menus::DropdownMenu::icon(self, ely_core::primitives::IconName) -> Self
@@ -5662,6 +5669,7 @@ pub struct ely_core::lists::SortableList
 pub struct ely_core::lists::SwipeAction
 pub struct ely_core::lists::SwipeableListItem
 pub struct ely_core::lists::Tree
+pub struct ely_core::lists::TreeDrag
 pub struct ely_core::lists::TreeNode
 pub struct ely_core::lists::TreeSelect
 pub struct ely_core::lists::VirtualList
@@ -6494,6 +6502,7 @@ pub use ely_core::lists::SortableList = ely_core::lists::sortable::SortableList
 pub use ely_core::lists::SwipeAction = ely_core::lists::swipe::SwipeAction
 pub use ely_core::lists::SwipeableListItem = ely_core::lists::swipe::SwipeableListItem
 pub use ely_core::lists::Tree = ely_core::lists::tree::Tree
+pub use ely_core::lists::TreeDrag = ely_core::lists::tree::TreeDrag
 pub use ely_core::lists::TreeNode = ely_core::lists::tree::model::TreeNode
 pub use ely_core::lists::TreeSelect = ely_core::lists::tree::select::TreeSelect
 pub use ely_core::lists::VirtualList = ely_core::lists::long::VirtualList

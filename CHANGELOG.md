@@ -4,6 +4,20 @@ What changes for an app built on Ely, newest first. An entry names the crates it
 
 ## Unreleased
 
+- `ely-core`: `ContextMenu::on_close` notifies its owner after dismissal, allowing numbered manual requests to be cleared before a host is mounted again.
+
+- `ely-core`: adds the Korean `ko-KR` locale and Korean component messages. The gallery's i18n page holds one catalog per listed locale, Spanish and Korean too; its table is sized to `LOCALES`, so a new locale without one does not build.
+- `ely-documents`: a wheel over `MarkdownDocument`'s margins beside a narrowed text column, or over its bar's track, scrolls the text as far as one over the text, once; in the source view a line wheel keeps the code's own line height at any text size, and a sideways wheel (Shift and the wheel) scrolls the code down there as over the code. Split is unchanged.
+- `ely-editor` 0.2.0: `Metrics` holds `wheel`, one wheel line as the code's list scrolls it, so a struct literal of `Metrics` names it.
+- `ely-core`: `TreeDrag` is public, with `key` and `label`, so a drop past a `Tree`'s rows names the dragged node.
+- `ely-core`: `SegmentedControl::on_context` hears a right press on a segment, with its value and the pointer, as `Tabs::on_context` does; the press stops on the segment, so the focus stays where it was.
+- `ely-core`: adds the Vietnamese `vi-VN` locale and Vietnamese component messages; the gallery's i18n page holds a Vietnamese catalog.
+- `ely-core`: adds the Spanish `es-ES` locale and Spanish component messages.
+- `ely-documents`: in `MarkdownDocument`'s visual view, F6 and Shift+F6 move focus to the nearest stop outside the document, so a keyboard user leaves a long document in one key; they had stepped block to block as Tab does. With nothing outside, focus stays where it was.
+- `ely-core`: a `Banner`'s action carries the debug selector `banner-action {label}`, so a test can press it.
+- `ely-core`: each box of a `CheckboxGroup` carries the debug selector `check {value}`, as `ToggleGroup`'s buttons carry `toggle {value}`, so a test can press one box by its value.
+- `ely-core`: a `Scrollbar` over a `ListState` reads the list's attainable end from its measured tail, so a held drag turned back from the bottom moves at once, and returning from the end keeps the thumb's size and range; an unmeasured gap had shrunk the range to the items measured.
+- `ely-documents`: on macOS, a formula or diagram letter only the system's Last Resort font draws counts as having no font, so `formula_svg` and `diagram_svg` refuse it instead of writing Last Resort's placeholder box.
 - `ely-documents`: a `TemplatePicker` as narrow as a `Dialog` gives its list at most half, so the preview's name and Use button both show; narrower still, the name is cut with an ellipsis, never the button. The button had been squeezed over the name.
 - `ely-documents`: in `MarkdownDocument`'s visual view, a drag or Shift+Up/Down past the open block opens the blocks it crosses as one field, selected across them; copy, cut, delete and typing take the whole selection, written back as one undo step. A drag past the view's top or bottom scrolls it.
 - `ely-documents`: bold, italic, strikethrough, underline and inline code over a selection that crosses blocks apply in each paragraph, heading or cell it touches; when all are styled, all lose it. Link and picture still refuse with `EditRefusal::Across`.

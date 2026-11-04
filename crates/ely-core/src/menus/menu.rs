@@ -86,6 +86,7 @@ pub(crate) struct Open {
     pub(super) over: Option<(usize, (usize, usize))>,
     /// A delayed mark; dropping it cancels.
     pub(super) pending: Option<Task<()>>,
+    pub(super) on_close: Option<Run>,
 }
 
 impl Open {
@@ -125,15 +126,18 @@ impl Open {
 
     /// Closes and hands focus back to whatever held it before the menu opened.
     pub(crate) fn close(state: &Entity<Open>, window: &mut Window, cx: &mut App) {
-        let takeover = state.update(cx, |open, cx| {
-            open.spot = None;
+        let (takeover, on_close) = state.update(cx, |open, cx| {
+            let was_open = open.spot.take().is_some();
             open.levels.clear();
             (open.pointer, open.over, open.pending) = (None, None, None);
             cx.notify();
-            open.takeover.take()
+            (open.takeover.take(), was_open.then(|| open.on_close.clone()).flatten())
         });
         if let Some(takeover) = takeover {
             give_back(&takeover, window, cx);
+        }
+        if let Some(on_close) = on_close {
+            on_close(window, cx);
         }
     }
 }

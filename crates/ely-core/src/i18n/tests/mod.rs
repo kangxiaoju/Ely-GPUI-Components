@@ -134,6 +134,7 @@ fn locales_write_their_own_numbers_and_dates() {
         [
             ("en-US", "−1,234,567.89".into(), "9/1/26".into()),
             ("en-GB", "−1,234,567.89".into(), "01/09/2026".into()),
+            ("es-ES", "−1.234.567,89".into(), "01/09/26".into()),
             ("de-DE", "−1.234.567,89".into(), "01.09.26".into()),
             (
                 "fr-FR",
@@ -141,6 +142,8 @@ fn locales_write_their_own_numbers_and_dates() {
                 "01/09/2026".into()
             ),
             ("ja-JP", "−1,234,567.89".into(), "2026/09/01".into()),
+            ("ko-KR", "−1,234,567.89".into(), "26. 9. 1.".into()),
+            ("vi-VN", "−1.234.567,89".into(), "01/09/2026".into()),
             ("zh-CN", "−1,234,567.89".into(), "2026/9/1".into()),
             ("he-IL", "\u{200e}−1,234,567.89".into(), "1.9.2026".into()),
         ]
@@ -237,4 +240,52 @@ mod shown {
         assert_eq!(side(Direction::Ltr), Some(gpui::TextAlign::Left));
         assert_eq!(side(Direction::Rtl), Some(gpui::TextAlign::Right));
     }
+}
+
+#[test]
+fn spanish_formats_and_component_messages_are_available() {
+    let locale = Locale::of("es-ES");
+    assert_eq!(locale.name, "Español");
+    assert_eq!(locale.direction, Direction::Ltr);
+    assert_eq!(locale.number(1234.5, 1), "1.234,5");
+    assert_eq!(
+        super::builtin::builtin("es-ES", "find.replace_all"),
+        "Reemplazar todo"
+    );
+    assert_eq!(
+        super::builtin::builtin("es-ES", "dialog.cancel"),
+        "Cancelar"
+    );
+    assert_eq!(
+        super::builtin::builtin("es-ES", "time.day.other"),
+        "{n} días"
+    );
+}
+
+#[test]
+fn korean_formats_and_component_messages_are_available() {
+    let locale = Locale::of("ko-KR");
+    assert_eq!(locale.name, "한국어");
+    assert_eq!(locale.number(1234.5, 1), "1,234.5");
+    assert_eq!(
+        super::builtin::builtin("ko-KR", "find.replace_all"),
+        "모두 바꾸기"
+    );
+    assert_eq!(super::builtin::builtin("ko-KR", "dialog.cancel"), "취소");
+}
+
+#[test]
+fn vietnamese_formats_and_component_messages_are_available() {
+    let locale = Locale::of("vi-VN");
+    assert_eq!(locale.name, "Tiếng Việt");
+    assert_eq!(locale.number(1234.5, 1), "1.234,5");
+    assert_eq!(
+        super::builtin::builtin("vi-VN", "find.replace_all"),
+        "Thay thế tất cả"
+    );
+    assert_eq!(super::builtin::builtin("vi-VN", "dialog.cancel"), "Hủy");
+    assert_eq!(
+        super::builtin::builtin("vi-VN", "time.day.other"),
+        "{n} ngày"
+    );
 }

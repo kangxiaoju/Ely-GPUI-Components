@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui::{
     Animation, AnimationExt, AnyElement, App, ElementId, FocusHandle, FontWeight,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, RenderOnce, Role,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Point, RenderOnce, Role,
     ScrollHandle, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::*, rems,
 };
 
@@ -16,6 +16,7 @@ use crate::{
 };
 
 type OnChange = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
+type OnContext = Rc<dyn Fn(&SharedString, Point<Pixels>, &mut Window, &mut App)>;
 
 struct Segment {
     value: SharedString,
@@ -41,6 +42,7 @@ pub struct SegmentedControl {
     selected: SharedString,
     size: ControlSize,
     on_change: Option<OnChange>,
+    on_context: Option<OnContext>,
 }
 
 impl SegmentedControl {
@@ -52,6 +54,7 @@ impl SegmentedControl {
             selected: selected.into(),
             size: ControlSize::default(),
             on_change: None,
+            on_context: None,
         }
     }
 
@@ -101,6 +104,15 @@ impl SegmentedControl {
         handler: impl Fn(&SharedString, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_change = Some(Rc::new(handler));
+        self
+    }
+
+    /// A right press on a segment: its value and the pointer.
+    pub fn on_context(
+        mut self,
+        handler: impl Fn(&SharedString, Point<Pixels>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_context = Some(Rc::new(handler));
         self
     }
 }
@@ -193,6 +205,7 @@ impl RenderOnce for SegmentedControl {
                 label.clone()
             };
             let (change, measure) = (self.on_change.clone(), state.clone());
+            let (context, pressed) = (self.on_context.clone(), value.clone());
             let segment = div()
                 .id(("segment", ix))
                 .role(Role::RadioButton)
@@ -222,6 +235,14 @@ impl RenderOnce for SegmentedControl {
                 .track_focus(&focus)
                 .focus_ring(cx)
                 .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
+                .when_some(context, |segment, context| {
+                    segment.on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                        window.prevent_default();
+                        cx.stop_propagation();
+                        log::info!("segmented control: context on {pressed}");
+                        context(&pressed, event.position, window, cx);
+                    })
+                })
                 .on_click(move |_, window, cx| {
                     if on {
                         return;

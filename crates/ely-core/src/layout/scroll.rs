@@ -13,14 +13,14 @@ mod source;
 #[cfg(test)]
 mod tests;
 
-use shown::{Activity, track_activity};
+use shown::{Activity, still, track_activity};
 pub use source::{ScrollModel, ScrollPlace, ScrollSource};
 use source::{follow, seen};
 
 use super::ScrollShadow;
 use crate::theme::ActiveTheme;
 
-/// Sets `scroll`'s offset along `axis` whole so `item`, as painted, sits inside the box, its start first when it is longer; true when it moved.
+/// Scrolls `item` into view along `axis`; true when moved.
 #[doc(hidden)]
 pub fn bring_into_view(scroll: &ScrollHandle, item: Bounds<Pixels>, axis: Axis) -> bool {
     let (frame, offset) = (scroll.bounds(), scroll.offset());
@@ -44,7 +44,7 @@ pub fn bring_into_view(scroll: &ScrollHandle, item: Bounds<Pixels>, axis: Axis) 
     shift != Pixels::ZERO
 }
 
-/// A canvas over a Tab stop in a scroll box: when the stop takes focus, it brings its painted box into view along `axis`, once per focus. A new `id` reveals again.
+/// Brings a Tab stop into view once each time it focuses.
 #[doc(hidden)]
 pub fn reveal_when_focused(
     id: impl Into<ElementId>,
@@ -77,7 +77,7 @@ pub fn reveal_when_focused(
     .size_full()
 }
 
-/// Keeps a scroll box's wheel to its own axes; gpui turns a wheel along the other axis onto a box that scrolls one way, while the page scrolls too.
+/// Keeps a scroll box's wheel to the axes it scrolls.
 pub fn on_axis<E: Styled>(mut element: E) -> E {
     element.style().restrict_scroll_to_axis = Some(true);
     element
@@ -188,6 +188,7 @@ impl RenderOnce for Scrollbar {
         let rem = window.rem_size();
         let thickness = theme.scrollbar_thickness().to_pixels(rem);
         let min_thumb = theme.scrollbar_min_thumb().to_pixels(rem);
+        let stays = theme.scrollbars_shown;
         let activity = matches!(self.shown, Shown::Auto).then(|| {
             window.use_keyed_state((self.id.clone(), "activity"), cx, |_, _| Activity::new())
         });
@@ -195,8 +196,9 @@ impl RenderOnce for Scrollbar {
             Shown::Given(presence) => presence,
             Shown::Auto => 0.0,
         };
-        let presence = activity.as_ref().map_or(given, |state| {
-            track_activity(state, self.handle.offset(cx), window, cx)
+        let presence = activity.as_ref().map_or(given, |state| match stays {
+            true => still(state, cx),
+            false => track_activity(state, self.handle.offset(cx), window, cx),
         });
         let presence = if held { 1.0 } else { presence };
         let hidden = activity.is_none() && presence <= 0.0;
@@ -335,7 +337,7 @@ impl ScrollArea {
         }
     }
 
-    /// Scrolls through the owner's handle, so the owner can move it.
+    /// Scrolls through the owner's handle, which it can move.
     pub fn track_scroll(mut self, handle: &ScrollHandle) -> Self {
         self.handle = Some(handle.clone());
         self
@@ -373,7 +375,10 @@ impl RenderOnce for ScrollArea {
             Some(handle) => handle,
             None => state.read(cx).handle.clone(),
         };
-        let presence = track_activity(&state, handle.offset(), window, cx);
+        let presence = match cx.theme().scrollbars_shown {
+            true => still(&state, cx),
+            false => track_activity(&state, handle.offset(), window, cx),
+        };
         self.base
             .id(self.id)
             .relative()
