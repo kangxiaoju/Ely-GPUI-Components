@@ -170,6 +170,7 @@ pub struct DatePicker {
     today: Option<Date>,
     size: ControlSize,
     disabled: bool,
+    iso: bool,
     on_change: Option<OnDate>,
 }
 
@@ -184,6 +185,7 @@ impl DatePicker {
             today: None,
             size: ControlSize::default(),
             disabled: false,
+            iso: false,
             on_change: None,
         }
     }
@@ -191,6 +193,12 @@ impl DatePicker {
     /// What it shows with no date chosen.
     pub fn placeholder(mut self, text: impl Into<SharedString>) -> Self {
         self.placeholder = Some(text.into());
+        self
+    }
+
+    /// Shows the chosen date as YYYY-MM-DD instead of the locale's long date.
+    pub fn iso(mut self) -> Self {
+        self.iso = true;
         self
     }
 
@@ -258,7 +266,7 @@ impl RenderOnce for DatePicker {
             self.id,
             Face {
                 icon: IconName::Calendar,
-                shown: value.map(|date| show_date(date, cx).into()),
+                shown: value.map(|date| if self.iso { date.to_string().into() } else { show_date(date, cx).into() }),
                 placeholder: (self.placeholder).unwrap_or_else(|| text(cx, "date.pick_date", &[])),
                 size: self.size,
                 disabled: self.disabled,

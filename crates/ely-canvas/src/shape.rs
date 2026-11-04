@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use gpui::SharedString;
 
 use super::view::Frame;
@@ -8,6 +9,19 @@ use crate::primitives::IconName;
 pub enum ShapeKind {
     /// A rectangle.
     Rect,
+    /// A rectangle with radius `min(12, min(width, height) * 0.25)` canvas units.
+    RoundedRect,
+    /// A diamond with vertices at the frame's side centers.
+    Diamond,
+    /// An embedded image; the host retains this shared resource between renders.
+    Image(Arc<gpui::Image>),
+    /// A connected line with frame-relative points and an optional arrow head.
+    Polyline {
+        /// Points relative to the frame's upper-left corner.
+        points: Vec<(f32, f32)>,
+        /// Draw an arrow head at the final point.
+        arrow: bool,
+    },
     /// An ellipse.
     Ellipse,
     /// A regular polygon of so many sides, three or more.
@@ -34,6 +48,10 @@ impl ShapeKind {
     pub(crate) fn icon(&self) -> IconName {
         match self {
             ShapeKind::Rect => IconName::Square,
+            ShapeKind::RoundedRect => IconName::SquareRoundCorner,
+            ShapeKind::Diamond => IconName::Hexagon,
+            ShapeKind::Image(_) => IconName::Square,
+            ShapeKind::Polyline { .. } => IconName::Spline,
             ShapeKind::Ellipse => IconName::Circle,
             ShapeKind::Polygon(_) => IconName::Hexagon,
             ShapeKind::Line(_) => IconName::Slash,
@@ -45,9 +63,13 @@ impl ShapeKind {
     }
 
     /// What it is, in a word.
-    pub(crate) fn word(&self) -> &'static str {
+    pub fn word(&self) -> &'static str {
         match self {
             ShapeKind::Rect => "Rectangle",
+            ShapeKind::RoundedRect => "Rounded rectangle",
+            ShapeKind::Diamond => "Diamond",
+            ShapeKind::Image(_) => "Image",
+            ShapeKind::Polyline { .. } => "Polyline",
             ShapeKind::Ellipse => "Ellipse",
             ShapeKind::Polygon(_) => "Polygon",
             ShapeKind::Line(_) => "Line",
@@ -56,6 +78,17 @@ impl ShapeKind {
             ShapeKind::Path { .. } => "Path",
             ShapeKind::Note(_) => "Note",
         }
+    }
+
+    /// Its localized type name, without changing the user's layer name or text.
+    pub fn words(&self, cx: &gpui::App) -> SharedString {
+        let key = match self {
+            Self::Rect => "rect", Self::RoundedRect => "rounded_rect", Self::Diamond => "diamond", Self::Image(_) => "image",
+            Self::Polyline { .. } => "polyline", Self::Ellipse => "ellipse",
+            Self::Polygon(_) => "polygon", Self::Line(_) => "line", Self::Arrow(_) => "arrow",
+            Self::Text(_) => "text", Self::Path { .. } => "path", Self::Note(_) => "note",
+        };
+        crate::i18n::text(cx, &format!("canvas.kind.{key}"), &[])
     }
 }
 
@@ -93,6 +126,57 @@ impl Corner {
     }
 }
 
+/// Font choice for canvas content, independent of the application's UI font.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CanvasFont {
+    /// The theme's proportional font.
+    #[default]
+    Default,
+    /// The host-provided Xiaolai Chinese and Latin handwritten font.
+    Handwritten,
+    /// The theme's monospace font.
+    Monospace,
+}
+
+impl CanvasFont {
+    pub(crate) fn family(self, cx: &gpui::App) -> SharedString {
+        use crate::theme::ActiveTheme;
+        match self {
+            Self::Default => cx.theme().font_family.clone(),
+            Self::Handwritten => "Xiaolai".into(),
+            Self::Monospace => cx.theme().mono_family.clone(),
+        }
+    }
+}
+
+/// Theme-relative appearance shared by committed shapes and tool previews.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ShapeAppearance {
+    /// Stroke hue slot.
+    pub stroke: usize,
+    /// Optional fill hue slot; `None` leaves the interior transparent.
+    pub fill: Option<usize>,
+    /// Stroke width in canvas units.
+    pub stroke_width: f32,
+    /// Overall alpha from zero to one.
+    pub opacity: f32,
+    /// Deterministic hand-drawn displacement in canvas units.
+    pub roughness: f32,
+    /// Stroke pattern.
+    pub dash: super::style::Dash,
+    /// Font size in canvas units.
+    pub font_size: f32,
+    /// Font family used by shape text, labels and writing previews.
+    pub font: CanvasFont,
+}
+
+impl Default for ShapeAppearance {
+    fn default() -> Self {
+        Self { stroke: 0, fill: None, stroke_width: 2.0, opacity: 1.0,
+            roughness: 0.0, dash: super::style::Dash::Solid, font_size: 16.0, font: CanvasFont::Default }
+    }
+}
+
 /// Something on a canvas: its key, its name, what it is, its frame, its hue among the chart colors, and whether it hides or is locked.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Shape {
@@ -112,6 +196,10 @@ pub struct Shape {
     pub locked: bool,
     /// Words shown in its middle.
     pub label: Option<SharedString>,
+    /// Explicit appearance, or the original theme-derived hue appearance.
+    pub appearance: Option<ShapeAppearance>,
+    /// Clockwise rotation about the frame center, in radians.
+    pub rotation: f32,
 }
 
 impl Shape {
@@ -134,6 +222,8 @@ impl Shape {
             hidden: false,
             locked: false,
             label: None,
+            appearance: None,
+            rotation: 0.0,
         }
     }
 
@@ -141,6 +231,64 @@ impl Shape {
     pub fn hue(mut self, hue: usize) -> Self {
         self.hue = hue;
         self
+    }
+
+    /// Sets the complete theme-relative appearance.
+    pub fn appearance(mut self, appearance: ShapeAppearance) -> Self {
+        self.hue = appearance.stroke;
+        self.appearance = Some(appearance);
+        self
+    }
+
+    /// Sets clockwise rotation about the frame center, in radians.
+    pub fn rotation(mut self, radians: f32) -> Self {
+        self.rotation = radians;
+        self
+    }
+
+    /// Rotates a canvas point about this shape's center.
+    pub fn rotate_point(&self, at: (f32, f32), angle: f32) -> (f32, f32) {
+        let (cx, cy) = self.frame.center();
+        let (s, c) = angle.sin_cos();
+        let (x, y) = (at.0 - cx, at.1 - cy);
+        (cx + x * c - y * s, cy + x * s + y * c)
+    }
+
+    /// Axis-aligned canvas bounds after rotation.
+    pub fn bounds(&self) -> Frame {
+        let (s, c) = self.rotation.sin_cos();
+        let w = self.frame.w * c.abs() + self.frame.h * s.abs();
+        let h = self.frame.w * s.abs() + self.frame.h * c.abs();
+        let (x, y) = self.frame.center();
+        Frame::new(x - w / 2.0, y - h / 2.0, w, h)
+    }
+
+    /// Point on the rotated outline facing a canvas-space destination.
+    pub fn outline_point(&self, destination: (f32,f32)) -> (f32,f32) {
+        let local = self.rotate_point(destination, -self.rotation);
+        let (cx,cy) = self.frame.center();
+        let (dx,dy) = (local.0-cx,local.1-cy);
+        let (rx,ry) = ((self.frame.w/2.0).max(0.001),(self.frame.h/2.0).max(0.001));
+        if dx.hypot(dy) < 0.000001 { return self.rotate_point((cx+rx,cy),self.rotation); }
+        if matches!(self.kind, ShapeKind::RoundedRect) {
+            let scale = 1.0 / (dx.abs() / rx).max(dy.abs() / ry);
+            let radius = super::rounded::radius(&self.frame);
+            let (x, y) = (dx.abs() * scale, dy.abs() * scale);
+            if x > rx - radius && y > ry - radius {
+                let (ox, oy) = (rx - radius, ry - radius);
+                let a = dx * dx + dy * dy;
+                let b = dx.abs() * ox + dy.abs() * oy;
+                let c = ox * ox + oy * oy - radius * radius;
+                let t = (b + (b * b - a * c).max(0.0).sqrt()) / a;
+                return self.rotate_point((cx + dx * t, cy + dy * t), self.rotation);
+            }
+        }
+        let divisor = match self.kind {
+            ShapeKind::Ellipse => ((dx/rx).powi(2)+(dy/ry).powi(2)).sqrt(),
+            ShapeKind::Diamond => (dx/rx).abs()+(dy/ry).abs(),
+            _ => (dx/rx).abs().max((dy/ry).abs()),
+        }.max(0.001);
+        self.rotate_point((cx+dx/divisor,cy+dy/divisor),self.rotation)
     }
 
     /// Whether it is hidden.

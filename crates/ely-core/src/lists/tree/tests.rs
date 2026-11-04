@@ -14,6 +14,7 @@ struct Explorer {
     checked: Option<Vec<SharedString>>,
     heard: Vec<String>,
     toggled: Vec<String>,
+    opened: Vec<String>,
 }
 
 impl Render for Explorer {
@@ -47,8 +48,14 @@ impl Render for Explorer {
         );
         let context = heard(&cx.entity());
         let toggled = cx.entity();
+        let opened = cx.entity();
         let tree = Tree::new("tree", all)
             .open(["src"])
+            .on_open(move |key, open, cx| opened.update(cx, |view, _| view.opened.push(format!("open {key} {open}"))))
+            .row_content(|key, _, _, _| {
+                use gpui::ParentElement;
+                gpui::div().flex_1().child(key.clone()).into_any_element()
+            })
             .selected(self.selected.clone())
             .on_select(move |keys, _, cx| {
                 select.update(cx, |explorer, _| explorer.selected = keys.to_vec())
@@ -273,4 +280,16 @@ fn each_open_and_close_is_heard(cx: &mut TestAppContext) {
         read(&view, cx, |explorer| explorer.toggled.clone()),
         ["open docs", "close docs"]
     );
+}
+
+#[gpui::test]
+fn custom_row_content_preserves_keyboard_expansion_notifications(cx: &mut TestAppContext) {
+    let (view, cx) = explorer(false, cx);
+    cx.simulate_click(row(0), Modifiers::none());
+    settle(cx);
+    cx.simulate_keystrokes("left right");
+    settle(cx);
+    let heard = read(&view, cx, |explorer| explorer.opened.clone());
+    assert!(heard.contains(&"open src false".to_owned()), "{heard:?}");
+    assert!(heard.contains(&"open src true".to_owned()), "{heard:?}");
 }

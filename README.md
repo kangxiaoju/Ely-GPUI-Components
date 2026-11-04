@@ -30,6 +30,32 @@ fn main() {
 
 `init` registers the fonts and the theme. It returns an error if the application's asset source cannot load one of Ely's files.
 
+## Native HTML email composition
+
+`ely_documents::email` (also `ely_gpui_component::documents::email`) provides `HtmlEmailEditor` and the serializable `EmailDocument`. The document stores literal Unicode text, normalized `EmailRun` style intervals and stable block IDs, not Markdown or editable HTML source. Call `EmailDocument::from_plain` for literal text or `from_html` for untrusted HTML; export the same model with `to_html` and `to_plain`.
+
+Create an `Entity<HtmlEmailEditor>` with `HtmlEmailEditor::new(document, window, cx)`. Render the entity for the body alone, or wrap it with `EmailEditorView::new(id, &editor)` for the selection-aware `EmailToolbar`. Call Ely's `init` before use to register its key bindings. The editor owns one focus handle and one GPUI `EntityInputHandler` across paragraphs, inline objects and table cells; the toolbar does not create another body input. `MailComposer` remains the separate envelope, attachment and send UI.
+
+### Supported content and safety
+
+- Paragraphs, headings 1–6, quotes, bulleted/numbered/task items, preformatted code, hard breaks and horizontal rules.
+- Bold, italic, underline, strike, inline code, safe font-family names, 8–72 pt sizes, explicit RGB text colors, alignment and indentation. Links accept HTTP, HTTPS and `mailto` only.
+- Atomic block and inline images, including rich table-cell content. `EmailText::images` associates image metadata with U+FFFC object tokens at UTF-8 byte offsets. Tables support row/column insertion and deletion and horizontal merge/unmerge; row spans are not preserved.
+- HTML5 import normalizes the supported subset. Scripts, stylesheets, embedded documents, forms, event attributes, hidden content and unsafe URLs are discarded; unsupported CSS and browser layout are not retained. This is a mail-body authoring component, not a browser, general DOM editor or lossless editor for arbitrary marketing HTML/CSS.
+- Images accept `cid:`, `asset:`, HTTP(S) and base64 PNG/JPEG/GIF/WebP data references, not SVG or file URLs. Import and rendering never fetch remote resources implicitly; unresolved images need host-provided assets.
+
+HTML and plain-text imports are limited to 2 MiB. The validated document budget also limits text and image/style-string metadata to 2 MiB, with at most 4,096 blocks and 65,536 style runs. HTML nesting is limited to 32 levels; tables to 64 rows × 64 columns (4,096 cells). Invalid or oversized editor operations return `EmailError` without replacing existing content. Undo/redo stores affected block splices and directed selections, retaining at most 100 complete operations within a 32 MiB accounting budget; oldest complete operations are evicted. Contiguous typing can coalesce, while paste, formatting and committed IME composition use separate transactions.
+
+### Host integration
+
+Subscribe to `EmailEditorEvent` for `Changed` and actionable `Problem` notifications. Use `snapshot()` when saving or exporting committed content: it excludes active IME previews. `committed_revision`, `committed_is_empty`, `committed_is_blank` and `committed_estimated_bytes` expose cached committed-state information; the byte estimate excludes MIME markup and attachments.
+
+GPUI's default clipboard path supports plain text and Ely's HTML metadata for internal copies; it is not an external `text/html` adapter. Enable `set_host_clipboard(true)` to handle `PasteRequested` and `CopyRequested` in your application. Read external HTML/plain-text flavors, import the chosen representation, and call `complete_paste(request, document, cx)`. Write both HTML and plain-text flavors on copy. For a cut, delete the original selection only after copying succeeds and only if the document and selection still match the request context.
+
+Handle `InsertImageRequested` by picking, validating and decoding the image outside the editor, storing its attachment/CID or asset reference, then calling `complete_image`. Supply resolved display assets with `set_images`; the host owns image I/O, decoding limits, attachment lifetime and CID-to-MIME assembly. Paste/image completions reject stale request IDs or changed document revisions/selections rather than overwrite newer edits. Use `set_problem` to present host failures. Neither MIME delivery nor operating-system rich clipboard access is supplied by this component.
+
+The [mail gallery source](crates/ely-gallery/src/pages/mail/write.rs) pairs the body editor with `MailComposer`; the standalone source is [`crates/ely-gallery/examples/html_email.rs`](crates/ely-gallery/examples/html_email.rs). End-to-end runtime acceptance is not recorded here; macOS behavior is unverified.
+
 ## With GPUI Kit
 
 Ely runs beside Longbridge's [GPUI Kit](https://gpui-kit.com) in one window, on the GPUI snapshot Kit 0.8.1 pins. Pass `Assets::before(gpui_kit::assets::Assets)` as the one asset source, call both `init`s, open the window with `gpui_kit::open_window`, and wrap the view in Ely's root `FocusScope`. The [guide](https://elygpui.com/docs/gpui-kit) covers themes, focus and the inspector; `compat/kit` holds a whole app and the tests behind each claim.
@@ -81,3 +107,4 @@ Ely is built by AI coding agents. A person sets each goal and decides what ships
 
 MIT. Lucide icons: ISC. Inter, JetBrains Mono, IBM Plex Sans and the gallery's Noto Sans Hebrew: SIL Open Font License 1.1.
 The gallery photos in `crates/ely-gallery/assets` were generated for this project with gpt-image-2.
+The native email editor draws architectural inspiration from [Aviary](https://github.com/Catvert/aviary) (Apache-2.0) and [gpui-flowtext](https://github.com/realartists-gitmo/gpui-flowtext) (MIT). These are design references, not copied source or runtime dependencies.

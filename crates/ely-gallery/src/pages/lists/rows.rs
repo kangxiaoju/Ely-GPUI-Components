@@ -43,6 +43,7 @@ pub fn items(cx: &mut App) -> impl IntoElement + use<> {
                 )
                 .child(
                     ListItem::new("item-drafts", "Drafts")
+                        .compact()
                         .description("Two unsent")
                         .leading(folder(IconName::FileText))
                         .trailing(Badge::new("Synced").tone(Severity::Success).dot()),

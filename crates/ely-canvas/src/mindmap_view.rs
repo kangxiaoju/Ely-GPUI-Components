@@ -259,7 +259,7 @@ impl RenderOnce for MindMap {
         let field = selected
             .as_ref()
             .and_then(|key| placed.iter().find(|topic| topic.key == *key))
-            .and_then(|topic| writing::field(&editing, in_view(&view, &topic.frame), cx));
+            .and_then(|topic| writing::field(&editing, in_view(&view, &topic.frame), super::ShapeAppearance::default(), view.zoom, cx));
         let layer = div()
             .absolute()
             .inset_0()

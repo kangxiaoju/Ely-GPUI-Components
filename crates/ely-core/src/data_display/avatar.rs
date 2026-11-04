@@ -5,7 +5,7 @@ use gpui::{
 
 use crate::{
     primitives::{Icon, IconName, Image},
-    theme::{ActiveTheme, AvatarSize, IconSize, Palette, Radius, TextSize},
+    theme::{ActiveTheme, AvatarSize, IconSize, Mix, Palette, Radius, TextSize},
 };
 
 /// Whether someone is around.
@@ -62,6 +62,22 @@ fn tint(name: &str, colors: &Palette) -> Hsla {
     colors.chart[hash as usize % colors.chart.len()]
 }
 
+fn face_colors(tone: Hsla, colors: &Palette, solid: bool) -> (Hsla, Hsla) {
+    if !solid {
+        return (tone.opacity(0.16), tone);
+    }
+    let mut foreground = colors.on_accent;
+    let mut best = crate::theme::contrast(foreground, tone);
+    for candidate in [colors.fg, colors.bg] {
+        let contrast = crate::theme::contrast(candidate, tone);
+        if contrast > best {
+            foreground = candidate;
+            best = contrast;
+        }
+    }
+    (tone, foreground)
+}
+
 /// A person or a team at a glance: their picture, or their initials on a tone kept by the name, or an icon. A presence dot can sit on the corner; squares suit teams.
 ///
 /// ```
@@ -81,6 +97,8 @@ pub struct Avatar {
     size: AvatarSize,
     square: bool,
     ring: bool,
+    solid: bool,
+    muted: bool,
     ring_color: Option<Hsla>,
     presence: Option<Presence>,
 }
@@ -96,6 +114,8 @@ impl Avatar {
             size: AvatarSize::default(),
             square: false,
             ring: false,
+            solid: false,
+            muted: false,
             ring_color: None,
             presence: None,
         }
@@ -127,6 +147,21 @@ impl Avatar {
     /// A rounded square, as teams and apps take.
     pub fn square(mut self) -> Self {
         self.square = true;
+        self
+    }
+
+    /// Uses the name's full theme-chart color with contrasting theme text.
+    /// Useful for app and project marks; the default remains a subtle tint.
+    pub fn solid(mut self) -> Self {
+        self.solid = true;
+        self.muted = false;
+        self
+    }
+
+    /// A subtle name-colored background with the theme's normal foreground text.
+    pub fn muted(mut self) -> Self {
+        self.solid = false;
+        self.muted = true;
         self
     }
 
@@ -163,6 +198,18 @@ impl RenderOnce for Avatar {
             }
         };
         let tone = tint(&self.name, colors);
+        let (background, foreground) = face_colors(tone, colors, self.solid);
+        let (background, foreground) = if self.muted {
+            let mut background = colors.bg;
+            for step in (1..=8).rev() {
+                let candidate = colors.bg.mix(&tone, step as f32 * 0.01);
+                if crate::theme::contrast(colors.fg, candidate) >= 4.5 {
+                    background = candidate;
+                    break;
+                }
+            }
+            (background, colors.fg)
+        } else { (background, foreground) };
         let text = match self.size {
             AvatarSize::Xs | AvatarSize::Sm => TextSize::Xs,
             AvatarSize::Md => TextSize::Sm,
@@ -183,7 +230,7 @@ impl RenderOnce for Avatar {
             }
             (None, Some(icon)) => Icon::new(icon)
                 .size(IconSize::Md)
-                .color(colors.fg_muted)
+                .color(if self.solid { foreground } else { colors.fg_muted })
                 .into_any_element(),
             (None, None) => initials(&self.name).into_any_element(),
         };
@@ -208,8 +255,8 @@ impl RenderOnce for Avatar {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .bg(tone.opacity(0.16))
-                    .text_color(tone)
+                    .bg(background)
+                    .text_color(foreground)
                     .text_size(theme.text_size(text))
                     .font_weight(FontWeight::SEMIBOLD)
                     .when(self.ring, |face| {
@@ -366,5 +413,20 @@ mod tests {
         assert_eq!(initials("mia"), "M");
         assert_eq!(initials("  "), "");
         assert_eq!(initials("élodie durand"), "ÉD");
+    }
+
+    #[test]
+    fn solid_marks_keep_theme_hues_and_choose_readable_foregrounds() {
+        for colors in [crate::theme::Palette::light(false), crate::theme::Palette::dark(false)] {
+            for tone in colors.chart {
+                let (background, foreground) = super::face_colors(tone, &colors, true);
+                assert_eq!(background, tone);
+                let contrast = crate::theme::contrast(foreground, background);
+                for candidate in [colors.on_accent, colors.fg, colors.bg] {
+                    assert!(contrast >= crate::theme::contrast(candidate, background));
+                }
+                assert_eq!(super::face_colors(tone, &colors, false), (tone.opacity(0.16), tone));
+            }
+        }
     }
 }

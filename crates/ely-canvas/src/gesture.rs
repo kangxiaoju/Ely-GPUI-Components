@@ -1,9 +1,9 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use gpui::{App, Bounds, Entity, Pixels, SharedString, Window};
 
 use super::{
-    edit::{Handle, drawn, hit, inside, resized, snapped},
+    edit::{Handle, drawn, hit, inside, snapped},
     shape::{Shape, ShapeKind},
     view::{Frame, Viewport},
 };
@@ -12,6 +12,7 @@ pub(super) type OnKeys = Rc<dyn Fn(&[SharedString], &mut Window, &mut App)>;
 pub(super) type OnDraw = Rc<dyn Fn(ShapeKind, Frame, &mut Window, &mut App)>;
 pub(super) type OnMove = Rc<dyn Fn(&[SharedString], (f32, f32), &mut Window, &mut App)>;
 pub(super) type OnResize = Rc<dyn Fn(&SharedString, Frame, &mut Window, &mut App)>;
+pub(super) type OnRotate = Rc<dyn Fn(&SharedString, f32, &mut Window, &mut App)>;
 /// A handler for two keys, or a key and its words.
 pub(crate) type OnPair = Rc<dyn Fn(&SharedString, &SharedString, &mut Window, &mut App)>;
 
@@ -29,6 +30,8 @@ pub struct Brush {
 pub(super) enum Gesture {
     #[default]
     Idle,
+    Erasing { keys: Vec<SharedString> },
+    Rotating { key: SharedString, center: (f32,f32), start: f32, from: (f32,f32), to: (f32,f32) },
     Marquee {
         from: (f32, f32),
         to: (f32, f32),
@@ -120,11 +123,13 @@ pub(super) struct Handlers {
     pub(super) on_resize: Option<OnResize>,
     pub(super) on_link: Option<OnPair>,
     pub(super) on_text: Option<OnPair>,
+    pub(super) on_delete: Option<OnKeys>,
+    pub(super) on_rotate: Option<OnRotate>,
 }
 
 /// What a gesture ends against: the shapes, the selection, the frames to snap to, and the view.
 pub(super) struct Scene {
-    pub(super) shapes: Rc<Vec<Shape>>,
+    pub(super) shapes: Arc<Vec<Shape>>,
     pub(super) selected: Rc<Vec<SharedString>>,
     pub(super) others: Vec<Frame>,
     pub(super) view: Viewport,
@@ -141,6 +146,15 @@ pub(super) fn commit(
     cx: &mut App,
 ) {
     match gesture {
+        Gesture::Erasing { keys } => {
+            if !keys.is_empty() {
+                if let Some(delete) = &handlers.on_delete { delete(&keys, window, cx); }
+            }
+        }
+        Gesture::Rotating { key, center, start, from, to } => {
+            let angle = start + (to.1-center.1).atan2(to.0-center.0) - (from.1-center.1).atan2(from.0-center.0);
+            if let Some(on_rotate) = &handlers.on_rotate { on_rotate(&key, angle, window, cx); }
+        }
         Gesture::Marquee { from, to } => {
             let keys = inside(&scene.shapes, &Frame::spanning(from, to));
             log::info!("tool layer: marquee takes {keys:?}");
@@ -174,8 +188,7 @@ pub(super) fn commit(
                 log::error!("tool layer: resized shape {key} left the canvas");
                 return;
             };
-            let frame = shape.frame;
-            let next = resized(frame, handle, (to.0 - from.0, to.1 - from.1), LEAST, square);
+            let next = super::edit::resized_shape(shape, handle, from, to, LEAST, square);
             log::info!("tool layer: resize {key} to {next:?}");
             if let Some(on_resize) = &handlers.on_resize {
                 on_resize(&key, next, window, cx);

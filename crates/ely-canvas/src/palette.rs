@@ -22,7 +22,10 @@ fn icon(tool: Tool) -> IconName {
         Tool::Select => IconName::MousePointer2,
         Tool::Hand => IconName::Hand,
         Tool::Rect => IconName::Square,
+        Tool::RoundedRect => IconName::SquareRoundCorner,
         Tool::Ellipse => IconName::Circle,
+        Tool::Diamond => IconName::Hexagon,
+        Tool::Eraser => IconName::Eraser,
         Tool::Polygon => IconName::Hexagon,
         Tool::Line => IconName::Slash,
         Tool::Arrow => IconName::MoveUpRight,
@@ -45,6 +48,7 @@ fn icon(tool: Tool) -> IconName {
 pub struct ToolPalette {
     id: ElementId,
     tool: Tool,
+    disabled: bool,
     tools: Vec<Tool>,
     on_change: Option<OnTool>,
 }
@@ -55,6 +59,7 @@ impl ToolPalette {
         Self {
             id: id.into(),
             tool,
+            disabled: false,
             tools: Tool::ALL.to_vec(),
             on_change: None,
         }
@@ -65,6 +70,9 @@ impl ToolPalette {
         self.tools = tools.into_iter().collect();
         self
     }
+
+    /// Dims palette tools and prevents picking them.
+    pub fn disabled(mut self, disabled: bool) -> Self { self.disabled=disabled; self }
 
     /// Gets the tool picked.
     pub fn on_change(mut self, handler: impl Fn(Tool, &mut Window, &mut App) + 'static) -> Self {
@@ -88,6 +96,7 @@ impl RenderOnce for ToolPalette {
             .fold(ToggleGroup::new(self.id), |group, tool| {
                 group.item(
                     ToggleItem::new(tool.id())
+                        .disabled(self.disabled)
                         .icon(icon(tool))
                         .tooltip(tool.words(cx)),
                 )
@@ -162,10 +171,7 @@ impl RenderOnce for BrushSettings {
             });
         let hues = ColorPalette::new(
             (self.id.clone(), "hue"),
-            HUE_NAMES
-                .iter()
-                .zip(chart)
-                .map(|(name, color)| (*name, color)),
+            HUE_NAMES.iter().enumerate().map(|(ix,_)| (i18n::text(cx,&format!("canvas.hue.{ix}"),&[]),chart[ix])),
         )
         .columns(8)
         .selected(chart[brush.hue])

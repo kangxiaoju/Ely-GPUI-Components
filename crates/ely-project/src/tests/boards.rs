@@ -1,5 +1,5 @@
 use gpui::{
-    AnyElement, Entity, IntoElement, Modifiers, MouseButton, ParentElement, SharedString, Styled,
+    AnyElement, Entity, IntoElement, InteractiveElement, Modifiers, MouseButton, ParentElement, SharedString, Styled,
     TestAppContext, point, px,
 };
 use jiff::civil::date;
@@ -109,6 +109,73 @@ fn a_focused_card_past_the_fold_scrolls_into_view(cx: &mut TestAppContext) {
         board.left() <= card.left() && card.right() <= board.right(),
         "card c at {card:?} shows inside the board at {board:?}"
     );
+}
+
+fn paged_board(_: &Desk, owner: Entity<Desk>) -> AnyElement {
+    let next = owner.clone();
+    KanbanBoard::new("paged-board")
+        .column(
+            KanbanColumn::new("todo", "Todo")
+                .total(20)
+                .card(card("a"))
+                .card(card("b"))
+                .footer(
+                    gpui::div().debug_selector(|| "next-page".into()).child(
+                        crate::buttons::Button::new("next-page", "Next")
+                            .on_click(move |_, _, cx| note(&next, "next".into(), cx)),
+                    ),
+                ),
+        )
+        .on_move(move |key, column, index, _, cx| {
+            note(&owner, format!("move {key} {column} {index}"), cx)
+        })
+        .into_any_element()
+}
+
+#[gpui::test]
+fn a_column_footer_follows_cards_without_becoming_a_card(cx: &mut TestAppContext) {
+    let (host, cx) = desk(paged_board, cx);
+    let last = cx.debug_bounds("card b").expect("the last card draws");
+    let next = cx.debug_bounds("next-page").expect("the footer draws");
+    assert!(next.top() >= last.bottom(), "the footer follows the cards");
+    tab_to(2, cx);
+    press("alt-down", cx);
+    assert!(heard(&host, cx).is_empty(), "the total adds no move slots");
+    tab_to(3, cx);
+    press("enter", cx);
+    assert_eq!(heard(&host, cx), ["next"]);
+}
+
+#[gpui::test]
+fn the_owner_can_scroll_a_board_through_its_shared_handle(cx: &mut TestAppContext) {
+    struct SharedBoard(gpui::ScrollHandle);
+
+    impl gpui::Render for SharedBoard {
+        fn render(&mut self, _: &mut gpui::Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            gpui::div().w(px(300.0)).child(
+                KanbanBoard::new("shared-board")
+                    .track_scroll(&self.0)
+                    .column(KanbanColumn::new("todo", "Todo").card(card("a")))
+                    .column(KanbanColumn::new("done", "Done").card(card("b"))),
+            )
+        }
+    }
+
+    cx.update(|cx| {
+        crate::theme::Theme::init(cx);
+        crate::theme::Theme::update(cx, |theme| theme.reduced_motion = true);
+    });
+    let handle = gpui::ScrollHandle::new();
+    let (_, cx) = cx.add_window_view(|_, _| SharedBoard(handle.clone()));
+    settle(cx);
+    let bounds = cx.debug_bounds("kanban-board").expect("the board draws");
+    assert!(bounds.size.width <= px(300.0), "the board stays in its host");
+    assert!(handle.max_offset().x > px(0.0), "the shared handle sees overflow");
+    let before = cx.debug_bounds("card b").expect("the card draws");
+    handle.set_offset(point(-px(100.0), px(0.0)));
+    settle(cx);
+    let after = cx.debug_bounds("card b").expect("the card still draws");
+    assert!(after.left() < before.left(), "the owner's handle moves the cards");
 }
 
 fn labels(_: &Desk, owner: Entity<Desk>) -> AnyElement {

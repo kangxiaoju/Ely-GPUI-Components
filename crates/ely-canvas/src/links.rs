@@ -1,3 +1,4 @@
+use std::{collections::HashMap, sync::Arc};
 use gpui::SharedString;
 
 use super::view::Frame;
@@ -45,6 +46,86 @@ impl Link {
     pub fn elbow(mut self) -> Self {
         self.elbow = true;
         self
+    }
+}
+
+/// The moving pattern painted along a connector.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlowMode {
+    /// Moving dashes.
+    Dashes,
+    /// Moving dots.
+    Dots,
+}
+
+/// Travel relative to a link's source and destination.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlowDirection {
+    /// From source to destination.
+    Forward,
+    /// From destination to source.
+    Reverse,
+}
+
+/// Independent presentation keyed by link; existing `Link` literals remain valid.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LinkAnimation {
+    /// Link key.
+    pub key: SharedString,
+    /// Moving pattern.
+    pub mode: FlowMode,
+    /// Travel direction.
+    pub direction: FlowDirection,
+    /// Canvas units per second.
+    pub speed: f32,
+    /// Freezes the pattern without requesting frames.
+    pub paused: bool,
+    /// Stroke hue slot.
+    pub hue: usize,
+    /// Paints an intermittent luminous particle traveling along the entire route.
+    pub glow: bool,
+}
+
+/// Immutable shared scene. Indexing and binding routes are computed once per content revision,
+/// never by an animation frame. Retain its `Arc` until document content changes.
+pub struct CanvasScene {
+    /// Shapes in paint order.
+    pub shapes: Arc<Vec<super::shape::Shape>>,
+    /// Connectors in paint order.
+    pub links: Arc<Vec<Link>>,
+    pub(crate) routes: Vec<Option<Vec<(f32, f32)>>>,
+    pub(crate) images: HashMap<SharedString, Arc<gpui::Image>>,
+}
+
+impl CanvasScene {
+    /// Builds the shape index and bound connector routes once.
+    pub fn new(shapes: impl IntoIterator<Item = super::shape::Shape>, links: impl IntoIterator<Item = Link>) -> Self {
+        let shapes: Vec<_> = shapes.into_iter().collect();
+        let links: Vec<_> = links.into_iter().collect();
+        let index: HashMap<_, _> = shapes.iter().map(|s| (s.key.clone(), s)).collect();
+        let routes = links.iter().map(|link| {
+            let (from,to) = (index.get(&link.from)?, index.get(&link.to)?);
+            if from.hidden || to.hidden { return None; }
+            let (a,b)=(from.frame.center(),to.frame.center());
+            Some(if link.elbow {
+                let start=from.outline_point((a.0+if b.0>=a.0 {1.0} else {-1.0},a.1));
+                let end=to.outline_point((b.0+if a.0>=b.0 {1.0} else {-1.0},b.1));
+                let x=(a.0+b.0)/2.0;
+                vec![start,(x,start.1),(x,end.1),end]
+            } else { vec![from.outline_point(b),to.outline_point(a)] })
+        }).collect();
+        let images = shapes.iter().filter_map(|shape| {
+            let super::shape::ShapeKind::Image(image) = &shape.kind else { return None; };
+            if shape.rotation == 0.0 { return Some((shape.key.clone(), image.clone())); }
+            use base64::Engine as _;
+            let bounds = shape.bounds();
+            let svg = format!("<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='{}' height='{}'><g transform='translate({} {}) rotate({})'><image x='{}' y='{}' width='{}' height='{}' xlink:href='data:{};base64,{}'/></g></svg>",
+                bounds.w, bounds.h, bounds.w/2.0, bounds.h/2.0, shape.rotation.to_degrees(),
+                -shape.frame.w/2.0, -shape.frame.h/2.0, shape.frame.w, shape.frame.h,
+                image.format.mime_type(), base64::engine::general_purpose::STANDARD.encode(&image.bytes));
+            Some((shape.key.clone(), Arc::new(gpui::Image::from_bytes(gpui::ImageFormat::Svg, svg.into_bytes()))))
+        }).collect();
+        Self { shapes: Arc::new(shapes), links: Arc::new(links), routes, images }
     }
 }
 

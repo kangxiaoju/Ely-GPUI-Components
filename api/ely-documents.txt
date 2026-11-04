@@ -14,6 +14,7 @@ impl core::clone::Clone for ely_documents::DocumentHeading
 impl core::clone::Clone for ely_documents::DocumentLook
 impl core::clone::Clone for ely_documents::DocumentTarget
 impl core::clone::Clone for ely_documents::EditRefusal
+impl core::clone::Clone for ely_documents::EmailEditorEvent
 impl core::clone::Clone for ely_documents::Favorite
 impl core::clone::Clone for ely_documents::Format
 impl core::clone::Clone for ely_documents::HeldPicture
@@ -26,6 +27,8 @@ impl core::clone::Clone for ely_documents::MathError
 impl core::clone::Clone for ely_documents::Media
 impl core::clone::Clone for ely_documents::PageHit
 impl core::clone::Clone for ely_documents::PageNote
+impl core::clone::Clone for ely_documents::PageRequestKind
+impl core::clone::Clone for ely_documents::PageResource
 impl core::clone::Clone for ely_documents::Paper
 impl core::clone::Clone for ely_documents::PrintSettings
 impl core::clone::Clone for ely_documents::Style
@@ -35,6 +38,25 @@ impl core::clone::Clone for ely_documents::TargetBlock
 impl core::clone::Clone for ely_documents::Template
 impl core::clone::Clone for ely_documents::Trashed
 impl core::clone::Clone for ely_documents::Version
+impl core::clone::Clone for ely_documents::email::EmailAlign
+impl core::clone::Clone for ely_documents::email::EmailBlock
+impl core::clone::Clone for ely_documents::email::EmailBlockKind
+impl core::clone::Clone for ely_documents::email::EmailCheckpoint
+impl core::clone::Clone for ely_documents::email::EmailColor
+impl core::clone::Clone for ely_documents::email::EmailDocument
+impl core::clone::Clone for ely_documents::email::EmailError
+impl core::clone::Clone for ely_documents::email::EmailFormat
+impl core::clone::Clone for ely_documents::email::EmailImage
+impl core::clone::Clone for ely_documents::email::EmailParagraph
+impl core::clone::Clone for ely_documents::email::EmailParagraphKind
+impl core::clone::Clone for ely_documents::email::EmailPoint
+impl core::clone::Clone for ely_documents::email::EmailRun
+impl core::clone::Clone for ely_documents::email::EmailSelection
+impl core::clone::Clone for ely_documents::email::EmailSpliceChange
+impl core::clone::Clone for ely_documents::email::EmailStyle
+impl core::clone::Clone for ely_documents::email::EmailTable
+impl core::clone::Clone for ely_documents::email::EmailTableEdit
+impl core::clone::Clone for ely_documents::email::EmailText
 impl core::clone::Clone for ely_documents::mdast::Code
 impl core::clone::Clone for ely_documents::mdast::Definition
 impl core::clone::Clone for ely_documents::mdast::FootnoteDefinition
@@ -65,12 +87,31 @@ impl core::cmp::Eq for ely_documents::InlineFormat
 impl core::cmp::Eq for ely_documents::Margins
 impl core::cmp::Eq for ely_documents::MarkdownMode
 impl core::cmp::Eq for ely_documents::MathError
+impl core::cmp::Eq for ely_documents::PageRequestKind
 impl core::cmp::Eq for ely_documents::Paper
 impl core::cmp::Eq for ely_documents::PrintSettings
 impl core::cmp::Eq for ely_documents::Style
 impl core::cmp::Eq for ely_documents::TableEdit
 impl core::cmp::Eq for ely_documents::TableRefusal
 impl core::cmp::Eq for ely_documents::TargetBlock
+impl core::cmp::Eq for ely_documents::email::EmailAlign
+impl core::cmp::Eq for ely_documents::email::EmailBlock
+impl core::cmp::Eq for ely_documents::email::EmailBlockKind
+impl core::cmp::Eq for ely_documents::email::EmailColor
+impl core::cmp::Eq for ely_documents::email::EmailDocument
+impl core::cmp::Eq for ely_documents::email::EmailError
+impl core::cmp::Eq for ely_documents::email::EmailFormat
+impl core::cmp::Eq for ely_documents::email::EmailImage
+impl core::cmp::Eq for ely_documents::email::EmailParagraph
+impl core::cmp::Eq for ely_documents::email::EmailParagraphKind
+impl core::cmp::Eq for ely_documents::email::EmailPoint
+impl core::cmp::Eq for ely_documents::email::EmailRun
+impl core::cmp::Eq for ely_documents::email::EmailSelection
+impl core::cmp::Eq for ely_documents::email::EmailSpliceChange
+impl core::cmp::Eq for ely_documents::email::EmailStyle
+impl core::cmp::Eq for ely_documents::email::EmailTable
+impl core::cmp::Eq for ely_documents::email::EmailTableEdit
+impl core::cmp::Eq for ely_documents::email::EmailText
 impl core::cmp::Eq for ely_documents::mdast::Code
 impl core::cmp::Eq for ely_documents::mdast::Definition
 impl core::cmp::Eq for ely_documents::mdast::FootnoteDefinition
@@ -115,6 +156,7 @@ impl core::cmp::PartialEq for ely_documents::MathError
 impl core::cmp::PartialEq for ely_documents::Media
 impl core::cmp::PartialEq for ely_documents::PageHit
 impl core::cmp::PartialEq for ely_documents::PageNote
+impl core::cmp::PartialEq for ely_documents::PageRequestKind
 impl core::cmp::PartialEq for ely_documents::Paper
 impl core::cmp::PartialEq for ely_documents::PrintSettings
 impl core::cmp::PartialEq for ely_documents::Style
@@ -124,6 +166,24 @@ impl core::cmp::PartialEq for ely_documents::TargetBlock
 impl core::cmp::PartialEq for ely_documents::Template
 impl core::cmp::PartialEq for ely_documents::Trashed
 impl core::cmp::PartialEq for ely_documents::Version
+impl core::cmp::PartialEq for ely_documents::email::EmailAlign
+impl core::cmp::PartialEq for ely_documents::email::EmailBlock
+impl core::cmp::PartialEq for ely_documents::email::EmailBlockKind
+impl core::cmp::PartialEq for ely_documents::email::EmailColor
+impl core::cmp::PartialEq for ely_documents::email::EmailDocument
+impl core::cmp::PartialEq for ely_documents::email::EmailError
+impl core::cmp::PartialEq for ely_documents::email::EmailFormat
+impl core::cmp::PartialEq for ely_documents::email::EmailImage
+impl core::cmp::PartialEq for ely_documents::email::EmailParagraph
+impl core::cmp::PartialEq for ely_documents::email::EmailParagraphKind
+impl core::cmp::PartialEq for ely_documents::email::EmailPoint
+impl core::cmp::PartialEq for ely_documents::email::EmailRun
+impl core::cmp::PartialEq for ely_documents::email::EmailSelection
+impl core::cmp::PartialEq for ely_documents::email::EmailSpliceChange
+impl core::cmp::PartialEq for ely_documents::email::EmailStyle
+impl core::cmp::PartialEq for ely_documents::email::EmailTable
+impl core::cmp::PartialEq for ely_documents::email::EmailTableEdit
+impl core::cmp::PartialEq for ely_documents::email::EmailText
 impl core::cmp::PartialEq for ely_documents::mdast::Code
 impl core::cmp::PartialEq for ely_documents::mdast::Definition
 impl core::cmp::PartialEq for ely_documents::mdast::FootnoteDefinition
@@ -146,7 +206,15 @@ impl core::default::Default for ely_documents::Inline
 impl core::default::Default for ely_documents::Margins
 impl core::default::Default for ely_documents::Paper
 impl core::default::Default for ely_documents::PrintSettings
+impl core::default::Default for ely_documents::email::EmailAlign
+impl core::default::Default for ely_documents::email::EmailDocument
+impl core::default::Default for ely_documents::email::EmailHistory
+impl core::default::Default for ely_documents::email::EmailParagraph
+impl core::default::Default for ely_documents::email::EmailParagraphKind
+impl core::default::Default for ely_documents::email::EmailStyle
+impl core::default::Default for ely_documents::email::EmailText
 impl core::error::Error for ely_documents::MathError
+impl core::error::Error for ely_documents::email::EmailError
 impl core::fmt::Debug for ely_documents::AlertKind
 impl core::fmt::Debug for ely_documents::Align
 impl core::fmt::Debug for ely_documents::AlignKind
@@ -163,6 +231,7 @@ impl core::fmt::Debug for ely_documents::DocumentHeading
 impl core::fmt::Debug for ely_documents::DocumentLook
 impl core::fmt::Debug for ely_documents::DocumentTarget
 impl core::fmt::Debug for ely_documents::EditRefusal
+impl core::fmt::Debug for ely_documents::EmailEditorEvent
 impl core::fmt::Debug for ely_documents::Favorite
 impl core::fmt::Debug for ely_documents::Format
 impl core::fmt::Debug for ely_documents::HeldPicture
@@ -175,6 +244,7 @@ impl core::fmt::Debug for ely_documents::MathError
 impl core::fmt::Debug for ely_documents::Media
 impl core::fmt::Debug for ely_documents::PageHit
 impl core::fmt::Debug for ely_documents::PageNote
+impl core::fmt::Debug for ely_documents::PageRequestKind
 impl core::fmt::Debug for ely_documents::Paper
 impl core::fmt::Debug for ely_documents::PrintSettings
 impl core::fmt::Debug for ely_documents::Style
@@ -184,6 +254,26 @@ impl core::fmt::Debug for ely_documents::TargetBlock
 impl core::fmt::Debug for ely_documents::Template
 impl core::fmt::Debug for ely_documents::Trashed
 impl core::fmt::Debug for ely_documents::Version
+impl core::fmt::Debug for ely_documents::email::EmailAlign
+impl core::fmt::Debug for ely_documents::email::EmailBlock
+impl core::fmt::Debug for ely_documents::email::EmailBlockKind
+impl core::fmt::Debug for ely_documents::email::EmailCheckpoint
+impl core::fmt::Debug for ely_documents::email::EmailColor
+impl core::fmt::Debug for ely_documents::email::EmailDocument
+impl core::fmt::Debug for ely_documents::email::EmailError
+impl core::fmt::Debug for ely_documents::email::EmailFormat
+impl core::fmt::Debug for ely_documents::email::EmailHistory
+impl core::fmt::Debug for ely_documents::email::EmailImage
+impl core::fmt::Debug for ely_documents::email::EmailParagraph
+impl core::fmt::Debug for ely_documents::email::EmailParagraphKind
+impl core::fmt::Debug for ely_documents::email::EmailPoint
+impl core::fmt::Debug for ely_documents::email::EmailRun
+impl core::fmt::Debug for ely_documents::email::EmailSelection
+impl core::fmt::Debug for ely_documents::email::EmailSpliceChange
+impl core::fmt::Debug for ely_documents::email::EmailStyle
+impl core::fmt::Debug for ely_documents::email::EmailTable
+impl core::fmt::Debug for ely_documents::email::EmailTableEdit
+impl core::fmt::Debug for ely_documents::email::EmailText
 impl core::fmt::Debug for ely_documents::mdast::Code
 impl core::fmt::Debug for ely_documents::mdast::Definition
 impl core::fmt::Debug for ely_documents::mdast::FootnoteDefinition
@@ -201,7 +291,9 @@ impl core::fmt::Debug for ely_documents::mdast::Node
 impl core::fmt::Debug for ely_documents::mdast::Parent
 impl core::fmt::Debug for ely_documents::mdast::Table
 impl core::fmt::Display for ely_documents::MathError
+impl core::fmt::Display for ely_documents::email::EmailError
 impl core::hash::Hash for ely_documents::HeldPicture
+impl core::hash::Hash for ely_documents::PageRequestKind
 impl core::marker::Copy for ely_documents::AlertKind
 impl core::marker::Copy for ely_documents::Align
 impl core::marker::Copy for ely_documents::AlignKind
@@ -212,12 +304,17 @@ impl core::marker::Copy for ely_documents::Format
 impl core::marker::Copy for ely_documents::InlineFormat
 impl core::marker::Copy for ely_documents::Margins
 impl core::marker::Copy for ely_documents::MarkdownMode
+impl core::marker::Copy for ely_documents::PageRequestKind
 impl core::marker::Copy for ely_documents::Paper
 impl core::marker::Copy for ely_documents::PrintSettings
 impl core::marker::Copy for ely_documents::Style
 impl core::marker::Copy for ely_documents::TableEdit
 impl core::marker::Copy for ely_documents::TableRefusal
 impl core::marker::Copy for ely_documents::TargetBlock
+impl core::marker::Copy for ely_documents::email::EmailAlign
+impl core::marker::Copy for ely_documents::email::EmailColor
+impl core::marker::Copy for ely_documents::email::EmailPoint
+impl core::marker::Copy for ely_documents::email::EmailSpliceChange
 impl core::marker::StructuralPartialEq for ely_documents::AlertKind
 impl core::marker::StructuralPartialEq for ely_documents::Align
 impl core::marker::StructuralPartialEq for ely_documents::AlignKind
@@ -245,6 +342,7 @@ impl core::marker::StructuralPartialEq for ely_documents::MathError
 impl core::marker::StructuralPartialEq for ely_documents::Media
 impl core::marker::StructuralPartialEq for ely_documents::PageHit
 impl core::marker::StructuralPartialEq for ely_documents::PageNote
+impl core::marker::StructuralPartialEq for ely_documents::PageRequestKind
 impl core::marker::StructuralPartialEq for ely_documents::Paper
 impl core::marker::StructuralPartialEq for ely_documents::PrintSettings
 impl core::marker::StructuralPartialEq for ely_documents::Style
@@ -254,6 +352,24 @@ impl core::marker::StructuralPartialEq for ely_documents::TargetBlock
 impl core::marker::StructuralPartialEq for ely_documents::Template
 impl core::marker::StructuralPartialEq for ely_documents::Trashed
 impl core::marker::StructuralPartialEq for ely_documents::Version
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailAlign
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailBlock
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailBlockKind
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailColor
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailDocument
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailError
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailFormat
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailImage
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailParagraph
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailParagraphKind
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailPoint
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailRun
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailSelection
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailSpliceChange
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailStyle
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailTable
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailTableEdit
+impl core::marker::StructuralPartialEq for ely_documents::email::EmailText
 impl core::marker::StructuralPartialEq for ely_documents::mdast::Code
 impl core::marker::StructuralPartialEq for ely_documents::mdast::Definition
 impl core::marker::StructuralPartialEq for ely_documents::mdast::FootnoteDefinition
@@ -279,12 +395,14 @@ impl ely_documents::BlockKind
 impl ely_documents::Checklist
 impl ely_documents::Diagram
 impl ely_documents::DocumentViewer
+impl ely_documents::EmailEditorView
 impl ely_documents::EpubReader
 impl ely_documents::Favorites
 impl ely_documents::FixedFormatToolbar
 impl ely_documents::Footnote
 impl ely_documents::Glossary
 impl ely_documents::HeldPicture
+impl ely_documents::HtmlEmailEditor
 impl ely_documents::Latex
 impl ely_documents::LinkEditor
 impl ely_documents::MarkdownDocument
@@ -294,6 +412,7 @@ impl ely_documents::Media
 impl ely_documents::PageCover
 impl ely_documents::PageHistoryDiff
 impl ely_documents::PageIcon
+impl ely_documents::PageResource
 impl ely_documents::PageThumbnailList
 impl ely_documents::PrintPreview
 impl ely_documents::ReadingProgress
@@ -306,14 +425,21 @@ impl ely_documents::TrashBin
 impl ely_documents::VersionHistory
 impl ely_documents::WordCount
 impl ely_documents::ZenMode
+impl ely_documents::email::EmailDocument
+impl ely_documents::email::EmailHistory
+impl ely_documents::email::EmailSelection
+impl ely_documents::email::EmailText
+impl ely_documents::email::EmailToolbar
 impl ely_documents::mdast::Node
 impl gpui::EventEmitter<ely_documents::Attachment> for ely_documents::MarkdownDocument
 impl gpui::EventEmitter<ely_documents::BlockEvent> for ely_documents::BlockEditor
 impl gpui::EventEmitter<ely_documents::DocumentEvent> for ely_documents::MarkdownDocument
+impl gpui::EventEmitter<ely_documents::EmailEditorEvent> for ely_documents::HtmlEmailEditor
 impl gpui::element::IntoElement for ely_documents::Backlinks
 impl gpui::element::IntoElement for ely_documents::Checklist
 impl gpui::element::IntoElement for ely_documents::Diagram
 impl gpui::element::IntoElement for ely_documents::DocumentViewer
+impl gpui::element::IntoElement for ely_documents::EmailEditorView
 impl gpui::element::IntoElement for ely_documents::EpubReader
 impl gpui::element::IntoElement for ely_documents::Favorites
 impl gpui::element::IntoElement for ely_documents::FixedFormatToolbar
@@ -338,13 +464,16 @@ impl gpui::element::IntoElement for ely_documents::TrashBin
 impl gpui::element::IntoElement for ely_documents::VersionHistory
 impl gpui::element::IntoElement for ely_documents::WordCount
 impl gpui::element::IntoElement for ely_documents::ZenMode
+impl gpui::element::IntoElement for ely_documents::email::EmailToolbar
 impl gpui::element::ParentElement for ely_documents::ZenMode
 impl gpui::element::Render for ely_documents::BlockEditor
+impl gpui::element::Render for ely_documents::HtmlEmailEditor
 impl gpui::element::Render for ely_documents::MarkdownDocument
 impl gpui::element::RenderOnce for ely_documents::Backlinks
 impl gpui::element::RenderOnce for ely_documents::Checklist
 impl gpui::element::RenderOnce for ely_documents::Diagram
 impl gpui::element::RenderOnce for ely_documents::DocumentViewer
+impl gpui::element::RenderOnce for ely_documents::EmailEditorView
 impl gpui::element::RenderOnce for ely_documents::EpubReader
 impl gpui::element::RenderOnce for ely_documents::Favorites
 impl gpui::element::RenderOnce for ely_documents::FixedFormatToolbar
@@ -369,8 +498,40 @@ impl gpui::element::RenderOnce for ely_documents::TrashBin
 impl gpui::element::RenderOnce for ely_documents::VersionHistory
 impl gpui::element::RenderOnce for ely_documents::WordCount
 impl gpui::element::RenderOnce for ely_documents::ZenMode
+impl gpui::element::RenderOnce for ely_documents::email::EmailToolbar
+impl gpui::input::EntityInputHandler for ely_documents::HtmlEmailEditor
+impl gpui::window::Focusable for ely_documents::HtmlEmailEditor
 impl gpui::window::Focusable for ely_documents::MarkdownDocument
+impl serde_core::ser::Serialize for ely_documents::email::EmailAlign
+impl serde_core::ser::Serialize for ely_documents::email::EmailBlock
+impl serde_core::ser::Serialize for ely_documents::email::EmailBlockKind
+impl serde_core::ser::Serialize for ely_documents::email::EmailColor
+impl serde_core::ser::Serialize for ely_documents::email::EmailDocument
+impl serde_core::ser::Serialize for ely_documents::email::EmailImage
+impl serde_core::ser::Serialize for ely_documents::email::EmailParagraph
+impl serde_core::ser::Serialize for ely_documents::email::EmailParagraphKind
+impl serde_core::ser::Serialize for ely_documents::email::EmailPoint
+impl serde_core::ser::Serialize for ely_documents::email::EmailRun
+impl serde_core::ser::Serialize for ely_documents::email::EmailSelection
+impl serde_core::ser::Serialize for ely_documents::email::EmailStyle
+impl serde_core::ser::Serialize for ely_documents::email::EmailTable
+impl serde_core::ser::Serialize for ely_documents::email::EmailText
 impl<'a> ely_documents::MarkdownReader<'a>
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailAlign
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailBlock
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailBlockKind
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailColor
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailDocument
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailImage
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailParagraph
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailParagraphKind
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailPoint
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailRun
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailSelection
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailStyle
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailTable
+impl<'de> serde_core::de::Deserialize<'de> for ely_documents::email::EmailText
+pub const ely_documents::DEFAULT_CACHE_BUDGET: usize
 pub const ely_documents::LARGEST_READ: usize
 pub ely_documents::AlertKind::Caution
 pub ely_documents::AlertKind::Important
@@ -470,6 +631,16 @@ pub ely_documents::EditRefusal::Present
 pub ely_documents::EditRefusal::Preview
 pub ely_documents::EditRefusal::Table
 pub ely_documents::EditRefusal::TooLong
+pub ely_documents::EmailEditorEvent::Changed
+pub ely_documents::EmailEditorEvent::CopyRequested
+pub ely_documents::EmailEditorEvent::CopyRequested::cut: bool
+pub ely_documents::EmailEditorEvent::CopyRequested::html: alloc::string::String
+pub ely_documents::EmailEditorEvent::CopyRequested::text: alloc::string::String
+pub ely_documents::EmailEditorEvent::InsertImageRequested
+pub ely_documents::EmailEditorEvent::InsertImageRequested::request: u64
+pub ely_documents::EmailEditorEvent::PasteRequested
+pub ely_documents::EmailEditorEvent::PasteRequested::request: u64
+pub ely_documents::EmailEditorEvent::Problem(alloc::string::String)
 pub ely_documents::Favorite::icon: gpui_shared_string::SharedString
 pub ely_documents::Favorite::key: gpui_shared_string::SharedString
 pub ely_documents::Favorite::title: gpui_shared_string::SharedString
@@ -528,6 +699,7 @@ pub ely_documents::MarkdownBlock::Table
 pub ely_documents::MarkdownBlock::Table::aligns: alloc::vec::Vec<ely_documents::AlignKind>
 pub ely_documents::MarkdownBlock::Table::head: alloc::vec::Vec<alloc::vec::Vec<ely_documents::MarkdownBlock>>
 pub ely_documents::MarkdownBlock::Table::rows: alloc::vec::Vec<alloc::vec::Vec<alloc::vec::Vec<ely_documents::MarkdownBlock>>>
+pub ely_documents::MarkdownBlock::Table::spans: alloc::vec::Vec<alloc::vec::Vec<usize>>
 pub ely_documents::MarkdownBlock::Toc(alloc::vec::Vec<ely_documents::DocumentHeading>)
 pub ely_documents::MarkdownMode::Preview
 pub ely_documents::MarkdownMode::Source
@@ -542,6 +714,13 @@ pub ely_documents::PageHit::page: usize
 pub ely_documents::PageNote::at: gpui::geometry::Point<f32>
 pub ely_documents::PageNote::page: usize
 pub ely_documents::PageNote::text: gpui_shared_string::SharedString
+pub ely_documents::PageRequestKind::Page
+pub ely_documents::PageRequestKind::Thumbnail
+pub ely_documents::PageResource::Failed(gpui_shared_string::SharedString)
+pub ely_documents::PageResource::Loading(alloc::rcs::rc::Rc<core::cell::RefCell<core::option::Option<scheduler::executor::Task<ely_documents::PageResource>>>>)
+pub ely_documents::PageResource::Ready
+pub ely_documents::PageResource::Ready::image: gpui::elements::img::ImageSource
+pub ely_documents::PageResource::Ready::pixels: usize
 pub ely_documents::Paper::A4
 pub ely_documents::Paper::Legal
 pub ely_documents::Paper::Letter
@@ -602,6 +781,94 @@ pub ely_documents::Trashed::title: gpui_shared_string::SharedString
 pub ely_documents::Version::at: jiff::timestamp::Timestamp
 pub ely_documents::Version::author: gpui_shared_string::SharedString
 pub ely_documents::Version::markdown: gpui_shared_string::SharedString
+pub ely_documents::email::EmailAlign::Center
+pub ely_documents::email::EmailAlign::Justify
+pub ely_documents::email::EmailAlign::Left
+pub ely_documents::email::EmailAlign::Right
+pub ely_documents::email::EmailBlock::id: u64
+pub ely_documents::email::EmailBlock::kind: ely_documents::email::EmailBlockKind
+pub ely_documents::email::EmailBlockKind::Image(ely_documents::email::EmailImage)
+pub ely_documents::email::EmailBlockKind::Paragraph(ely_documents::email::EmailParagraph)
+pub ely_documents::email::EmailBlockKind::Rule
+pub ely_documents::email::EmailBlockKind::Table(ely_documents::email::EmailTable)
+pub ely_documents::email::EmailColor::blue: u8
+pub ely_documents::email::EmailColor::green: u8
+pub ely_documents::email::EmailColor::red: u8
+pub ely_documents::email::EmailEditorEvent::Changed
+pub ely_documents::email::EmailEditorEvent::CopyRequested
+pub ely_documents::email::EmailEditorEvent::CopyRequested::cut: bool
+pub ely_documents::email::EmailEditorEvent::CopyRequested::html: alloc::string::String
+pub ely_documents::email::EmailEditorEvent::CopyRequested::text: alloc::string::String
+pub ely_documents::email::EmailEditorEvent::InsertImageRequested
+pub ely_documents::email::EmailEditorEvent::InsertImageRequested::request: u64
+pub ely_documents::email::EmailEditorEvent::PasteRequested
+pub ely_documents::email::EmailEditorEvent::PasteRequested::request: u64
+pub ely_documents::email::EmailEditorEvent::Problem(alloc::string::String)
+pub ely_documents::email::EmailError::Invalid(alloc::string::String)
+pub ely_documents::email::EmailError::Limit(&'static str)
+pub ely_documents::email::EmailFormat::Bold(bool)
+pub ely_documents::email::EmailFormat::Clear
+pub ely_documents::email::EmailFormat::Code(bool)
+pub ely_documents::email::EmailFormat::Color(core::option::Option<ely_documents::email::EmailColor>)
+pub ely_documents::email::EmailFormat::Font(core::option::Option<alloc::string::String>)
+pub ely_documents::email::EmailFormat::Italic(bool)
+pub ely_documents::email::EmailFormat::Link(core::option::Option<alloc::string::String>)
+pub ely_documents::email::EmailFormat::Size(core::option::Option<u16>)
+pub ely_documents::email::EmailFormat::Strike(bool)
+pub ely_documents::email::EmailFormat::Underline(bool)
+pub ely_documents::email::EmailImage::align: ely_documents::email::EmailAlign
+pub ely_documents::email::EmailImage::alt: alloc::string::String
+pub ely_documents::email::EmailImage::height: core::option::Option<u32>
+pub ely_documents::email::EmailImage::source: alloc::string::String
+pub ely_documents::email::EmailImage::width: core::option::Option<u32>
+pub ely_documents::email::EmailParagraph::align: ely_documents::email::EmailAlign
+pub ely_documents::email::EmailParagraph::content: ely_documents::email::EmailText
+pub ely_documents::email::EmailParagraph::indent: u8
+pub ely_documents::email::EmailParagraph::kind: ely_documents::email::EmailParagraphKind
+pub ely_documents::email::EmailParagraphKind::Bullet
+pub ely_documents::email::EmailParagraphKind::Code
+pub ely_documents::email::EmailParagraphKind::Heading(u8)
+pub ely_documents::email::EmailParagraphKind::Normal
+pub ely_documents::email::EmailParagraphKind::Numbered(u32)
+pub ely_documents::email::EmailParagraphKind::Quote
+pub ely_documents::email::EmailParagraphKind::Task(bool)
+pub ely_documents::email::EmailPoint::block: u64
+pub ely_documents::email::EmailPoint::cell: usize
+pub ely_documents::email::EmailPoint::offset: usize
+pub ely_documents::email::EmailRun::range: core::ops::range::Range<usize>
+pub ely_documents::email::EmailRun::style: ely_documents::email::EmailStyle
+pub ely_documents::email::EmailSelection::anchor: ely_documents::email::EmailPoint
+pub ely_documents::email::EmailSelection::head: ely_documents::email::EmailPoint
+pub ely_documents::email::EmailSpliceChange::inserted: usize
+pub ely_documents::email::EmailSpliceChange::removed: usize
+pub ely_documents::email::EmailSpliceChange::revision: u64
+pub ely_documents::email::EmailSpliceChange::start: usize
+pub ely_documents::email::EmailStyle::bold: bool
+pub ely_documents::email::EmailStyle::code: bool
+pub ely_documents::email::EmailStyle::color: core::option::Option<ely_documents::email::EmailColor>
+pub ely_documents::email::EmailStyle::font: core::option::Option<alloc::string::String>
+pub ely_documents::email::EmailStyle::italic: bool
+pub ely_documents::email::EmailStyle::link: core::option::Option<alloc::string::String>
+pub ely_documents::email::EmailStyle::size: core::option::Option<u16>
+pub ely_documents::email::EmailStyle::strike: bool
+pub ely_documents::email::EmailStyle::underline: bool
+pub ely_documents::email::EmailTable::cells: alloc::vec::Vec<ely_documents::email::EmailText>
+pub ely_documents::email::EmailTable::columns: usize
+pub ely_documents::email::EmailTable::spans: alloc::vec::Vec<usize>
+pub ely_documents::email::EmailTableEdit::DeleteColumn(usize)
+pub ely_documents::email::EmailTableEdit::DeleteRow(usize)
+pub ely_documents::email::EmailTableEdit::InsertColumn(usize)
+pub ely_documents::email::EmailTableEdit::InsertRow(usize)
+pub ely_documents::email::EmailTableEdit::Merge
+pub ely_documents::email::EmailTableEdit::Merge::column: usize
+pub ely_documents::email::EmailTableEdit::Merge::columns: usize
+pub ely_documents::email::EmailTableEdit::Merge::row: usize
+pub ely_documents::email::EmailTableEdit::Unmerge
+pub ely_documents::email::EmailTableEdit::Unmerge::column: usize
+pub ely_documents::email::EmailTableEdit::Unmerge::row: usize
+pub ely_documents::email::EmailText::images: alloc::collections::btree::map::BTreeMap<usize, ely_documents::email::EmailImage>
+pub ely_documents::email::EmailText::runs: alloc::vec::Vec<ely_documents::email::EmailRun>
+pub ely_documents::email::EmailText::text: alloc::string::String
 pub ely_documents::mdast::AlignKind::Center
 pub ely_documents::mdast::AlignKind::Left
 pub ely_documents::mdast::AlignKind::None
@@ -687,16 +954,26 @@ pub enum ely_documents::BlockEvent
 pub enum ely_documents::BlockKind
 pub enum ely_documents::DocumentEvent
 pub enum ely_documents::EditRefusal
+pub enum ely_documents::EmailEditorEvent
 pub enum ely_documents::Format
 pub enum ely_documents::InlineFormat
 pub enum ely_documents::Margins
 pub enum ely_documents::MarkdownBlock
 pub enum ely_documents::MarkdownMode
+pub enum ely_documents::PageRequestKind
+pub enum ely_documents::PageResource
 pub enum ely_documents::Paper
 pub enum ely_documents::Style
 pub enum ely_documents::TableEdit
 pub enum ely_documents::TableRefusal
 pub enum ely_documents::TargetBlock
+pub enum ely_documents::email::EmailAlign
+pub enum ely_documents::email::EmailBlockKind
+pub enum ely_documents::email::EmailEditorEvent
+pub enum ely_documents::email::EmailError
+pub enum ely_documents::email::EmailFormat
+pub enum ely_documents::email::EmailParagraphKind
+pub enum ely_documents::email::EmailTableEdit
 pub enum ely_documents::mdast::AlignKind
 pub enum ely_documents::mdast::Node
 pub fn ely_documents::AlertKind::clone(&self) -> Self
@@ -785,17 +1062,25 @@ pub fn ely_documents::DocumentLook::fmt(&self, &mut core::fmt::Formatter<'_>) ->
 pub fn ely_documents::DocumentTarget::clone(&self) -> Self
 pub fn ely_documents::DocumentTarget::eq(&self, &Self) -> bool
 pub fn ely_documents::DocumentTarget::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::DocumentViewer::cache_pixel_budget(self, usize) -> Self
 pub fn ely_documents::DocumentViewer::find(self, ely_editor::find::FindWidget, alloc::vec::Vec<ely_documents::PageHit>, core::option::Option<usize>) -> Self
 pub fn ely_documents::DocumentViewer::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_documents::DocumentViewer::into_element(self) -> Self::Element
 pub fn ely_documents::DocumentViewer::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>, impl core::convert::Into<alloc::rcs::rc::Rc<alloc::vec::Vec<ely_documents::DocPage>>>) -> Self
 pub fn ely_documents::DocumentViewer::notes(self, alloc::vec::Vec<ely_documents::PageNote>, impl core::ops::function::Fn(usize, gpui::geometry::Point<f32>, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_documents::DocumentViewer::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_documents::DocumentViewer::source(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>, impl ely_documents::PageSource + 'static) -> Self
 pub fn ely_documents::DocumentViewer::thumbnails(self) -> Self
 pub fn ely_documents::DocumentViewer::zoom(self, f32, impl core::ops::function::Fn(f32, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_documents::EditRefusal::clone(&self) -> Self
 pub fn ely_documents::EditRefusal::eq(&self, &Self) -> bool
 pub fn ely_documents::EditRefusal::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::EmailEditorEvent::clone(&self) -> Self
+pub fn ely_documents::EmailEditorEvent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::EmailEditorView::into_any_element(self) -> gpui::element::AnyElement
+pub fn ely_documents::EmailEditorView::into_element(self) -> Self::Element
+pub fn ely_documents::EmailEditorView::new(impl core::convert::Into<gpui::window::ElementId>, &gpui::app::entity_map::Entity<ely_documents::HtmlEmailEditor>) -> Self
+pub fn ely_documents::EmailEditorView::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_documents::EpubReader::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_documents::EpubReader::into_element(self) -> Self::Element
 pub fn ely_documents::EpubReader::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>, impl core::convert::Into<alloc::rcs::rc::Rc<alloc::vec::Vec<ely_documents::Chapter>>>) -> Self
@@ -831,6 +1116,65 @@ pub fn ely_documents::HeldPicture::eq(&self, &Self) -> bool
 pub fn ely_documents::HeldPicture::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn ely_documents::HeldPicture::hash<H: core::hash::Hasher>(&self, &mut H)
 pub fn ely_documents::HeldPicture::new(gpui::platform::ImageFormat, impl core::convert::Into<alloc::rcs::arc::Arc<[u8]>>) -> Self
+pub fn ely_documents::HtmlEmailEditor::accepts_text_input(&self, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> bool
+pub fn ely_documents::HtmlEmailEditor::apply_format(&mut self, ely_documents::email::EmailFormat, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::bounds_for_range(&mut self, core::ops::range::Range<usize>, gpui::geometry::Bounds<gpui::geometry::Pixels>, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> core::option::Option<gpui::geometry::Bounds<gpui::geometry::Pixels>>
+pub fn ely_documents::HtmlEmailEditor::can_redo(&self) -> bool
+pub fn ely_documents::HtmlEmailEditor::can_undo(&self) -> bool
+pub fn ely_documents::HtmlEmailEditor::cancel_composition(&mut self, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::change_indent(&mut self, bool, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::character_index_for_point(&mut self, gpui::geometry::Point<gpui::geometry::Pixels>, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> core::option::Option<usize>
+pub fn ely_documents::HtmlEmailEditor::committed_estimated_bytes(&self) -> usize
+pub fn ely_documents::HtmlEmailEditor::committed_is_blank(&self) -> bool
+pub fn ely_documents::HtmlEmailEditor::committed_is_empty(&self) -> bool
+pub fn ely_documents::HtmlEmailEditor::committed_revision(&self) -> u64
+pub fn ely_documents::HtmlEmailEditor::complete_image(&mut self, u64, ely_documents::email::EmailImage, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::complete_paste(&mut self, u64, ely_documents::email::EmailDocument, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::current_image(&self) -> core::option::Option<ely_documents::email::EmailImage>
+pub fn ely_documents::HtmlEmailEditor::current_paragraph(&self) -> core::option::Option<ely_documents::email::EmailParagraph>
+pub fn ely_documents::HtmlEmailEditor::current_style(&self) -> ely_documents::email::EmailStyle
+pub fn ely_documents::HtmlEmailEditor::delete_image(&mut self, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::disabled(&self) -> bool
+pub fn ely_documents::HtmlEmailEditor::document(&self) -> &ely_documents::email::EmailDocument
+pub fn ely_documents::HtmlEmailEditor::edit_table(&mut self, ely_documents::email::EmailTableEdit, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::focus_handle(&self, &gpui::app::App) -> gpui::window::FocusHandle
+pub fn ely_documents::HtmlEmailEditor::generation(&self) -> u64
+pub fn ely_documents::HtmlEmailEditor::insert_document(&mut self, ely_documents::email::EmailDocument, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::insert_html(&mut self, &str, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::insert_image(&mut self, ely_documents::email::EmailImage, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::insert_rule(&mut self, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::insert_table(&mut self, usize, usize, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::insert_text(&mut self, &str, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::marked_text_range(&self, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> core::option::Option<core::ops::range::Range<usize>>
+pub fn ely_documents::HtmlEmailEditor::new(ely_documents::email::EmailDocument, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> Self
+pub fn ely_documents::HtmlEmailEditor::paragraph_format(&mut self, ely_documents::email::EmailParagraphKind, ely_documents::email::EmailAlign, u8, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::paste(&mut self, gpui::platform::ClipboardItem, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::read_only(&self) -> bool
+pub fn ely_documents::HtmlEmailEditor::redo(&mut self, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::render(&mut self, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> impl gpui::element::IntoElement
+pub fn ely_documents::HtmlEmailEditor::replace_and_mark_text_in_range(&mut self, core::option::Option<core::ops::range::Range<usize>>, &str, core::option::Option<core::ops::range::Range<usize>>, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::replace_text_in_range(&mut self, core::option::Option<core::ops::range::Range<usize>>, &str, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::request_image(&mut self, &mut gpui::app::context::Context<'_, Self>) -> u64
+pub fn ely_documents::HtmlEmailEditor::request_paste(&mut self, &mut gpui::app::context::Context<'_, Self>) -> u64
+pub fn ely_documents::HtmlEmailEditor::selected_text_range(&mut self, bool, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> core::option::Option<gpui::platform::UTF16Selection>
+pub fn ely_documents::HtmlEmailEditor::selection(&self) -> ely_documents::email::EmailSelection
+pub fn ely_documents::HtmlEmailEditor::selection_bounds_for_range(&mut self, core::ops::range::Range<usize>, gpui::geometry::Bounds<gpui::geometry::Pixels>, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> alloc::vec::Vec<gpui::geometry::Bounds<gpui::geometry::Pixels>>
+pub fn ely_documents::HtmlEmailEditor::set_alignment(&mut self, ely_documents::email::EmailAlign, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::set_disabled(&mut self, bool, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::set_document(&mut self, ely_documents::email::EmailDocument, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::set_host_clipboard(&mut self, bool)
+pub fn ely_documents::HtmlEmailEditor::set_images(&mut self, std::collections::hash::map::HashMap<alloc::string::String, alloc::rcs::arc::Arc<gpui::platform::Image>>, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::set_paragraph_kind(&mut self, ely_documents::email::EmailParagraphKind, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::HtmlEmailEditor::set_problem(&mut self, core::option::Option<alloc::string::String>, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::set_read_only(&mut self, bool, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::set_selected_text_range(&mut self, core::ops::range::Range<usize>, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::set_selection(&mut self, ely_documents::email::EmailSelection, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::snapshot(&self) -> ely_documents::email::EmailDocument
+pub fn ely_documents::HtmlEmailEditor::text_for_range(&mut self, core::ops::range::Range<usize>, &mut core::option::Option<core::ops::range::Range<usize>>, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> core::option::Option<alloc::string::String>
+pub fn ely_documents::HtmlEmailEditor::text_length_utf16(&mut self, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> core::option::Option<usize>
+pub fn ely_documents::HtmlEmailEditor::undo(&mut self, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::unmark_text(&mut self, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::HtmlEmailEditor::update_image(&mut self, ely_documents::email::EmailImage, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::email::EmailError>
 pub fn ely_documents::Inline::clone(&self) -> Self
 pub fn ely_documents::Inline::default() -> Self
 pub fn ely_documents::Inline::eq(&self, &Self) -> bool
@@ -908,6 +1252,7 @@ pub fn ely_documents::MarkdownRenderer::on_link(self, impl core::ops::function::
 pub fn ely_documents::MarkdownRenderer::pictures(self, alloc::rcs::rc::Rc<ely_documents::Pictures>) -> Self
 pub fn ely_documents::MarkdownRenderer::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_documents::MarkdownRenderer::sections(self, &gpui::app::entity_map::Entity<ely_core::navigation::toc::Sections>) -> Self
+pub fn ely_documents::MarkdownRenderer::selectable(self, bool) -> Self
 pub fn ely_documents::MarkdownRenderer::text_size(self, ely_core::theme::tokens::TextSize) -> Self
 pub fn ely_documents::MathError::clone(&self) -> Self
 pub fn ely_documents::MathError::eq(&self, &Self) -> bool
@@ -936,6 +1281,15 @@ pub fn ely_documents::PageIcon::render(self, &mut gpui::window::Window, &mut gpu
 pub fn ely_documents::PageNote::clone(&self) -> Self
 pub fn ely_documents::PageNote::eq(&self, &Self) -> bool
 pub fn ely_documents::PageNote::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::PageRequestKind::clone(&self) -> Self
+pub fn ely_documents::PageRequestKind::eq(&self, &Self) -> bool
+pub fn ely_documents::PageRequestKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::PageRequestKind::hash<__H: core::hash::Hasher>(&self, &mut __H)
+pub fn ely_documents::PageResource::clone(&self) -> Self
+pub fn ely_documents::PageResource::loading(scheduler::executor::Task<ely_documents::PageResource>) -> Self
+pub fn ely_documents::PageSource::len(&self) -> usize
+pub fn ely_documents::PageSource::request(&self, usize, f32, ely_documents::PageRequestKind, &mut gpui::window::Window, &mut gpui::app::App) -> ely_documents::PageResource
+pub fn ely_documents::PageSource::size(&self, usize) -> gpui::geometry::Size<f32>
 pub fn ely_documents::PageThumbnailList::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_documents::PageThumbnailList::into_element(self) -> Self::Element
 pub fn ely_documents::PageThumbnailList::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<alloc::rcs::rc::Rc<alloc::vec::Vec<ely_documents::DocPage>>>, usize) -> Self
@@ -1031,6 +1385,154 @@ pub fn ely_documents::ZenMode::render(self, &mut gpui::window::Window, &mut gpui
 pub fn ely_documents::alert(&ely_documents::mdast::Parent) -> core::option::Option<(ely_documents::AlertKind, alloc::vec::Vec<ely_documents::mdast::Node>)>
 pub fn ely_documents::bind_keys(&mut gpui::app::App)
 pub fn ely_documents::diagram_svg(&str) -> core::result::Result<alloc::string::String, gpui_shared_string::SharedString>
+pub fn ely_documents::email::EmailAlign::clone(&self) -> Self
+pub fn ely_documents::email::EmailAlign::default() -> Self
+pub fn ely_documents::email::EmailAlign::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailAlign::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailAlign::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailAlign::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailBlock::clone(&self) -> Self
+pub fn ely_documents::email::EmailBlock::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailBlock::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailBlock::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailBlock::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailBlockKind::clone(&self) -> Self
+pub fn ely_documents::email::EmailBlockKind::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailBlockKind::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailBlockKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailBlockKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailCheckpoint::clone(&self) -> Self
+pub fn ely_documents::email::EmailCheckpoint::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailColor::clone(&self) -> Self
+pub fn ely_documents::email::EmailColor::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailColor::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailColor::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailColor::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailDocument::block_at(&self, usize) -> core::option::Option<&ely_documents::email::EmailBlock>
+pub fn ely_documents::email::EmailDocument::block_revision(&self, u64) -> core::option::Option<u64>
+pub fn ely_documents::email::EmailDocument::blocks(&self) -> &[ely_documents::email::EmailBlock]
+pub fn ely_documents::email::EmailDocument::change_indent(&mut self, &ely_documents::email::EmailSelection, bool) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::changes_since(&self, u64) -> core::option::Option<alloc::vec::Vec<ely_documents::email::EmailSpliceChange>>
+pub fn ely_documents::email::EmailDocument::clone(&self) -> Self
+pub fn ely_documents::email::EmailDocument::default() -> Self
+pub fn ely_documents::email::EmailDocument::delete_image(&mut self, ely_documents::email::EmailPoint) -> core::result::Result<ely_documents::email::EmailSelection, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
+pub fn ely_documents::email::EmailDocument::end_point(&self) -> ely_documents::email::EmailPoint
+pub fn ely_documents::email::EmailDocument::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailDocument::estimated_bytes(&self) -> usize
+pub fn ely_documents::email::EmailDocument::first_point(&self) -> ely_documents::email::EmailPoint
+pub fn ely_documents::email::EmailDocument::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailDocument::format(&mut self, &ely_documents::email::EmailSelection, &ely_documents::email::EmailFormat) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::fragment(&self, &ely_documents::email::EmailSelection) -> core::result::Result<Self, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::from_blocks(alloc::vec::Vec<ely_documents::email::EmailBlock>) -> core::result::Result<Self, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::from_html(&str) -> core::result::Result<Self, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::from_plain(&str) -> core::result::Result<Self, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::image_at(&self, ely_documents::email::EmailPoint) -> core::option::Option<&ely_documents::email::EmailImage>
+pub fn ely_documents::email::EmailDocument::images(&self) -> alloc::vec::Vec<&ely_documents::email::EmailImage>
+pub fn ely_documents::email::EmailDocument::index_by_id(&self, u64) -> core::option::Option<usize>
+pub fn ely_documents::email::EmailDocument::insert_image(&mut self, &ely_documents::email::EmailSelection, ely_documents::email::EmailImage) -> core::result::Result<ely_documents::email::EmailSelection, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::insert_rule(&mut self, &ely_documents::email::EmailSelection) -> core::result::Result<ely_documents::email::EmailSelection, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::insert_table(&mut self, &ely_documents::email::EmailSelection, usize, usize) -> core::result::Result<ely_documents::email::EmailSelection, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::is_blank(&self) -> bool
+pub fn ely_documents::email::EmailDocument::is_empty(&self) -> bool
+pub fn ely_documents::email::EmailDocument::ordered_selection(&self, &ely_documents::email::EmailSelection) -> core::result::Result<(ely_documents::email::EmailPoint, ely_documents::email::EmailPoint), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::paragraph(&mut self, &ely_documents::email::EmailSelection, ely_documents::email::EmailParagraphKind, ely_documents::email::EmailAlign, u8) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::replace(&mut self, &ely_documents::email::EmailSelection, &str, &ely_documents::email::EmailStyle) -> core::result::Result<ely_documents::email::EmailSelection, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::replace_fragment(&mut self, &ely_documents::email::EmailSelection, &Self) -> core::result::Result<ely_documents::email::EmailSelection, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::revision(&self) -> u64
+pub fn ely_documents::email::EmailDocument::selected_plain(&self, &ely_documents::email::EmailSelection) -> core::result::Result<alloc::string::String, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailDocument::set_alignment(&mut self, &ely_documents::email::EmailSelection, ely_documents::email::EmailAlign) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::set_paragraph_kind(&mut self, &ely_documents::email::EmailSelection, ely_documents::email::EmailParagraphKind) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::table_edit(&mut self, u64, &ely_documents::email::EmailTableEdit) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::text_at(&self, ely_documents::email::EmailPoint) -> core::option::Option<&ely_documents::email::EmailText>
+pub fn ely_documents::email::EmailDocument::to_html(&self) -> alloc::string::String
+pub fn ely_documents::email::EmailDocument::to_plain(&self) -> alloc::string::String
+pub fn ely_documents::email::EmailDocument::try_map_images(&mut self, impl core::ops::function::FnMut(&mut ely_documents::email::EmailImage) -> core::result::Result<(), ely_documents::email::EmailError>) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::update_image(&mut self, ely_documents::email::EmailPoint, ely_documents::email::EmailImage) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailDocument::validate(&self) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailError::clone(&self) -> Self
+pub fn ely_documents::email::EmailError::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailFormat::clone(&self) -> Self
+pub fn ely_documents::email::EmailFormat::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailFormat::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailHistory::amend_typing(&mut self, &ely_documents::email::EmailDocument, ely_documents::email::EmailSelection) -> core::result::Result<bool, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailHistory::begin(&ely_documents::email::EmailDocument, &ely_documents::email::EmailSelection) -> core::result::Result<ely_documents::email::EmailCheckpoint, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailHistory::can_redo(&self) -> bool
+pub fn ely_documents::email::EmailHistory::can_undo(&self) -> bool
+pub fn ely_documents::email::EmailHistory::clear(&mut self)
+pub fn ely_documents::email::EmailHistory::commit(&mut self, &ely_documents::email::EmailDocument, ely_documents::email::EmailCheckpoint, ely_documents::email::EmailSelection) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailHistory::default() -> Self
+pub fn ely_documents::email::EmailHistory::expand(&ely_documents::email::EmailDocument, &mut ely_documents::email::EmailCheckpoint, &ely_documents::email::EmailSelection) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailHistory::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailHistory::redo(&mut self, &mut ely_documents::email::EmailDocument) -> core::option::Option<ely_documents::email::EmailSelection>
+pub fn ely_documents::email::EmailHistory::rollback(&mut ely_documents::email::EmailDocument, &ely_documents::email::EmailCheckpoint) -> core::result::Result<ely_documents::email::EmailSelection, ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailHistory::undo(&mut self, &mut ely_documents::email::EmailDocument) -> core::option::Option<ely_documents::email::EmailSelection>
+pub fn ely_documents::email::EmailImage::clone(&self) -> Self
+pub fn ely_documents::email::EmailImage::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailImage::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailImage::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailImage::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailParagraph::clone(&self) -> Self
+pub fn ely_documents::email::EmailParagraph::default() -> Self
+pub fn ely_documents::email::EmailParagraph::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailParagraph::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailParagraph::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailParagraph::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailParagraphKind::clone(&self) -> Self
+pub fn ely_documents::email::EmailParagraphKind::default() -> Self
+pub fn ely_documents::email::EmailParagraphKind::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailParagraphKind::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailParagraphKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailParagraphKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailPoint::clone(&self) -> Self
+pub fn ely_documents::email::EmailPoint::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailPoint::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailPoint::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailPoint::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailRun::clone(&self) -> Self
+pub fn ely_documents::email::EmailRun::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailRun::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailRun::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailRun::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailSelection::caret(ely_documents::email::EmailPoint) -> Self
+pub fn ely_documents::email::EmailSelection::clone(&self) -> Self
+pub fn ely_documents::email::EmailSelection::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailSelection::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailSelection::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailSelection::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailSpliceChange::clone(&self) -> Self
+pub fn ely_documents::email::EmailSpliceChange::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailSpliceChange::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailStyle::clone(&self) -> Self
+pub fn ely_documents::email::EmailStyle::default() -> Self
+pub fn ely_documents::email::EmailStyle::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailStyle::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailStyle::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailStyle::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailTable::clone(&self) -> Self
+pub fn ely_documents::email::EmailTable::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailTable::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailTable::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailTable::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailTableEdit::clone(&self) -> Self
+pub fn ely_documents::email::EmailTableEdit::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailTableEdit::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailText::clone(&self) -> Self
+pub fn ely_documents::email::EmailText::default() -> Self
+pub fn ely_documents::email::EmailText::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub fn ely_documents::email::EmailText::eq(&self, &Self) -> bool
+pub fn ely_documents::email::EmailText::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::email::EmailText::format(&mut self, core::ops::range::Range<usize>, &ely_documents::email::EmailFormat) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailText::plain(&str) -> Self
+pub fn ely_documents::email::EmailText::replace(&mut self, core::ops::range::Range<usize>, &str, &ely_documents::email::EmailStyle) -> core::result::Result<(), ely_documents::email::EmailError>
+pub fn ely_documents::email::EmailText::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+pub fn ely_documents::email::EmailText::style_at(&self, usize) -> ely_documents::email::EmailStyle
+pub fn ely_documents::email::EmailToolbar::into_any_element(self) -> gpui::element::AnyElement
+pub fn ely_documents::email::EmailToolbar::into_element(self) -> Self::Element
+pub fn ely_documents::email::EmailToolbar::new(impl core::convert::Into<gpui::window::ElementId>, &gpui::app::entity_map::Entity<ely_documents::HtmlEmailEditor>) -> Self
+pub fn ely_documents::email::EmailToolbar::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_documents::format(&gpui::app::entity_map::Entity<ely_core::forms::text::TextInput>, ely_documents::Format, &mut gpui::app::App)
 pub fn ely_documents::formula_svg(&str, bool) -> core::result::Result<alloc::string::String, ely_documents::MathError>
 pub fn ely_documents::is_toc(&ely_documents::mdast::Node, &str) -> bool
@@ -1089,6 +1591,7 @@ pub fn ely_documents::mdast::Table::fmt(&self, &mut core::fmt::Formatter<'_>) ->
 pub fn ely_documents::outline(&str) -> alloc::vec::Vec<(gpui_shared_string::SharedString, gpui_shared_string::SharedString, usize)>
 pub fn ely_documents::sheet(ely_documents::PrintSettings) -> (f32, f32)
 pub mod ely_documents
+pub mod ely_documents::email
 pub mod ely_documents::mdast
 pub struct ely_documents::Backlink
 pub struct ely_documents::Backlinks
@@ -1102,6 +1605,8 @@ pub struct ely_documents::DocumentHeading
 pub struct ely_documents::DocumentLook
 pub struct ely_documents::DocumentTarget
 pub struct ely_documents::DocumentViewer
+pub struct ely_documents::EmailDocument
+pub struct ely_documents::EmailEditorView
 pub struct ely_documents::EpubReader
 pub struct ely_documents::Favorite
 pub struct ely_documents::Favorites
@@ -1109,6 +1614,7 @@ pub struct ely_documents::FixedFormatToolbar
 pub struct ely_documents::Footnote
 pub struct ely_documents::Glossary
 pub struct ely_documents::HeldPicture
+pub struct ely_documents::HtmlEmailEditor
 pub struct ely_documents::Inline
 pub struct ely_documents::Latex
 pub struct ely_documents::LinkEditor
@@ -1139,6 +1645,23 @@ pub struct ely_documents::Version
 pub struct ely_documents::VersionHistory
 pub struct ely_documents::WordCount
 pub struct ely_documents::ZenMode
+pub struct ely_documents::email::EmailBlock
+pub struct ely_documents::email::EmailCheckpoint
+pub struct ely_documents::email::EmailColor
+pub struct ely_documents::email::EmailDocument
+pub struct ely_documents::email::EmailEditorView
+pub struct ely_documents::email::EmailHistory
+pub struct ely_documents::email::EmailImage
+pub struct ely_documents::email::EmailParagraph
+pub struct ely_documents::email::EmailPoint
+pub struct ely_documents::email::EmailRun
+pub struct ely_documents::email::EmailSelection
+pub struct ely_documents::email::EmailSpliceChange
+pub struct ely_documents::email::EmailStyle
+pub struct ely_documents::email::EmailTable
+pub struct ely_documents::email::EmailText
+pub struct ely_documents::email::EmailToolbar
+pub struct ely_documents::email::HtmlEmailEditor
 pub struct ely_documents::mdast::Code
 pub struct ely_documents::mdast::Definition
 pub struct ely_documents::mdast::FootnoteDefinition
@@ -1154,10 +1677,12 @@ pub struct ely_documents::mdast::ListItem
 pub struct ely_documents::mdast::Literal
 pub struct ely_documents::mdast::Parent
 pub struct ely_documents::mdast::Table
+pub trait ely_documents::PageSource
 pub type ely_documents::Backlinks::Element = gpui::view::ViewElement<ely_documents::Backlinks>
 pub type ely_documents::Checklist::Element = gpui::view::ViewElement<ely_documents::Checklist>
 pub type ely_documents::Diagram::Element = gpui::view::ViewElement<ely_documents::Diagram>
 pub type ely_documents::DocumentViewer::Element = gpui::view::ViewElement<ely_documents::DocumentViewer>
+pub type ely_documents::EmailEditorView::Element = gpui::view::ViewElement<ely_documents::EmailEditorView>
 pub type ely_documents::EpubReader::Element = gpui::view::ViewElement<ely_documents::EpubReader>
 pub type ely_documents::Favorites::Element = gpui::view::ViewElement<ely_documents::Favorites>
 pub type ely_documents::FixedFormatToolbar::Element = gpui::view::ViewElement<ely_documents::FixedFormatToolbar>
@@ -1184,6 +1709,7 @@ pub type ely_documents::TrashBin::Element = gpui::view::ViewElement<ely_document
 pub type ely_documents::VersionHistory::Element = gpui::view::ViewElement<ely_documents::VersionHistory>
 pub type ely_documents::WordCount::Element = gpui::view::ViewElement<ely_documents::WordCount>
 pub type ely_documents::ZenMode::Element = gpui::view::ViewElement<ely_documents::ZenMode>
+pub type ely_documents::email::EmailToolbar::Element = gpui::view::ViewElement<ely_documents::email::EmailToolbar>
 pub use ely_documents::AlertKind = ely_documents::tree::blocks::AlertKind
 pub use ely_documents::Align = ely_documents::blocks::kind::Align
 pub use ely_documents::AlignKind = ely_documents::markdown::mdast::AlignKind
@@ -1197,6 +1723,7 @@ pub use ely_documents::BlockEvent = ely_documents::blocks::BlockEvent
 pub use ely_documents::BlockKind = ely_documents::blocks::kind::BlockKind
 pub use ely_documents::Chapter = ely_documents::epub::Chapter
 pub use ely_documents::Checklist = ely_documents::todo::Checklist
+pub use ely_documents::DEFAULT_CACHE_BUDGET = ely_documents::viewer::DEFAULT_CACHE_BUDGET
 pub use ely_documents::Diagram = ely_documents::diagram::Diagram
 pub use ely_documents::DocPage = ely_documents::viewer::DocPage
 pub use ely_documents::DocumentEvent = ely_documents::document::DocumentEvent
@@ -1205,6 +1732,9 @@ pub use ely_documents::DocumentLook = ely_documents::document::look::DocumentLoo
 pub use ely_documents::DocumentTarget = ely_documents::document::point::DocumentTarget
 pub use ely_documents::DocumentViewer = ely_documents::viewer::DocumentViewer
 pub use ely_documents::EditRefusal = ely_documents::document::format::EditRefusal
+pub use ely_documents::EmailDocument = ely_documents::email::model::EmailDocument
+pub use ely_documents::EmailEditorEvent = ely_documents::email::editor::EmailEditorEvent
+pub use ely_documents::EmailEditorView = ely_documents::email::view::EmailEditorView
 pub use ely_documents::EpubReader = ely_documents::epub::EpubReader
 pub use ely_documents::Favorite = ely_documents::knowledge::Favorite
 pub use ely_documents::Favorites = ely_documents::knowledge::Favorites
@@ -1213,6 +1743,7 @@ pub use ely_documents::Footnote = ely_documents::reading::Footnote
 pub use ely_documents::Format = ely_documents::format::Format
 pub use ely_documents::Glossary = ely_documents::reading::Glossary
 pub use ely_documents::HeldPicture = ely_documents::picture::HeldPicture
+pub use ely_documents::HtmlEmailEditor = ely_documents::email::editor::HtmlEmailEditor
 pub use ely_documents::Inline = ely_documents::tree::Inline
 pub use ely_documents::InlineFormat = ely_documents::document::format::InlineFormat
 pub use ely_documents::LARGEST_READ = ely_documents::document::LARGEST_READ
@@ -1232,6 +1763,9 @@ pub use ely_documents::PageHistoryDiff = ely_documents::history::PageHistoryDiff
 pub use ely_documents::PageHit = ely_documents::viewer::PageHit
 pub use ely_documents::PageIcon = ely_documents::pages::PageIcon
 pub use ely_documents::PageNote = ely_documents::viewer::PageNote
+pub use ely_documents::PageRequestKind = ely_documents::viewer::PageRequestKind
+pub use ely_documents::PageResource = ely_documents::viewer::PageResource
+pub use ely_documents::PageSource = ely_documents::viewer::PageSource
 pub use ely_documents::PageThumbnailList = ely_documents::thumbs::PageThumbnailList
 pub use ely_documents::Paper = ely_documents::print::Paper
 pub use ely_documents::Pictures = ely_documents::picture::Pictures
@@ -1256,6 +1790,13 @@ pub use ely_documents::WordCount = ely_documents::counts::WordCount
 pub use ely_documents::ZenMode = ely_documents::reading::ZenMode
 pub use ely_documents::alert = ely_documents::tree::blocks::alert
 pub use ely_documents::diagram_svg = ely_documents::diagram::diagram_svg
+pub use ely_documents::email::* = model::*
+pub use ely_documents::email::EmailCheckpoint = ely_documents::email::history::EmailCheckpoint
+pub use ely_documents::email::EmailEditorEvent = ely_documents::email::editor::EmailEditorEvent
+pub use ely_documents::email::EmailEditorView = ely_documents::email::view::EmailEditorView
+pub use ely_documents::email::EmailHistory = ely_documents::email::history::EmailHistory
+pub use ely_documents::email::EmailToolbar = ely_documents::email::toolbar::EmailToolbar
+pub use ely_documents::email::HtmlEmailEditor = ely_documents::email::editor::HtmlEmailEditor
 pub use ely_documents::format = ely_documents::format::format
 pub use ely_documents::formula_svg = ely_documents::math::formula_svg
 pub use ely_documents::is_toc = ely_documents::tree::blocks::is_toc

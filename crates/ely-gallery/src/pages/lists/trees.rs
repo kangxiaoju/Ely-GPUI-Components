@@ -121,6 +121,7 @@ pub fn tree(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
             .child(
                 Tree::new("tree", nodes)
                     .open(["app", "src"])
+                    .on_open(|key, open, _| log::info!("gallery tree {key}: open={open}"))
                     .multiple()
                     .selected(now.clone())
                     .on_select(move |keys, _, cx| set(&pick, keys.to_vec(), cx))

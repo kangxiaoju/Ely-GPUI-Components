@@ -51,6 +51,7 @@ pub struct LayerPanel {
     on_show: Option<OnKeys>,
     on_rename: Option<OnPair>,
     on_restack: Option<OnKeys>,
+    read_only: bool,
 }
 
 impl LayerPanel {
@@ -64,8 +65,12 @@ impl LayerPanel {
             on_show: None,
             on_rename: None,
             on_restack: None,
+            read_only: false,
         }
     }
+
+    /// Disables visibility, rename and reorder affordances while preserving selection.
+    pub fn read_only(mut self, read_only: bool) -> Self { self.read_only=read_only; self }
 
     /// The layers selected now, by key.
     pub fn selected(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
@@ -111,7 +116,7 @@ impl LayerPanel {
 }
 
 impl RenderOnce for LayerPanel {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let order: Vec<SharedString> = self.shapes.iter().map(|shape| shape.key.clone()).collect();
         let shown: Vec<SharedString> = self
             .shapes
@@ -122,7 +127,7 @@ impl RenderOnce for LayerPanel {
         let nodes = self.shapes.iter().rev().map(|shape| {
             let node = TreeNode::new(shape.key.clone(), shape.name.clone()).icon(shape.kind.icon());
             if shape.locked {
-                node.note("Locked")
+                node.note(crate::i18n::text(cx,"canvas.locked",&[]))
             } else {
                 node
             }
@@ -130,21 +135,21 @@ impl RenderOnce for LayerPanel {
         let mut tree = Tree::new(self.id.clone(), nodes)
             .selected(self.selected)
             .multiple()
-            .checked(shown)
             .size_full();
+        if !self.read_only { tree=tree.checked(shown); }
         if let Some(on_select) = self.on_select {
             tree = tree.on_select(move |keys, window, cx| on_select(keys, window, cx));
         }
-        if let Some(on_show) = self.on_show {
+        if let Some(on_show) = self.on_show.filter(|_| !self.read_only) {
             tree = tree.on_check(move |keys, window, cx| {
                 log::info!("layer panel: {} shown", keys.len());
                 on_show(keys, window, cx)
             });
         }
-        if let Some(on_rename) = self.on_rename {
+        if let Some(on_rename) = self.on_rename.filter(|_| !self.read_only) {
             tree = tree.on_rename(move |key, name, window, cx| on_rename(key, name, window, cx));
         }
-        if let Some(on_restack) = self.on_restack {
+        if let Some(on_restack) = self.on_restack.filter(|_| !self.read_only) {
             tree = tree.on_move(move |dragged, target, at, window, cx| {
                 log::info!("layer panel: {dragged} {at:?} {target}");
                 if let Some(order) = restacked(&order, dragged, target, at) {

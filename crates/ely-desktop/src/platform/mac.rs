@@ -58,12 +58,31 @@ impl StatusItem {
         entries: &[Option<&str>],
         on_pick: OnPick,
     ) -> anyhow::Result<Self> {
+        Self::build(Some(symbol), None, name, entries, on_pick)
+    }
+
+    pub(crate) fn new_text(
+        label: &str,
+        name: &str,
+        entries: &[Option<&str>],
+        on_pick: OnPick,
+    ) -> anyhow::Result<Self> {
+        Self::build(None, Some(label), name, entries, on_pick)
+    }
+
+    fn build(
+        symbol: Option<&str>,
+        label: Option<&str>,
+        name: &str,
+        entries: &[Option<&str>],
+        on_pick: OnPick,
+    ) -> anyhow::Result<Self> {
         let mtm = main_thread("the tray");
-        let image = NSImage::imageWithSystemSymbolName_accessibilityDescription(
-            &NSString::from_str(symbol),
-            None,
-        )
-        .with_context(|| format!("no SF Symbol named {symbol}"))?;
+        let image = symbol.map(|symbol| {
+            NSImage::imageWithSystemSymbolName_accessibilityDescription(
+                &NSString::from_str(symbol), None,
+            ).with_context(|| format!("no SF Symbol named {symbol}"))
+        }).transpose()?;
         let target = Target::new(on_pick, mtm);
         let menu = NSMenu::new(mtm);
         for (index, entry) in entries.iter().enumerate() {
@@ -89,7 +108,8 @@ impl StatusItem {
         }
         let item = NSStatusBar::systemStatusBar().statusItemWithLength(NSVariableStatusItemLength);
         let button = item.button(mtm).context("status item has no button")?;
-        button.setImage(Some(&image));
+        button.setImage(image.as_deref());
+        if let Some(label) = label { button.setTitle(&NSString::from_str(label)); }
         button.setToolTip(Some(&NSString::from_str(name)));
         item.setMenu(Some(&menu));
         log::info!("tray: shown with {} items", entries.len());

@@ -194,6 +194,7 @@ pub fn ely_mail::MailboxList::on_open(self, impl core::ops::function::Fn(&gpui_s
 pub fn ely_mail::MailboxList::open(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_mail::MailboxList::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_mail::MailboxList::section(self, impl core::convert::Into<gpui_shared_string::SharedString>, impl core::iter::traits::collect::IntoIterator<Item = ely_mail::Mailbox>) -> Self
+pub fn ely_mail::MailboxList::section_action(self, impl gpui::element::IntoElement) -> Self
 pub fn ely_mail::Message::cc(self, impl core::iter::traits::collect::IntoIterator<Item = ely_mail::Contact>) -> Self
 pub fn ely_mail::Message::clone(&self) -> Self
 pub fn ely_mail::Message::eq(&self, &Self) -> bool

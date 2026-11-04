@@ -14,8 +14,14 @@ pub enum Tool {
     Hand,
     /// Draws a rectangle.
     Rect,
+    /// Draws a rounded rectangle.
+    RoundedRect,
     /// Draws an ellipse.
     Ellipse,
+    /// Draws a diamond.
+    Diamond,
+    /// Deletes unlocked shapes along the pointer stroke.
+    Eraser,
     /// Draws a polygon.
     Polygon,
     /// Draws a line.
@@ -36,12 +42,15 @@ pub enum Tool {
 
 impl Tool {
     /// Every tool, in the palette's order.
-    pub const ALL: [Tool; 12] = [
+    pub const ALL: [Tool; 15] = [
         Tool::Select,
         Tool::Hand,
         Tool::Rect,
+        Tool::RoundedRect,
         Tool::Ellipse,
         Tool::Polygon,
+        Tool::Diamond,
+        Tool::Eraser,
         Tool::Line,
         Tool::Arrow,
         Tool::Pen,
@@ -57,7 +66,10 @@ impl Tool {
             Tool::Select => "select",
             Tool::Hand => "hand",
             Tool::Rect => "rect",
+            Tool::RoundedRect => "rounded_rect",
             Tool::Ellipse => "ellipse",
+            Tool::Diamond => "diamond",
+            Tool::Eraser => "eraser",
             Tool::Polygon => "polygon",
             Tool::Line => "line",
             Tool::Arrow => "arrow",
@@ -80,7 +92,10 @@ impl Tool {
             Tool::Select => "v",
             Tool::Hand => "h",
             Tool::Rect => "r",
+            Tool::RoundedRect => "u",
             Tool::Ellipse => "o",
+            Tool::Diamond => "d",
+            Tool::Eraser => "e",
             Tool::Polygon => "y",
             Tool::Line => "l",
             Tool::Arrow => "a",
@@ -96,7 +111,9 @@ impl Tool {
     pub(crate) fn draws(self) -> Option<ShapeKind> {
         match self {
             Tool::Rect => Some(ShapeKind::Rect),
+            Tool::RoundedRect => Some(ShapeKind::RoundedRect),
             Tool::Ellipse => Some(ShapeKind::Ellipse),
+            Tool::Diamond => Some(ShapeKind::Diamond),
             Tool::Polygon => Some(ShapeKind::Polygon(6)),
             Tool::Line => Some(ShapeKind::Line(Corner::BottomRight)),
             Tool::Arrow => Some(ShapeKind::Arrow(Corner::BottomRight)),
@@ -157,6 +174,7 @@ impl Handle {
 /// The topmost shape at a canvas point that is shown and not locked, by its place.
 pub(crate) fn hit(shapes: &[Shape], at: (f32, f32), reach: f32) -> Option<usize> {
     shapes.iter().rposition(|shape| {
+        let at = shape.rotate_point(at, -shape.rotation);
         let frame = &shape.frame;
         let grown = Frame::new(
             frame.x - reach,
@@ -164,15 +182,47 @@ pub(crate) fn hit(shapes: &[Shape], at: (f32, f32), reach: f32) -> Option<usize>
             frame.w + reach * 2.0,
             frame.h + reach * 2.0,
         );
-        !shape.hidden && !shape.locked && grown.contains(at)
+        let contains = match &shape.kind {
+            ShapeKind::Line(end) | ShapeKind::Arrow(end) => {
+                distance_to_segment(at,end.opposite().of(frame),end.of(frame)) <= reach + shape.appearance.map_or(1.0,|s|s.stroke_width/2.0)
+            }
+            ShapeKind::Path {points,..} | ShapeKind::Polyline {points,..} => {
+                points.windows(2).any(|p| distance_to_segment(at,(frame.x+p[0].0,frame.y+p[0].1),(frame.x+p[1].0,frame.y+p[1].1)) <= reach + shape.appearance.map_or(2.0,|s|s.stroke_width/2.0))
+            }
+            ShapeKind::RoundedRect => {
+                let radius = super::rounded::radius(frame);
+                let (cx, cy) = frame.center();
+                let x = ((at.0 - cx).abs() - (frame.w / 2.0 - radius)).max(0.0);
+                let y = ((at.1 - cy).abs() - (frame.h / 2.0 - radius)).max(0.0);
+                x.hypot(y) <= radius + reach
+            }
+            ShapeKind::Diamond => {
+                let (cx, cy) = frame.center();
+                (at.0 - cx).abs() / (frame.w / 2.0 + reach).max(0.01)
+                    + (at.1 - cy).abs() / (frame.h / 2.0 + reach).max(0.01) <= 1.0
+            }
+            ShapeKind::Ellipse => {
+                let (cx, cy) = frame.center();
+                ((at.0 - cx) / (frame.w / 2.0 + reach).max(0.01)).powi(2)
+                    + ((at.1 - cy) / (frame.h / 2.0 + reach).max(0.01)).powi(2) <= 1.0
+            }
+            _ => grown.contains(at),
+        };
+        !shape.hidden && !shape.locked && contains
     })
+}
+
+fn distance_to_segment(p:(f32,f32),a:(f32,f32),b:(f32,f32)) -> f32 {
+    let (dx,dy)=(b.0-a.0,b.1-a.1);
+    let t=(((p.0-a.0)*dx+(p.1-a.1)*dy)/(dx*dx+dy*dy).max(0.000001)).clamp(0.0,1.0);
+    (p.0-a.0-t*dx).hypot(p.1-a.1-t*dy)
 }
 
 /// The shapes wholly inside a marquee, shown and not locked.
 pub(crate) fn inside(shapes: &[Shape], marquee: &Frame) -> Vec<SharedString> {
     shapes
         .iter()
-        .filter(|shape| !shape.hidden && !shape.locked && shape.frame.within(marquee))
+        .filter(|shape| !shape.hidden && !shape.locked && shape.bounds().within(marquee))
         .map(|shape| shape.key.clone())
         .collect()
 }
@@ -208,6 +258,16 @@ pub(crate) fn resized(
         next.h = h;
     }
     next
+}
+
+/// Resizes in rotated local axes, keeping the opposite handle fixed.
+pub(crate) fn resized_shape(shape:&Shape, handle:Handle, from:(f32,f32), to:(f32,f32), least:f32, square:bool) -> Frame {
+    let from=shape.rotate_point(from,-shape.rotation);
+    let to=shape.rotate_point(to,-shape.rotation);
+    let mut frame=resized(shape.frame,handle,(to.0-from.0,to.1-from.1),least,square);
+    let center=shape.rotate_point(frame.center(),shape.rotation);
+    frame.x=center.0-frame.w/2.0; frame.y=center.1-frame.h/2.0;
+    frame
 }
 
 /// How far to nudge a moving frame so an edge or its middle meets another frame's within `reach`, and the lines it meets.
@@ -366,5 +426,20 @@ mod tests {
         assert_eq!(frame, Frame::new(40.0, 100.0, 60.0, 60.0));
         let (_, square) = drawn(ShapeKind::Rect, (0.0, 0.0), (30.0, -80.0), true);
         assert_eq!(square, Frame::new(0.0, -80.0, 80.0, 80.0));
+    }
+
+    #[test]
+    fn rounded_tool_draws_resizes_writes_and_hits_real_corners() {
+        let kind = super::Tool::RoundedRect.draws().unwrap();
+        let (kind, frame) = drawn(kind, (40.0, 40.0), (0.0, 0.0), false);
+        let shape = Shape::new("round", "Round", kind, frame).written("Words");
+        assert_eq!(shape.words().map(|s| s.as_ref()), Some("Words"));
+        assert_eq!(hit(std::slice::from_ref(&shape), (0.0, 0.0), 0.0), None);
+        assert_eq!(hit(std::slice::from_ref(&shape), (10.0, 0.0), 0.0), Some(0));
+        let rotated = shape.clone().rotation(std::f32::consts::FRAC_PI_4);
+        assert_eq!(hit(std::slice::from_ref(&rotated), rotated.rotate_point((0.0, 0.0), rotated.rotation), 0.0), None);
+        let next = super::resized_shape(&shape, Handle::SouthEast, (40.0, 40.0), (80.0, 60.0), 1.0, false);
+        assert_eq!(next, Frame::new(0.0, 0.0, 80.0, 60.0));
+        assert_eq!(inside(&[shape], &frame), [gpui::SharedString::from("round")]);
     }
 }

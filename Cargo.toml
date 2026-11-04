@@ -24,7 +24,7 @@ ely-account = { path = "crates/ely-account", version = "0.1.1" }
 ely-settings = { path = "crates/ely-settings", version = "0.1.1" }
 ely-dashboard = { path = "crates/ely-dashboard", version = "0.1.1" }
 ely-devtools = { path = "crates/ely-devtools", version = "0.1.1" }
-ely-canvas = { path = "crates/ely-canvas", version = "0.1.1" }
+ely-canvas = { path = "crates/ely-canvas", version = "0.3.0" }
 ely-project = { path = "crates/ely-project", version = "0.1.1" }
 ely-calendar = { path = "crates/ely-calendar", version = "0.1.1" }
 ely-mail = { path = "crates/ely-mail", version = "0.1.1" }
@@ -35,7 +35,7 @@ ely-generative = { path = "crates/ely-generative", version = "0.1.1" }
 ely-agent = { path = "crates/ely-agent", version = "0.1.1" }
 ely-chat = { path = "crates/ely-chat", version = "0.1.1" }
 ely-collab = { path = "crates/ely-collab", version = "0.1.1" }
-ely-documents = { path = "crates/ely-documents", version = "0.1.1" }
+ely-documents = { path = "crates/ely-documents", version = "0.2.0" }
 ely-debug = { path = "crates/ely-debug", version = "0.1.1" }
 ely-git = { path = "crates/ely-git", version = "0.1.1" }
 ely-terminal = { path = "crates/ely-terminal", version = "0.1.1" }

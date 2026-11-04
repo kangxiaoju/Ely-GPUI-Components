@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use gpui::{
     App, AppContext as _, Bounds, ElementId, EmptyView, Entity, EntityId, InteractiveElement,
@@ -7,7 +7,7 @@ use gpui::{
 };
 
 use super::{
-    edit::{Tool, drawn, resized, snapped},
+    edit::{Tool, drawn, snapped},
     gesture::{
         Brush, Gesture, Hand, Handlers, LEAST, OnDraw, OnKeys, OnMove, OnPair, OnResize, PEN,
         REACH, Scene, commit, path, spanned, stroke_shape, taken,
@@ -15,7 +15,7 @@ use super::{
     marks::{SelectionBox, SnapIndicator, TransformHandles, placed},
     paint::{in_view, paint_shape},
     press::{Press, pressed as pressed_with},
-    shape::{Corner, Shape, ShapeKind},
+    shape::{Corner, Shape, ShapeKind, ShapeAppearance},
     view::{Frame, Viewport},
     writing,
 };
@@ -41,9 +41,10 @@ pub struct ToolLayer {
     id: ElementId,
     tool: Tool,
     viewport: Viewport,
-    shapes: Vec<Shape>,
+    shapes: Arc<Vec<Shape>>,
     selected: Vec<SharedString>,
     brush: Brush,
+    appearance: Option<ShapeAppearance>,
     on_select: Option<OnKeys>,
     on_draw: Option<OnDraw>,
     on_move: Option<OnMove>,
@@ -51,6 +52,7 @@ pub struct ToolLayer {
     on_link: Option<OnPair>,
     on_text: Option<OnPair>,
     on_delete: Option<OnKeys>,
+    on_rotate: Option<super::gesture::OnRotate>,
 }
 
 impl ToolLayer {
@@ -65,9 +67,10 @@ impl ToolLayer {
             id: id.into(),
             tool,
             viewport,
-            shapes: shapes.into_iter().collect(),
+            shapes: Arc::new(shapes.into_iter().collect()),
             selected: Vec::new(),
             brush: Brush { size: 4.0, hue: 0 },
+            appearance: None,
             on_select: None,
             on_draw: None,
             on_move: None,
@@ -75,6 +78,7 @@ impl ToolLayer {
             on_link: None,
             on_text: None,
             on_delete: None,
+            on_rotate: None,
         }
     }
 
@@ -88,6 +92,20 @@ impl ToolLayer {
     pub fn brush(mut self, brush: Brush) -> Self {
         self.brush = brush;
         self
+    }
+
+    /// Matches drawing previews to the appearance committed by the host.
+    pub fn appearance(mut self, appearance: ShapeAppearance) -> Self {
+        self.appearance = Some(appearance);
+        self
+    }
+
+    /// Uses the scene's shared shapes without cloning the document each frame.
+    pub fn shared_shapes(mut self, shapes: Arc<Vec<Shape>>) -> Self { self.shapes = shapes; self }
+
+    /// Gets clockwise radians after dragging a shape's rotation handle.
+    pub fn on_rotate(mut self, handler: impl Fn(&SharedString, f32, &mut Window, &mut App) + 'static) -> Self {
+        self.on_rotate = Some(Rc::new(handler)); self
     }
 
     /// Gets the keys selected after each press or marquee.
@@ -135,7 +153,7 @@ impl ToolLayer {
         self
     }
 
-    /// Gets the selected keys when Delete or Backspace is pressed on the layer.
+    /// Gets unique eraser targets once on release, or the selection on Delete/Backspace.
     pub fn on_delete(
         mut self,
         handler: impl Fn(&[SharedString], &mut Window, &mut App) + 'static,
@@ -168,7 +186,7 @@ impl RenderOnce for ToolLayer {
             return div().into_any_element();
         }
         let (view, tool) = (self.viewport, self.tool);
-        let shapes = Rc::new(self.shapes);
+        let shapes = self.shapes;
         let selected = Rc::new(self.selected);
         let others: Vec<Frame> = shapes
             .iter()
@@ -202,7 +220,12 @@ impl RenderOnce for ToolLayer {
             }
             _ => ((0.0, 0.0), Vec::new()),
         };
-        let preview: Vec<Shape> = match &gesture {
+        let mut preview: Vec<Shape> = match &gesture {
+            Gesture::Rotating { key, center, start, from, to } => shapes.iter().filter(|s| s.key == *key).map(|s| {
+                let mut s = s.clone();
+                s.rotation = start + (to.1-center.1).atan2(to.0-center.0) - (from.1-center.1).atan2(from.0-center.0);
+                s
+            }).collect(),
             Gesture::Drawing { kind, from, to } => {
                 let (kind, frame) = drawn(kind.clone(), *from, *to, square);
                 vec![Shape::new("+draft", "Draft", kind, frame)]
@@ -227,13 +250,7 @@ impl RenderOnce for ToolLayer {
                 .filter(|shape| shape.key == *key)
                 .map(|shape| {
                     let mut sized = shape.clone();
-                    sized.frame = resized(
-                        shape.frame,
-                        *handle,
-                        (to.0 - from.0, to.1 - from.1),
-                        LEAST,
-                        square,
-                    );
+                    sized.frame = super::edit::resized_shape(shape, *handle, *from, *to, LEAST, square);
                     sized
                 })
                 .collect(),
@@ -257,6 +274,35 @@ impl RenderOnce for ToolLayer {
             }
             _ => Vec::new(),
         };
+        if let Some(appearance) = self.appearance {
+            for shape in &mut preview {
+                if shape.key.as_ref().starts_with('+') {
+                    *shape = shape.clone().appearance(appearance);
+                }
+            }
+        }
+        let preview_scene=super::links::CanvasScene::new(preview.clone(),[]);
+        let image_preview:Vec<_>=preview.iter().filter_map(|shape| {
+            let image=preview_scene.images.get(&shape.key)?;
+            let frame=in_view(&view,&shape.bounds());
+            Some(gpui::img(image.clone()).absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y))
+                .w(Pixels::from(frame.w)).h(Pixels::from(frame.h)).opacity(shape.appearance.map_or(1.0,|s|s.opacity)))
+        }).collect();
+        let text_preview:Vec<_>=preview.iter().filter_map(|shape| {
+            let text=shape.words()?;
+            let frame=in_view(&view,&shape.frame);
+            let style=shape.appearance.unwrap_or_default();
+            let family=style.font.family(cx);
+            if shape.rotation != 0.0 {
+                let escaped=|text:&str|text.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;").replace('"',"&quot;").replace('\'',"&apos;");
+                let spans=text.lines().enumerate().map(|(ix,line)|format!("<tspan x='0' y='{}'>{}</tspan>",style.font_size*(1.0+ix as f32*1.3),escaped(line))).collect::<String>();
+                let svg=format!("<svg xmlns='http://www.w3.org/2000/svg' width='{}' height='{}'><text font-family='{}' font-size='{}'>{}</text></svg>",shape.frame.w,shape.frame.h,escaped(&family),style.font_size,spans);
+                return Some(gpui::svg().data(&super::text_outline::outlined(&svg,cx)).with_transformation(gpui::Transformation::rotate(gpui::radians(shape.rotation)))
+                    .absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y)).w(Pixels::from(frame.w)).h(Pixels::from(frame.h)).text_color(palette.fg).opacity(style.opacity).into_any_element());
+            }
+            Some(placed(&frame).overflow_hidden().font_family(family).text_size(Pixels::from(style.font_size*view.zoom)).line_height(Pixels::from(style.font_size*view.zoom*1.3))
+                .text_color(palette.fg).opacity(style.opacity).child(text.to_string()).into_any_element())
+        }).collect();
         let marquee = match &gesture {
             Gesture::Marquee { from, to } => Some(SelectionBox::new(in_view(
                 &view,
@@ -270,7 +316,14 @@ impl RenderOnce for ToolLayer {
             .map(|frame| in_view(&view, &frame));
         let handles = chosen
             .filter(|_| selected.len() == 1)
-            .map(TransformHandles::new);
+            .map(|frame| TransformHandles::new(frame).rotation(shapes.iter().find(|s| s.key == selected[0]).map_or(0.0,|s|s.rotation)));
+        let rotation_handle = (tool == Tool::Select && selected.len() == 1).then(|| {
+            let shape = shapes.iter().find(|s| s.key == selected[0])?;
+            let knob = shape.rotate_point((shape.frame.x + shape.frame.w/2.0, shape.frame.y - 24.0/view.zoom), shape.rotation);
+            let (x,y) = view.to_view(knob);
+            Some(placed(&Frame::new(x-side/2.0,y-side/2.0,side,side)).rounded_full()
+                .bg(palette.surface).border_1().border_color(palette.accent))
+        }).flatten();
         let outline = chosen
             .filter(|_| selected.len() > 1)
             .map(|frame| placed(&frame).border_1().border_color(palette.accent));
@@ -279,7 +332,7 @@ impl RenderOnce for ToolLayer {
         let field = writing_on
             .as_ref()
             .and_then(|key| shapes.iter().find(|shape| shape.key == *key))
-            .and_then(|shape| writing::field(&editing, in_view(&view, &shape.frame), cx));
+            .and_then(|shape| writing::field(&editing, in_view(&view, &shape.frame), shape.appearance.unwrap_or_default(),view.zoom,cx));
         if field.is_none() && writing_on.is_some() && editing.read(cx).field().is_some() {
             let closing = editing.clone();
             log::info!("tool layer: the shape written on left the canvas");
@@ -315,6 +368,8 @@ impl RenderOnce for ToolLayer {
             on_resize: self.on_resize,
             on_link: self.on_link,
             on_text: self.on_text,
+            on_delete: self.on_delete,
+            on_rotate: self.on_rotate,
         };
         let scene = Rc::new(Scene {
             shapes,
@@ -323,9 +378,10 @@ impl RenderOnce for ToolLayer {
             view,
         });
         let handlers = Rc::new(handlers);
-        let select_on_up = handlers.on_select.clone();
+        let (select_on_up, release_scene, release_handlers) = (handlers.on_select.clone(), scene.clone(), handlers.clone());
         let (press_scene, press_handlers, press_editing) =
             (scene.clone(), handlers.clone(), editing.clone());
+        let erasing_scene = press_scene.clone();
         let brush = self.brush;
         let (out_hand, out_scene, out_handlers) = (hand.clone(), scene.clone(), handlers.clone());
         let measured = hand.clone();
@@ -389,7 +445,7 @@ impl RenderOnce for ToolLayer {
                 });
             })
             .on_drag(Tracing { owner }, |_, _, _, cx| cx.new(|_| EmptyView))
-            .on_drag_move::<Tracing>(move |event, _, cx| {
+            .on_drag_move::<Tracing>(move |event, _window, cx| {
                 if event.drag(cx).owner != owner {
                     return;
                 }
@@ -398,8 +454,15 @@ impl RenderOnce for ToolLayer {
                 moved.update(cx, |hand, cx| {
                     hand.square = event.event.modifiers.shift;
                     match &mut hand.gesture {
+                        Gesture::Erasing { keys } => {
+                            if let Some(ix) = super::edit::hit(&erasing_scene.shapes, at, REACH / view.zoom) {
+                                let key = &erasing_scene.shapes[ix].key;
+                                if !keys.contains(key) { keys.push(key.clone()); }
+                            }
+                        }
                         Gesture::Marquee { to, .. }
                         | Gesture::Moving { to, .. }
+                        | Gesture::Rotating { to, .. }
                         | Gesture::Resizing { to, .. }
                         | Gesture::Drawing { to, .. }
                         | Gesture::Linking { to, .. } => *to = at,
@@ -438,6 +501,8 @@ impl RenderOnce for ToolLayer {
                     if let Some(on_select) = &select_on_up {
                         on_select(&[], window, cx);
                     }
+                } else if matches!(gesture, Gesture::Erasing { .. }) {
+                    commit(gesture, false, &release_scene, &release_handlers, brush, window, cx);
                 }
             })
             .child(
@@ -461,6 +526,9 @@ impl RenderOnce for ToolLayer {
             )
             .children(marquee)
             .children(handles)
+            .children(image_preview)
+            .children(text_preview)
+            .children(rotation_handle)
             .children(outline)
             .children(field)
             .children(snap)
