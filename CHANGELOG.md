@@ -3,6 +3,7 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
+- `ely-core`: `Spinner::max_fps` optionally bounds decorative redraws while preserving cycle duration, styles, and reduced-motion behavior. Existing spinners keep display-rate updates.
 - `ely-core`: `RadioCard::thumbnail` places a preview above its name, with native selected/focus outlines and the radio mark beside the name. Existing card layouts are unchanged.
 
 - `ely-core`: `ContextMenu::on_close` notifies its owner after dismissal, allowing numbered manual requests to be cleared before a host is mounted again.

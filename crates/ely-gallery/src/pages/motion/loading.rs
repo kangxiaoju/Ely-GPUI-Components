@@ -60,6 +60,7 @@ pub fn spinners(cx: &mut App) -> impl IntoElement + use<> {
     .child(specimens().children(SIZES.map(|(size, name)| {
         specimen(name, Spinner::new(SharedString::from(format!("spinner-size-{name}"))).size(size), cx)
     })))
+    .child(specimen("30 fps", Spinner::new("spinner-paced").max_fps(30.0), cx))
 }
 
 pub fn skeletons(cx: &mut App) -> impl IntoElement + use<> {
