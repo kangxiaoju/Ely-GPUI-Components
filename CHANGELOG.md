@@ -3,6 +3,7 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
+- `ely-core`: `RadioCard::thumbnail` places a preview above its name, with native selected/focus outlines and the radio mark beside the name. Existing card layouts are unchanged.
 
 - `ely-documents` (within the unreleased 0.2.0): add `email::{HtmlEmailEditor, EmailEditorView, EmailToolbar, EmailDocument}` for native, structured HTML mail bodies, with one GPUI input handler, shared selection/history across rich paragraphs, inline images and table cells, sanitized HTML/plain-text codecs, and bounded import/model/history budgets. Host events delegate rich clipboard and image/CID work; the component does not provide MIME sending, implicit remote image loading or arbitrary HTML/CSS fidelity. The mail gallery composes it with `MailComposer`. These APIs are additive; the existing 0.2.0 bump remains for the table-constructor change below. Runtime acceptance is not asserted; macOS is unverified.
 - `ely-documents`: group contiguous native typing into one undo step while isolating paste, formatting and IME commits; capture both paragraphs for boundary Backspace/Delete so undo restores exact blocks and the original caret.

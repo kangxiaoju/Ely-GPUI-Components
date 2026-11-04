@@ -26,6 +26,7 @@ struct Face {
     icon: Option<IconName>,
     disabled: bool,
     on: bool,
+    thumbnail: bool,
 }
 
 impl Face {
@@ -37,6 +38,7 @@ impl Face {
             icon: None,
             disabled: false,
             on,
+            thumbnail: false,
         }
     }
 }
@@ -62,6 +64,48 @@ fn card(
         colors.border
     };
     let strong = colors.border_strong;
+    if face.thumbnail {
+        return div()
+            .id(id)
+            .aria_label(face.title.clone())
+            .aria_toggled(on.into())
+            .track_focus(focus)
+            .flex()
+            .flex_col()
+            .gap_2()
+            .when(face.disabled, |card| card.opacity(0.5))
+            .when(!face.disabled, |card| {
+                card.cursor_pointer()
+                    .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
+                    .on_click(move |_, window, cx| press(window, cx))
+            })
+            .child(
+                div()
+                    .w_full()
+                    .overflow_hidden()
+                    .rounded(theme.radius(Radius::Lg))
+                    .border_2()
+                    .border_color(border)
+                    .when(!on && !focused && !face.disabled, |preview| {
+                        preview.hover(|style| style.border_color(strong))
+                    })
+                    .children(face.preview),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap_2()
+                    .text_size(theme.text_size(TextSize::Base))
+                    .text_color(colors.fg)
+                    .child(face.title)
+                    .child(mark),
+            )
+            .when_some(face.description, |card, description| {
+                card.child(div().text_size(theme.text_size(TextSize::Sm)).text_color(colors.fg_muted).child(description))
+            });
+    }
     div()
         .id(id)
         .aria_label(face.title.clone())
@@ -233,6 +277,15 @@ impl RadioCard {
     /// Shows `element` under the words, such as what the choice looks like.
     pub fn preview(mut self, element: impl IntoElement) -> Self {
         self.face.preview = Some(element.into_any_element());
+        self
+    }
+
+    /// Shows `element` as a bordered thumbnail above the title. Selection and focus
+    /// outline the thumbnail; the radio mark sits beside the title. Useful for
+    /// visual choices such as themes or document templates.
+    pub fn thumbnail(mut self, element: impl IntoElement) -> Self {
+        self.face.preview = Some(element.into_any_element());
+        self.face.thumbnail = true;
         self
     }
 
