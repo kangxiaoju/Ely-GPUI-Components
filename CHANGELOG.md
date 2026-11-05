@@ -3,11 +3,14 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
+- `ely-core`, `ely-documents`, `ely-git`: merge official upstream `e32d7f2` while retaining Yu's context-menu dismissal, selectable Markdown, spinner pacing, native mail, canvas, tree and theme extensions; dependencies remain on `gpui-pre` 0.3.10.
 - `ely-core`: `Spinner::max_fps` optionally bounds decorative redraws while preserving cycle duration, styles, and reduced-motion behavior. Existing spinners keep display-rate updates.
 - `ely-core`: `RadioCard::thumbnail` places a preview above its name, with native selected/focus outlines and the radio mark beside the name. Existing card layouts are unchanged.
 
 - `ely-core`: `ContextMenu::on_close` notifies its owner after dismissal, allowing numbered manual requests to be cleared before a host is mounted again.
 
+- `ely-core`: Shell code colors a `#` right after the `)` that closes `$(`, `$((`, `<(` or `>(` as part of the word, as Bash reads it; only a bare subshell's `)` ends a word before a comment. A `case` pattern's `)` inside `$(` no longer counts as the `)` that closes it.
+- `ely-core`: a menu's icon buttons carry no selected state, so Windows offers their Invoke pattern to a screen reader; in a `SearchableMenu`, the arrows lend the panel focus so a reader hears the marked row or button, and typing or Backspace gives the filter focus back.
 - `ely-core`: adds the Korean `ko-KR` locale and Korean component messages. The gallery's i18n page holds one catalog per listed locale, Spanish and Korean too; its table is sized to `LOCALES`, so a new locale without one does not build.
 - `ely-documents`: a wheel over `MarkdownDocument`'s margins beside a narrowed text column, or over its bar's track, scrolls the text as far as one over the text, once; in the source view a line wheel keeps the code's own line height at any text size, and a sideways wheel (Shift and the wheel) scrolls the code down there as over the code. Split is unchanged.
 - `ely-editor` 0.2.0: `Metrics` holds `wheel`, one wheel line as the code's list scrolls it, so a struct literal of `Metrics` names it.

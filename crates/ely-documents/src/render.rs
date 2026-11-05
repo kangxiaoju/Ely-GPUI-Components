@@ -37,6 +37,9 @@ pub(crate) fn bind_keys(cx: &mut App) {
     selection::bind_keys(cx);
 }
 
+/// Line height against the text size.
+pub(crate) const LINE: f32 = 1.6;
+
 pub(crate) type OnLink = Rc<dyn Fn(&str, &mut Window, &mut App)>;
 /// Reveals the heading whose source starts at a byte.
 pub(crate) type OnHeading = Rc<dyn Fn(usize, &mut Window, &mut App)>;
@@ -587,7 +590,7 @@ impl RenderOnce for MarkdownRenderer {
             .flex_col()
             .gap_3()
             .text_size(body_size)
-            .line_height(body_size * 1.6)
+            .line_height(body_size * LINE)
             .children(draw.nodes(nodes, cx));
         let Some(selection) = selection else {
             return root.into_any_element();

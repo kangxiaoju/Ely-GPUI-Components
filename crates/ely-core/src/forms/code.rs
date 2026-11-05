@@ -7,7 +7,8 @@ use gpui::{
 
 use super::{
     Highlight, Input, TextInput,
-    syntax::{CommentStart, Syntax},
+    shell::Nesting,
+    syntax::{CommentStart, Syntax, escaped},
 };
 use crate::theme::{ActiveTheme, ControlSize, TextSize};
 
@@ -63,6 +64,8 @@ pub fn lex(source: &str) -> Vec<(Range<usize>, Kind)> {
 /// Splits source as `syntax` reads it.
 pub(crate) fn lex_with(source: &str, syntax: &Syntax) -> Vec<(Range<usize>, Kind)> {
     let mut out = Vec::new();
+    let mut nesting = Nesting::default();
+    let mut shut = None;
     let mut chars = source.char_indices().peekable();
     while let Some((start, ch)) = chars.next() {
         let kind = match ch {
@@ -80,7 +83,9 @@ pub(crate) fn lex_with(source: &str, syntax: &Syntax) -> Vec<(Range<usize>, Kind
                 Kind::Text
             }
             _ if source[start..].starts_with(syntax.comment)
-                && syntax.comment_start.after(&source[..start]) =>
+                && syntax
+                    .comment_start
+                    .after(&source[..start], shut == Some(start)) =>
             {
                 while chars.next_if(|(_, next)| *next != '\n').is_some() {}
                 Kind::Comment
@@ -97,9 +102,25 @@ pub(crate) fn lex_with(source: &str, syntax: &Syntax) -> Vec<(Range<usize>, Kind
                     .next_if(|(_, next)| next.is_alphanumeric() || matches!(next, '_' | '$'))
                     .is_some()
                 {}
+                let end = chars.peek().map_or(source.len(), |(next, _)| *next);
+                nesting.word(source, start..end);
                 Kind::Word
             }
             ch if ch.is_whitespace() => continue,
+            '(' if !escaped(&source[..start]) => {
+                nesting.open(source, start);
+                Kind::Mark
+            }
+            ')' if !escaped(&source[..start]) => {
+                if nesting.close() {
+                    shut = Some(start + 1);
+                }
+                Kind::Mark
+            }
+            ';' if !escaped(&source[..start]) => {
+                nesting.semicolon(source, start);
+                Kind::Mark
+            }
             _ => Kind::Mark,
         };
         let end = chars.peek().map_or(source.len(), |(next, _)| *next);

@@ -227,6 +227,9 @@ mod tests {
                 "echo x;# return 42",
                 "echo x&# return 42",
                 "(echo x)# return 4",
+                "(echo $(a))# return 4",
+                "(case a in a) echo y;; esac)# return 4",
+                "case a in a)# return 42",
                 r"echo x\\;# return 4",
             ] {
                 assert_eq!(
@@ -245,6 +248,17 @@ mod tests {
                 r"echo x\ # return 42",
                 r"echo x\\\;# return 42",
                 r##"echo "a;"# return 42"##,
+                "echo 1 $(echo a)# return 42",
+                "echo 2 $((1+2))# return 42",
+                "cat <(echo 4 p)# return 42",
+                "tee >(cat)# return 42",
+                "echo 5 $(case a in a) echo y;; esac)# return 42",
+                "echo 6 $(case a in (a) echo y;; esac)# return 42",
+                "echo 7 $(case a in a) case b in b) echo z;; esac;; esac)# return 42",
+                "echo 8 $(case a in @(a|b)) echo y;; esac)# return 42",
+                "echo 9 $(if true; then case a in a) echo y;& b) echo w;; esac; fi)# return 42",
+                "echo 10 $(echo case)# return 42",
+                r"echo \(x\)# return 42",
             ] {
                 let shell = color(line, "run.sh", cx);
                 assert!(
