@@ -323,6 +323,10 @@ pub(super) fn reference(text: &str, attribute: bool) -> Option<(String, usize)> 
     let len = body
         .find(|ch: char| !ch.is_ascii_alphanumeric())
         .unwrap_or(body.len());
+    // A literal ampersand needs no entity-table lookup.
+    if len == 0 {
+        return None;
+    }
     let name = &body[..len];
     if (1..=LONGEST).contains(&len)
         && body[len..].starts_with(';')
