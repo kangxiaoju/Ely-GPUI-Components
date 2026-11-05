@@ -4,6 +4,8 @@ What changes for an app built on Ely, newest first. An entry names the crates it
 
 ## Unreleased
 - `ely-core`, `ely-documents`, `ely-git`: merge official upstream `e32d7f2` while retaining Yu's context-menu dismissal, selectable Markdown, spinner pacing, native mail, canvas, tree and theme extensions; dependencies remain on `gpui-pre` 0.3.10.
+- `ely-editor`: typewriter scrolling centers the caret in the full editor viewport, independent of reserved scrollbar padding; horizontal scrolling and end-of-document room remain intact.
+- `ely-documents`: literal ampersand runs skip empty entity-name lookups while preserving HTML decoding rules and linear scanning.
 - `ely-core`: `Spinner::max_fps` optionally bounds decorative redraws while preserving cycle duration, styles, and reduced-motion behavior. Existing spinners keep display-rate updates.
 - `ely-core`: `RadioCard::thumbnail` places a preview above its name, with native selected/focus outlines and the radio mark beside the name. Existing card layouts are unchanged.
 
