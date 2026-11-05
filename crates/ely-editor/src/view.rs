@@ -331,8 +331,12 @@ impl Render for CodeEditor {
         // Typewriter: the caret's row centers as it moves.
         let centered = (self.primary_row(), self.metrics.height, line);
         if self.options.typewriter && self.centered != Some(centered) {
-            self.scroll
-                .scroll_to_item_strict(centered.0, ScrollStrategy::Center);
+            // List padding reserves scrollbar room, not part of the centering viewport.
+            let mut scroll = self.scroll.0.borrow_mut();
+            scroll.deferred_scroll_to_item = None;
+            let mut offset = scroll.base_handle.offset();
+            offset.y = self.metrics.height / 2.0 - line * (centered.0 as f32 + 0.5);
+            scroll.base_handle.set_offset(offset);
             self.centered = Some(centered);
         }
         let sticky = if self.options.sticky {
