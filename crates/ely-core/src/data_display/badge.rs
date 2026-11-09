@@ -2,12 +2,12 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, ElementId, FontWeight, Hsla, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    ParentElement, RenderOnce, Role, SharedString, StatefulInteractiveElement, Styled, Window, div,
     prelude::*,
 };
 
 use crate::{
-    primitives::{Icon, IconName, Severity},
+    primitives::{FocusRing, Icon, IconName, Severity},
     theme::{ActiveTheme, ControlSize, IconSize, Palette, Radius, TextSize},
     typography::{AnimatedNumber, Ellipsis},
 };
@@ -291,7 +291,7 @@ impl RenderOnce for DotBadge {
     }
 }
 
-type OnRemove = Rc<dyn Fn(&mut Window, &mut App)>;
+type OnPress = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// A short label for a kind, a topic or a filter: an optional icon, the label, and an x when it can be removed. It is never wider than its container; a long label ends in an ellipsis.
 ///
@@ -302,6 +302,12 @@ type OnRemove = Rc<dyn Fn(&mut Window, &mut App)>;
 /// };
 ///
 /// let label = Tag::new("bug", "Bug").icon(IconName::Bug).tone(Tone::Danger);
+/// let chip = Tag::new("work", "Work").hue(2).outlined();
+/// let filter = Tag::new("work-filter", "Work")
+///     .hue(2)
+///     .outlined()
+///     .selected(true)
+///     .on_click(|_, _| {});
 /// ```
 #[derive(IntoElement)]
 pub struct Tag {
@@ -309,7 +315,11 @@ pub struct Tag {
     label: SharedString,
     icon: Option<IconName>,
     tone: Tone,
-    on_remove: Option<OnRemove>,
+    hue: Option<usize>,
+    outlined: bool,
+    selected: bool,
+    on_click: Option<OnPress>,
+    on_remove: Option<OnPress>,
 }
 
 impl Tag {
@@ -320,6 +330,10 @@ impl Tag {
             label: label.into(),
             icon: None,
             tone: Tone::Neutral,
+            hue: None,
+            outlined: false,
+            selected: false,
+            on_click: None,
             on_remove: None,
         }
     }
@@ -336,6 +350,30 @@ impl Tag {
         self
     }
 
+    /// Uses the theme's chart hue instead of its tone; the index must be in 0..8.
+    pub fn hue(mut self, hue: usize) -> Self {
+        self.hue = Some(hue);
+        self
+    }
+
+    /// Uses colored text and a border instead of a fill; selection adds a soft wash.
+    pub fn outlined(mut self) -> Self {
+        self.outlined = true;
+        self
+    }
+
+    /// Marks it as chosen with a border and a stronger fill.
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.selected = selected;
+        self
+    }
+
+    /// Makes it a named, focusable button, pressed by click, Enter or Space.
+    pub fn on_click(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_click = Some(Rc::new(handler));
+        self
+    }
+
     /// Adds an x that runs `handler`; the press stays out of focus.
     pub fn on_remove(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_remove = Some(Rc::new(handler));
@@ -347,12 +385,32 @@ impl RenderOnce for Tag {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         let colors = &theme.colors;
-        let (fill, text) = match self.tone {
-            Tone::Neutral => (colors.hover, colors.fg),
-            other => other.colors(colors),
+        let (fill, text) = match self.hue {
+            Some(hue) => {
+                let color = colors.hue(hue, format_args!("tag {:?}", self.id));
+                (color.opacity(0.14), color)
+            }
+            None => match self.tone {
+                Tone::Neutral => (colors.hover, colors.fg),
+                other => other.colors(colors),
+            },
         };
+        let border = self.hue.map_or_else(|| self.tone.dot(colors), |_| text);
+        let fill = if self.outlined {
+            if self.selected {
+                border.opacity(0.14)
+            } else {
+                gpui::transparent_black()
+            }
+        } else if self.selected {
+            self.hue.map_or(fill, |_| text.opacity(0.24))
+        } else {
+            fill
+        };
+        let text = if self.outlined { border } else { text };
+        let label = self.label.clone();
         let (remove, named) = (self.id.clone(), self.id.clone());
-        div()
+        let tag = div()
             .debug_selector(move || format!("tag {named}"))
             .flex()
             .flex_none()
@@ -364,6 +422,14 @@ impl RenderOnce for Tag {
             .when(self.on_remove.is_some(), |tag| tag.pr_1())
             .h(theme.control_height(ControlSize::Sm))
             .rounded(theme.radius(Radius::Sm))
+            .when(self.outlined || self.selected || self.on_click.is_some(), |tag| {
+                tag.border_1().border_color(if self.outlined || self.selected {
+                    border
+                } else {
+                    gpui::transparent_black()
+                })
+            })
+            .when(self.selected, |tag| tag.font_weight(FontWeight::MEDIUM))
             .bg(fill)
             .text_size(theme.text_size(TextSize::Sm))
             .text_color(text)
@@ -383,7 +449,10 @@ impl RenderOnce for Tag {
                         .rounded(theme.radius(Radius::Sm))
                         .cursor_pointer()
                         .hover(|style| style.bg(colors.active))
-                        .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
+                        .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                            window.prevent_default();
+                            cx.stop_propagation();
+                        })
                         .on_click(move |_, window, cx| {
                             cx.stop_propagation();
                             remove_it(window, cx)
@@ -394,7 +463,32 @@ impl RenderOnce for Tag {
                                 .color(colors.fg_muted),
                         ),
                 )
-            })
+            });
+        match self.on_click {
+            Some(click) => tag
+                .id(self.id)
+                .role(Role::Button)
+                .aria_label(label)
+                .aria_selected(self.selected)
+                .tab_index(0)
+                .focus_ring(cx)
+                .cursor_pointer()
+                .hover(|style| style.bg(if self.selected { fill } else { colors.hover }))
+                .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
+                .on_click(move |_, window, cx| click(window, cx))
+                .into_any_element(),
+            None => tag.into_any_element(),
+        }
+    }
+}
+
+impl crate::primitives::Selectable for Tag {
+    fn selected(self, selected: bool) -> Self {
+        Tag::selected(self, selected)
+    }
+
+    fn is_selected(&self) -> bool {
+        self.selected
     }
 }
 
