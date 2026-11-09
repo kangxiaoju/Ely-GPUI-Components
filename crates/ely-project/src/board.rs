@@ -150,6 +150,7 @@ pub struct KanbanBoard {
     id: ElementId,
     columns: Vec<KanbanColumn>,
     scroll: Option<ScrollHandle>,
+    fill_height: bool,
     on_move: Option<OnMove>,
     on_open: Option<OnCard>,
 }
@@ -161,6 +162,7 @@ impl KanbanBoard {
             id: id.into(),
             columns: Vec::new(),
             scroll: None,
+            fill_height: false,
             on_move: None,
             on_open: None,
         }
@@ -175,6 +177,13 @@ impl KanbanBoard {
     /// Shares horizontal scrolling with the owner; otherwise the board keeps a keyed handle.
     pub fn track_scroll(mut self, handle: &ScrollHandle) -> Self {
         self.scroll = Some(handle.clone());
+        self
+    }
+
+    /// Fills a height-constrained parent, scrolling each column's cards independently.
+    /// Defaults to false; give the parent a height or `flex_1().min_h_0()` in a sized column.
+    pub fn fill_height(mut self, fill_height: bool) -> Self {
+        self.fill_height = fill_height;
         self
     }
 
@@ -277,6 +286,16 @@ impl RenderOnce for KanbanBoard {
         for (column_ix, column) in self.columns.into_iter().enumerate() {
             let mut flip = Flip::new((id.clone(), format!("column-{}", column.key)));
             let count = column.total.unwrap_or(column.cards.len());
+            let vertical_scroll = self.fill_height.then(|| {
+                window
+                    .use_keyed_state(
+                        (id.clone(), format!("scroll-{}", column.key)),
+                        cx,
+                        |_, _| ScrollHandle::new(),
+                    )
+                    .read(cx)
+                    .clone()
+            });
             let mut shown = 0;
             let slot = held
                 .as_ref()
@@ -379,6 +398,16 @@ impl RenderOnce for KanbanBoard {
                     .pb_2()
                     .child(face)
                     .child(reveal)
+                    .children(vertical_scroll.as_ref().map(|scroll| {
+                        reveal_when_focused(
+                            (id.clone(), format!("vertical-reveal-{key}-{}", column.key)),
+                            scroll,
+                            &handle,
+                            Axis::Vertical,
+                            window,
+                            cx,
+                        )
+                    }))
                     .child(measure(&row_measures, {
                         let key = key.clone();
                         move |measures, bounds| {
@@ -393,6 +422,25 @@ impl RenderOnce for KanbanBoard {
                 flip = flip.row("+slot", placeholder(&measures, held_key, cx));
             }
             let body_key = column.key.clone();
+            let body = div().relative().min_h_16().child(flip).child(measure(
+                &measures,
+                move |measures, bounds| {
+                    measures.bodies.insert(body_key.clone(), bounds) != Some(bounds)
+                },
+            ));
+            let body = match vertical_scroll {
+                Some(scroll) => on_axis(
+                    div()
+                        .id((id.clone(), format!("body-{}", column.key)))
+                        .flex_1()
+                        .min_h_0()
+                        .track_scroll(&scroll)
+                        .overflow_y_scroll(),
+                )
+                .child(body)
+                .into_any_element(),
+                None => body.into_any_element(),
+            };
             columns.push(
                 div()
                     .debug_selector({
@@ -403,6 +451,7 @@ impl RenderOnce for KanbanBoard {
                     .flex_none()
                     .flex()
                     .flex_col()
+                    .when(self.fill_height, |column| column.h_full().min_h_0())
                     .gap_2()
                     .p_2()
                     .rounded(theme.radius(Radius::Lg))
@@ -410,6 +459,7 @@ impl RenderOnce for KanbanBoard {
                     .child(
                         div()
                             .flex()
+                            .when(self.fill_height, |header| header.flex_none())
                             .items_center()
                             .justify_between()
                             .gap_2()
@@ -427,13 +477,14 @@ impl RenderOnce for KanbanBoard {
                                     .child(count.to_string()),
                             ),
                     )
-                    .child(div().relative().min_h_16().child(flip).child(measure(
-                        &measures,
-                        move |measures, bounds| {
-                            measures.bodies.insert(body_key.clone(), bounds) != Some(bounds)
-                        },
-                    )))
-                    .children(column.footer),
+                    .child(body)
+                    .children(column.footer.map(|footer| {
+                        if self.fill_height {
+                            div().flex_none().child(footer).into_any_element()
+                        } else {
+                            footer
+                        }
+                    })),
             );
         }
         let raised = held.as_ref().zip(lifted).map(|(held, content)| {
@@ -462,6 +513,9 @@ impl RenderOnce for KanbanBoard {
         )
         .flex()
         .items_start()
+        .when(self.fill_height, |board| {
+            board.h_full().min_h_0().items_stretch()
+        })
         .gap_3()
         .on_drag_move::<CardDrag>(move |event, _, cx| {
             if event.drag(cx).owner != owner {

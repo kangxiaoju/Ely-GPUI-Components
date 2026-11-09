@@ -215,6 +215,7 @@ pub fn ely_project::IssueIdBadge::into_element(self) -> Self::Element
 pub fn ely_project::IssueIdBadge::new(ely_project::IssueId) -> Self
 pub fn ely_project::IssueIdBadge::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_project::KanbanBoard::column(self, ely_project::KanbanColumn) -> Self
+pub fn ely_project::KanbanBoard::fill_height(self, bool) -> Self
 pub fn ely_project::KanbanBoard::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_project::KanbanBoard::into_element(self) -> Self::Element
 pub fn ely_project::KanbanBoard::new(impl core::convert::Into<gpui::window::ElementId>) -> Self
