@@ -1,7 +1,7 @@
 use ely_gpui_component::{
     canvas::{
         Artboard, Corner, Frame, Guide, InfiniteCanvas, MiniMap, Shape, ShapeKind, Viewport,
-        ZoomControls,
+        NodeEmphasis, NodeEmphasisPath, ZoomControls, rounded_rectangle_outline,
     },
     theme::{ActiveTheme, Radius},
 };
@@ -9,11 +9,12 @@ use gpui::{App, IntoElement, ParentElement, Styled, Window, div, px};
 
 use crate::{
     probe::probe,
-    ui::{keep, section, set},
+    ui::{keep, live, section, set},
 };
 
 /// The demo's view, in pixels.
 const VIEW: (f32, f32) = (820.0, 460.0);
+const TITLE: &str = "InfiniteCanvas · CanvasGrid / Guides · Ruler · ArtboardFrame · ZoomControls / ZoomIndicator · MiniMap";
 
 fn boards() -> Vec<Artboard> {
     vec![
@@ -109,6 +110,22 @@ pub fn plane(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
         .skip(1)
         .fold(frames[0], |whole, frame| whole.union(frame));
     let (panned, zoomed, fitted, steered) = (view.clone(), view.clone(), view.clone(), view);
+    let emphasis = keep("canvas-node-emphasis", NodeEmphasis::new, window, cx);
+    let paths = shapes().into_iter().filter(|shape| matches!(shape.key.as_ref(), "hero" | "note"))
+        .filter(|shape| {
+            let (x, y) = now.to_view((shape.frame.x, shape.frame.y));
+            x + shape.frame.w * now.zoom >= 0.0 && y + shape.frame.h * now.zoom >= 0.0
+                && x <= VIEW.0 && y <= VIEW.1
+        })
+        .map(|shape| NodeEmphasisPath {
+            points: rounded_rectangle_outline(&Frame::new(shape.frame.x - 4.0, shape.frame.y - 4.0,
+                shape.frame.w + 8.0, shape.frame.h + 8.0))
+                .into_iter().map(|point| now.to_view(point)).collect(),
+            running: shape.key.as_ref() == "hero",
+            hue: shape.hue,
+        }).collect();
+    let active = live(TITLE, cx);
+    emphasis.update(cx, |layer, cx| layer.set_paths(paths, active, cx));
     let theme = cx.theme();
     let canvas = InfiniteCanvas::new("canvas-plane", now)
         .artboards(boards())
@@ -116,6 +133,7 @@ pub fn plane(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
         .guides([Guide::Vertical(24.0), Guide::Horizontal(212.0)])
         .rulers()
         .on_viewport(move |next, _, cx| set(&panned, next, cx))
+        .layer(emphasis)
         .layer(
             div()
                 .absolute()
@@ -146,7 +164,7 @@ pub fn plane(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
         );
     section(
         "InfiniteCanvas · CanvasGrid / Guides · Ruler · ArtboardFrame · ZoomControls / ZoomIndicator · MiniMap",
-        "An endless plane: a dot grid that thins as it zooms out, rulers in canvas units, guides, and artboards with their names. Drag to pan, scroll to move, and hold Command to zoom about the pointer. The zoom steps in fixed stops, and the minimap moves the view to a press.",
+        "An endless plane: drag to pan, scroll to move, and hold Command to zoom about the pointer. NodeEmphasis adds a moving theme-hue outline to Hero and a static outline to the note; view-space paths track pan/zoom and omit offscreen nodes. Reduced motion holds both still without changing the scene.",
         cx,
     )
     .child(probe(
