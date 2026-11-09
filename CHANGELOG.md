@@ -4,6 +4,7 @@ What changes for an app built on Ely, newest first. An entry names the crates it
 
 ## Unreleased
 - `ely-project`: `KanbanBoard::fill_height(true)` fills a height-constrained parent, including empty columns, with independently scrolling cards and fixed headers and footers. Focused cards reveal vertically, and drag landing measures follow the scrolled content; the default content-height layout is unchanged.
+- `ely-project`: `KanbanColumn::on_load_more` requests a bounded next page when loaded cards leave spare viewport height in full-height mode. Requests are deferred and deduplicated by measured content/viewport heights and loaded count; omit the callback while pending or exhausted, then reattach when ready.
 - `ely-core`: `Tag::hue`, `outlined`, `selected` and `on_click` support theme-colored label chips and keyboard-accessible filter buttons with Ely focus rings; removing a tag does not activate its filter.
 - `ely-core`: `TextInput::clear_sensitive` zeroizes owned text and composition/undo/redo snapshots and resets selection/layout. Masked fields retain sensitive-drop handling after reveal; OS, renderer and caller copies are outside this guarantee.
 - `ely-core`, `ely-documents`, `ely-git`: merge official upstream `e32d7f2` while retaining Yu's context-menu dismissal, selectable Markdown, spinner pacing, native mail, canvas, tree and theme extensions; dependencies remain on `gpui-pre` 0.3.10.
