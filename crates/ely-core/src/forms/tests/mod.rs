@@ -7,6 +7,7 @@ mod other;
 mod path;
 mod popup;
 mod stale;
+mod sensitive;
 mod structure;
 mod tags;
 mod upload;

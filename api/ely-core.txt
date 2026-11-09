@@ -3627,6 +3627,7 @@ pub fn ely_core::forms::TextInput::bounds_for_range(&mut self, core::ops::range:
 pub fn ely_core::forms::TextInput::bounds_for_range(&self, core::ops::range::Range<usize>) -> alloc::vec::Vec<gpui::geometry::Bounds<gpui::geometry::Pixels>>
 pub fn ely_core::forms::TextInput::caret_bounds(&self) -> core::option::Option<gpui::geometry::Bounds<gpui::geometry::Pixels>>
 pub fn ely_core::forms::TextInput::character_index_for_point(&mut self, gpui::geometry::Point<gpui::geometry::Pixels>, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> core::option::Option<usize>
+pub fn ely_core::forms::TextInput::clear_sensitive(&mut self, &mut gpui::app::context::Context<'_, Self>)
 pub fn ely_core::forms::TextInput::cursor(&self) -> usize
 pub fn ely_core::forms::TextInput::filter(self, impl core::ops::function::Fn(char) -> bool + 'static) -> Self
 pub fn ely_core::forms::TextInput::focus_handle(&self, &gpui::app::App) -> gpui::window::FocusHandle

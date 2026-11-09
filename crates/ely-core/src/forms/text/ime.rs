@@ -108,7 +108,7 @@ impl EntityInputHandler for TextInput {
             self.composing = Some(self.snapshot());
         }
         self.edits += 1;
-        self.text.replace_range(range.clone(), text);
+        self.replace_owned_range(range.clone(), text);
         self.marked = (!text.is_empty()).then(|| range.start..range.start + text.len());
         if self.marked.is_none() {
             self.composing = None;
