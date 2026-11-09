@@ -516,6 +516,7 @@ impl core::marker::StructuralPartialEq for ely_core::theme::TextSize
 impl core::marker::StructuralPartialEq for ely_core::theme::ToolingSizes
 impl core::marker::StructuralPartialEq for ely_core::typography::format::DurationStyle
 impl core::marker::StructuralPartialEq for ely_core::typography::format::Separators
+impl core::ops::drop::Drop for ely_core::forms::TextInput
 impl ely_core::Assets
 impl ely_core::buttons::ActionBar
 impl ely_core::buttons::ActionSheet
@@ -3629,6 +3630,7 @@ pub fn ely_core::forms::TextInput::caret_bounds(&self) -> core::option::Option<g
 pub fn ely_core::forms::TextInput::character_index_for_point(&mut self, gpui::geometry::Point<gpui::geometry::Pixels>, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> core::option::Option<usize>
 pub fn ely_core::forms::TextInput::clear_sensitive(&mut self, &mut gpui::app::context::Context<'_, Self>)
 pub fn ely_core::forms::TextInput::cursor(&self) -> usize
+pub fn ely_core::forms::TextInput::drop(&mut self)
 pub fn ely_core::forms::TextInput::filter(self, impl core::ops::function::Fn(char) -> bool + 'static) -> Self
 pub fn ely_core::forms::TextInput::focus_handle(&self, &gpui::app::App) -> gpui::window::FocusHandle
 pub fn ely_core::forms::TextInput::highlighter(self, impl core::ops::function::Fn(&str, &gpui::app::App) -> alloc::vec::Vec<(core::ops::range::Range<usize>, ely_core::forms::Highlight)> + 'static) -> Self
