@@ -27,6 +27,9 @@
 //! fonts and colors; choosing Hand-drawn again preserves an existing roughness.
 //! Eraser strokes accumulate unique unlocked targets and call `ToolLayer::on_delete`
 //! once after release, so owners can confirm one batch without interrupting the drag.
+//! `NodeEmphasis` overlays viewport-visible `NodeEmphasisPath` outlines in view pixels.
+//! Hosts refresh paths on layout/pan/zoom, clip the canvas, and hide the layer explicitly;
+//! only running paths animate, below 30fps, with theme hues and reduced-motion support.
 #![deny(missing_docs)]
 
 use ely_core::{buttons, feedback, forms, i18n, layout, lists, overlays, primitives, shell, theme};
@@ -49,6 +52,7 @@ mod marks;
 mod mindmap;
 mod mindmap_view;
 mod minimap;
+mod node_emphasis;
 mod nodes;
 mod paint;
 mod palette;
@@ -88,6 +92,7 @@ pub use marks::{SelectionBox, SnapIndicator, TransformHandles};
 pub use mindmap::Topic;
 pub use mindmap_view::MindMap;
 pub use minimap::MiniMap;
+pub use node_emphasis::{NodeEmphasis, NodeEmphasisPath};
 pub use nodes::NodeGraph;
 pub use paint::{at, finish, outline};
 pub use palette::{BrushSettings, ToolPalette};
