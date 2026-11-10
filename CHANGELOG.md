@@ -3,7 +3,7 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
-- `ely-devtools`: `JsonViewer::from_tree` and `JsonEditor::prepared` compose host-prepared trees and validation statuses without parsing during render. Both components can `fill` a bounded panel; `JsonEditor::controls` hides built-in formatting actions.
+- `ely-devtools` 0.2.0: `JsonViewer::from_tree` and `JsonEditor::prepared` compose host-prepared trees and validation statuses without parsing during render. Both components can `fill` a bounded panel; `JsonEditor::controls` hides built-in formatting actions. Prepared native elements make these builders UI-thread-only (no longer `Send`/`Sync`), a breaking auto-trait change.
 - `ely-editor`: minimap highlighting samples at most 512 rows and 120 columns per row while retaining whole-document navigation, bounding redraw work on large files.
 - `ely-mail`: `MailList::on_load_more(loading, has_more, handler)` defers one next-page request when its last virtual row is visible, deduplicated per rows version/count without changing selection or scroll. Hosts retain rows during loading and provide explicit retry on failure.
 - `ely-project`: `KanbanBoard::fill_height(true)` fills a height-constrained parent, including empty columns, with independently scrolling cards and fixed headers and footers. Focused cards reveal vertically, and drag landing measures follow the scrolled content; the default content-height layout is unchanged.
