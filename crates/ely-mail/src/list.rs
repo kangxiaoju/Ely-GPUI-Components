@@ -20,6 +20,27 @@ use crate::{
 
 type OnStar = Rc<dyn Fn(&SharedString, bool, &mut Window, &mut App)>;
 type Picker = Rc<dyn Fn(usize, Pick, &mut Window, &mut App)>;
+type OnLoadMore = Rc<dyn Fn(&mut Window, &mut App)>;
+
+#[derive(Default)]
+struct Bottom(Option<(usize, usize)>);
+
+impl Bottom {
+    fn request(
+        &mut self,
+        version: usize,
+        count: usize,
+        end: usize,
+        loading: bool,
+        has_more: bool,
+    ) -> bool {
+        if count == 0 || end < count || loading || !has_more || self.0 == Some((version, count)) {
+            return false;
+        }
+        self.0 = Some((version, count));
+        true
+    }
+}
 
 /// The row the keyboard is on and where a Shift range starts, by index and by key so they follow their rows; the scroll; the owner's last selection and the one the list last sent; the list last checked and its keys.
 #[derive(Default)]
@@ -32,6 +53,7 @@ struct Cursor {
     sent: Option<Vec<SharedString>>,
     checked: usize,
     listed: HashSet<SharedString>,
+    bottom: Bottom,
 }
 
 /// The selection after picking row `at`, a range reaching back to `anchor`; in list order.
@@ -88,6 +110,7 @@ pub struct MailList {
     zone: Option<TimeZone>,
     on_select: Option<OnValues>,
     on_star: Option<OnStar>,
+    load_more: Option<(bool, bool, OnLoadMore)>,
 }
 
 impl MailList {
@@ -100,6 +123,7 @@ impl MailList {
             zone: None,
             on_select: None,
             on_star: None,
+            load_more: None,
         }
     }
 
@@ -121,6 +145,18 @@ impl MailList {
         handler: impl Fn(&[SharedString], &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_select = Some(Rc::new(handler));
+        self
+    }
+
+    /// Requests the next page once per rows version when the last row is visible.
+    /// Keep rows stable while pending; failures should offer an explicit retry.
+    pub fn on_load_more(
+        mut self,
+        loading: bool,
+        has_more: bool,
+        handler: impl Fn(&mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.load_more = Some((loading, has_more, Rc::new(handler)));
         self
     }
 
@@ -229,38 +265,56 @@ impl RenderOnce for MailList {
                 focus.clone(),
                 self.on_star,
             );
-            uniform_list((self.id.clone(), "rows"), count, move |range, _, cx| {
-                range
-                    .map(|ix| {
-                        let mail = mails[ix].clone();
-                        let key = mail.key.clone();
-                        let item = MailItem::new((id.clone(), format!("mail-{key}")), mail)
-                            .zone(zone.clone());
-                        let item = match on_star.clone() {
-                            Some(star) => {
-                                let starred = key.clone();
-                                item.on_star(move |on, window, cx| star(&starred, on, window, cx))
-                            }
-                            None => item,
-                        };
-                        let (pick, focus) = (pick.clone(), focus.clone());
-                        item.item(cx)
-                            .selected(selected.contains(&key))
-                            .place(ix + 1, count)
-                            .current(focused && ix == at)
-                            .on_click(move |event, window, cx| {
-                                let held = event.modifiers();
-                                let how = match (held.shift, held.platform) {
-                                    (true, _) => Pick::Range,
-                                    (false, true) => Pick::Toggle,
-                                    _ => Pick::One,
-                                };
-                                window.focus(&focus, cx);
-                                pick(ix, how, window, cx);
-                            })
-                    })
-                    .collect()
-            })
+            let (bottom, load_more) = (cursor.clone(), self.load_more);
+            uniform_list(
+                (self.id.clone(), "rows"),
+                count,
+                move |range, window, cx| {
+                    if let Some((loading, has_more, handler)) = &load_more {
+                        let request = bottom.update(cx, |cursor, _| {
+                            cursor
+                                .bottom
+                                .request(list, count, range.end, *loading, *has_more)
+                        });
+                        if request {
+                            let handler = handler.clone();
+                            window.defer(cx, move |window, cx| handler(window, cx));
+                        }
+                    }
+                    range
+                        .map(|ix| {
+                            let mail = mails[ix].clone();
+                            let key = mail.key.clone();
+                            let item = MailItem::new((id.clone(), format!("mail-{key}")), mail)
+                                .zone(zone.clone());
+                            let item = match on_star.clone() {
+                                Some(star) => {
+                                    let starred = key.clone();
+                                    item.on_star(move |on, window, cx| {
+                                        star(&starred, on, window, cx)
+                                    })
+                                }
+                                None => item,
+                            };
+                            let (pick, focus) = (pick.clone(), focus.clone());
+                            item.item(cx)
+                                .selected(selected.contains(&key))
+                                .place(ix + 1, count)
+                                .current(focused && ix == at)
+                                .on_click(move |event, window, cx| {
+                                    let held = event.modifiers();
+                                    let how = match (held.shift, held.platform) {
+                                        (true, _) => Pick::Range,
+                                        (false, true) => Pick::Toggle,
+                                        _ => Pick::One,
+                                    };
+                                    window.focus(&focus, cx);
+                                    pick(ix, how, window, cx);
+                                })
+                        })
+                        .collect()
+                },
+            )
             .track_scroll(&scroll)
             .size_full()
         };
@@ -316,6 +370,19 @@ mod tests {
 
     fn set(keys: &[&'static str]) -> HashSet<SharedString> {
         keys.iter().map(|key| SharedString::from(*key)).collect()
+    }
+
+    #[test]
+    fn bottom_requests_once_per_rows_and_never_while_loading_or_exhausted() {
+        let mut guard = Bottom::default();
+        assert!(!guard.request(1, 20, 19, false, true));
+        assert!(!guard.request(1, 20, 20, true, true));
+        assert!(!guard.request(1, 20, 20, false, false));
+        assert!(guard.request(1, 20, 20, false, true));
+        assert!(!guard.request(1, 20, 20, false, true));
+        assert!(guard.request(2, 40, 40, false, true));
+        assert!(!guard.request(3, 0, 0, false, true));
+        assert!(guard.request(3, 40, 40, false, true));
     }
 
     #[test]

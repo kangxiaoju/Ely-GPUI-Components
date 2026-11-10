@@ -3,6 +3,7 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
+- `ely-mail`: `MailList::on_load_more(loading, has_more, handler)` defers one next-page request when its last virtual row is visible, deduplicated per rows version/count without changing selection or scroll. Hosts retain rows during loading and provide explicit retry on failure.
 - `ely-project`: `KanbanBoard::fill_height(true)` fills a height-constrained parent, including empty columns, with independently scrolling cards and fixed headers and footers. Focused cards reveal vertically, and drag landing measures follow the scrolled content; the default content-height layout is unchanged.
 - `ely-project`: `KanbanColumn::on_load_more` requests a bounded next page when loaded cards leave spare viewport height in full-height mode. Requests are deferred and deduplicated by measured content/viewport heights and loaded count; omit the callback while pending or exhausted, then reattach when ready.
 - `ely-canvas`: public `NodeEmphasis` / `NodeEmphasisPath` provide isolated, theme-hue node outlines in view pixels. Running paths move along their geometry below 30fps; hidden/static paths and reduced motion stop the timer. The canvas gallery demonstrates viewport-filtered running and static outlines without changing its retained scene.
