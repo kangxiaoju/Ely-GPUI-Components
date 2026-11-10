@@ -14,11 +14,11 @@ use super::{
     state::{CodeEditor, EditorEvent},
     syntax::{self, Bracket, brackets, folds},
 };
-use ely_core::layout::{Scrollbar, on_axis};
 use crate::{
     i18n,
     theme::{ActiveTheme, TextSize},
 };
+use ely_core::layout::{Scrollbar, on_axis};
 
 /// What one render worked out, for the rows the list builds after it.
 #[derive(Default)]
@@ -42,6 +42,10 @@ const LEADING: f32 = 1.6;
 const STICKY: usize = 3;
 /// Columns the minimap spans, in code characters.
 const MINIMAP: f32 = 12.0;
+// A minimap never needs more detail than its pixels can show. Keep both
+// highlighter work and painted spans bounded even for very large files.
+const MINIMAP_ROWS: usize = 512;
+const MINIMAP_COLUMNS: usize = 120;
 
 impl CodeEditor {
     /// The text the primary selection or its word gives, for highlighting where else it appears.
@@ -143,23 +147,31 @@ impl CodeEditor {
     fn minimap_view(&self, cx: &mut Context<Self>) -> AnyElement {
         let colors = cx.theme().colors.clone();
         let (advance, line) = (self.frame.advance, self.frame.line);
-        let tokens: Vec<Vec<(usize, usize, gpui::Hsla)>> = self
-            .frame
-            .rows
-            .iter()
-            .map(|row| match row {
-                Row::Line(at) => {
-                    let text = self.buffer.line(*at);
-                    self.line_colors(text, cx)
-                        .into_iter()
-                        .filter_map(|(range, style)| {
-                            let start = text[..range.start].chars().count();
-                            let len = text[range].chars().count();
-                            style.color.map(|color| (start, len, color))
-                        })
-                        .collect()
-                }
-                _ => Vec::new(),
+        let total_rows = self.frame.rows.len().max(1);
+        let samples = total_rows.min(MINIMAP_ROWS);
+        let tokens: Vec<(usize, Vec<(usize, usize, gpui::Hsla)>)> = (0..samples)
+            .map(|sample| {
+                let index = sample * (total_rows - 1) / (samples - 1).max(1);
+                let spans = match self.frame.rows.get(index) {
+                    Some(Row::Line(at)) => {
+                        let text = self.buffer.line(*at);
+                        let end = text
+                            .char_indices()
+                            .nth(MINIMAP_COLUMNS)
+                            .map_or(text.len(), |(offset, _)| offset);
+                        let text = &text[..end];
+                        self.line_colors(text, cx)
+                            .into_iter()
+                            .filter_map(|(range, style)| {
+                                let start = text[..range.start].chars().count();
+                                let len = text[range].chars().count();
+                                style.color.map(|color| (start, len, color))
+                            })
+                            .collect()
+                    }
+                    _ => Vec::new(),
+                };
+                (index, spans)
             })
             .collect();
         let scroll = self.scroll.clone();
@@ -172,6 +184,7 @@ impl CodeEditor {
             .flex_none()
             .w(advance * MINIMAP)
             .h_full()
+            .overflow_hidden()
             .border_l_1()
             .border_color(colors.border)
             .cursor_pointer()
@@ -181,7 +194,7 @@ impl CodeEditor {
                         entity.update(cx, |editor, _| editor.frame.minimap = bounds);
                     },
                     move |bounds, _, window, _| {
-                        let rows = tokens.len().max(1) as f32;
+                        let rows = total_rows as f32;
                         let tall = (line * 0.15).min(bounds.size.height / rows);
                         let wide = advance * 0.12;
                         let state = scroll.0.borrow();
@@ -193,13 +206,17 @@ impl CodeEditor {
                             Bounds::new(point(bounds.origin.x, top), extent),
                             shade,
                         ));
-                        for (ix, spans) in tokens.iter().enumerate() {
+                        for (ix, spans) in &tokens {
                             for (start, len, color) in spans {
                                 let origin = point(
                                     bounds.origin.x + wide * (*start + 2) as f32,
-                                    bounds.origin.y + tall * ix as f32,
+                                    bounds.origin.y + tall * *ix as f32,
                                 );
-                                let extent = size(wide * *len as f32, tall * 0.7);
+                                let extent = size(
+                                    wide * *len as f32,
+                                    (tall * total_rows as f32 / samples as f32 * 0.7)
+                                        .max(gpui::px(1.0)),
+                                );
                                 window.paint_quad(fill(
                                     Bounds::new(origin, extent),
                                     color.opacity(0.7),

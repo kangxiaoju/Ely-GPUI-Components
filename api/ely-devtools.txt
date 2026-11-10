@@ -596,10 +596,15 @@ pub fn ely_devtools::IndexManager::into_any_element(self) -> gpui::element::AnyE
 pub fn ely_devtools::IndexManager::into_element(self) -> Self::Element
 pub fn ely_devtools::IndexManager::new(impl core::convert::Into<gpui::window::ElementId>, impl core::iter::traits::collect::IntoIterator<Item = ely_devtools::Index>, impl core::iter::traits::collect::IntoIterator<Item = impl core::convert::Into<gpui_shared_string::SharedString>>, impl core::ops::function::Fn(ely_devtools::Index, &mut gpui::window::Window, &mut gpui::app::App) + 'static, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_devtools::IndexManager::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_devtools::JsonEditor::controls(self, bool) -> Self
+pub fn ely_devtools::JsonEditor::fill(self) -> Self
 pub fn ely_devtools::JsonEditor::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_devtools::JsonEditor::into_element(self) -> Self::Element
 pub fn ely_devtools::JsonEditor::new(impl core::convert::Into<gpui::window::ElementId>, &gpui::app::entity_map::Entity<ely_editor::state::CodeEditor>) -> Self
+pub fn ely_devtools::JsonEditor::prepared(impl core::convert::Into<gpui::window::ElementId>, &gpui::app::entity_map::Entity<ely_editor::state::CodeEditor>, ely_core::feedback::InlineMessage) -> Self
 pub fn ely_devtools::JsonEditor::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_devtools::JsonViewer::fill(self) -> Self
+pub fn ely_devtools::JsonViewer::from_tree(impl core::convert::Into<gpui::window::ElementId>, ely_core::lists::Tree, &gpui::app::entity_map::Entity<ely_core::forms::text::TextInput>) -> Self
 pub fn ely_devtools::JsonViewer::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_devtools::JsonViewer::into_element(self) -> Self::Element
 pub fn ely_devtools::JsonViewer::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>, &gpui::app::entity_map::Entity<ely_core::forms::text::TextInput>) -> Self

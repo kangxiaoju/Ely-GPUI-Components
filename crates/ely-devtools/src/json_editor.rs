@@ -1,4 +1,7 @@
-use gpui::{App, ElementId, Entity, IntoElement, ParentElement, RenderOnce, Styled, Window, div};
+use gpui::{
+    App, ElementId, Entity, IntoElement, ParentElement, RenderOnce, Styled, Window, div,
+    prelude::FluentBuilder,
+};
 
 use super::datum::{Datum, read_json};
 use crate::{
@@ -45,6 +48,9 @@ pub(crate) fn tally(datum: &Datum) -> (usize, usize) {
 pub struct JsonEditor {
     id: ElementId,
     editor: Entity<CodeEditor>,
+    status: Option<InlineMessage>,
+    controls: bool,
+    fill: bool,
 }
 
 impl JsonEditor {
@@ -53,7 +59,43 @@ impl JsonEditor {
         Self {
             id: id.into(),
             editor: editor.clone(),
+            status: None,
+            controls: true,
+            fill: false,
         }
+    }
+
+    /// Uses a caller-prepared status without reading or parsing the editor text.
+    ///
+    /// The owner updates `status` when the document changes and provides any
+    /// formatting actions. Built-in Format and Minify controls are always
+    /// omitted in this mode, even if [`Self::controls`] is set to `true`.
+    pub fn prepared(
+        id: impl Into<ElementId>,
+        editor: &Entity<CodeEditor>,
+        status: InlineMessage,
+    ) -> Self {
+        Self {
+            status: Some(status),
+            ..Self::new(id, editor)
+        }
+    }
+
+    /// Shows or hides the built-in Format and Minify controls.
+    ///
+    /// Defaults to `true` for [`Self::new`]. Prepared editors always omit them.
+    pub fn controls(mut self, controls: bool) -> Self {
+        self.controls = controls;
+        self
+    }
+
+    /// Fills the parent panel, letting the editor use the height above status.
+    ///
+    /// The parent must provide a bounded height. Without this option the editor
+    /// uses the theme's list height.
+    pub fn fill(mut self) -> Self {
+        self.fill = true;
+        self
     }
 }
 
@@ -70,24 +112,35 @@ pub(crate) fn reformat(text: &str, pretty: bool) -> Option<String> {
 
 impl RenderOnce for JsonEditor {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let text = self.editor.read(cx).text().to_string();
-        let read = read_json(&text);
-        let theme = cx.theme();
-        let status = match &read {
-            Ok(datum) => {
-                let (keys, items) = tally(datum);
-                InlineMessage::new(
-                    Severity::Success,
-                    format!("Reads as JSON · {keys} keys · {items} items"),
-                )
+        let prepared = self.status.is_some();
+        let (status, valid) = match self.status {
+            Some(status) => (status, false),
+            None => {
+                let text = self.editor.read(cx).text().to_string();
+                match read_json(&text) {
+                    Ok(datum) => {
+                        let (keys, items) = tally(&datum);
+                        (
+                            InlineMessage::new(
+                                Severity::Success,
+                                format!("Reads as JSON · {keys} keys · {items} items"),
+                            ),
+                            true,
+                        )
+                    }
+                    Err(unread) => (
+                        InlineMessage::new(Severity::Danger, unread.to_string()),
+                        false,
+                    ),
+                }
             }
-            Err(unread) => InlineMessage::new(Severity::Danger, unread.to_string()),
         };
+        let theme = cx.theme();
         let button = |label: &'static str, pretty: bool| {
             let editor = self.editor.clone();
             Button::new((self.id.clone(), label), label)
                 .variant(ButtonVariant::Secondary)
-                .disabled(read.is_err())
+                .disabled(!valid)
                 .on_click(move |_, _, cx| {
                     let text = editor.read(cx).text().to_string();
                     let out = reformat(&text, pretty)
@@ -100,23 +153,28 @@ impl RenderOnce for JsonEditor {
             .flex()
             .flex_col()
             .gap_2()
+            .when(self.fill, |frame| frame.size_full().min_h_0().min_w_0())
+            .when(self.controls && !prepared, |frame| {
+                frame.child(
+                    div()
+                        .flex()
+                        .flex_none()
+                        .gap_2()
+                        .child(button("Format", true))
+                        .child(button("Minify", false)),
+                )
+            })
             .child(
                 div()
-                    .flex()
-                    .gap_2()
-                    .child(button("Format", true))
-                    .child(button("Minify", false)),
-            )
-            .child(
-                div()
-                    .h(theme.list_max_height())
+                    .when(self.fill, |panel| panel.flex_1().min_h_0().min_w_0())
+                    .when(!self.fill, |panel| panel.h(theme.list_max_height()))
                     .rounded(theme.radius(Radius::Lg))
                     .border_1()
                     .border_color(theme.colors.border)
                     .overflow_hidden()
                     .child(self.editor),
             )
-            .child(status)
+            .child(div().flex_none().child(status))
     }
 }
 
