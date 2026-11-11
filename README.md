@@ -12,8 +12,8 @@ Status: early. `TASKS.md` tracks every component, chapter by chapter. To help, s
 ```toml
 [dependencies]
 ely-gpui-component = { git = "https://github.com/ELY-Open-Source/Ely-GPUI-Components" }
-gpui = { package = "gpui-pre", version = "=0.3.10" }
-gpui_platform = { package = "gpui-pre-platform", version = "=0.3.10", features = ["font-kit", "wayland", "x11"] }
+gpui = { package = "gpui-fast", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b", default-features = false }
+gpui_platform = { package = "gpui-fast-platform", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b", default-features = false, features = ["font-kit", "wayland", "x11"] }
 ```
 
 ```rust
@@ -29,6 +29,8 @@ fn main() {
 ```
 
 `init` registers the fonts and the theme. It returns an error if the application's asset source cannot load one of Ely's files.
+
+Ely uses GPUI Fast directly, without GPUI Kit or another component/theme layer. The workspace keeps the Rust dependency names `gpui`, `gpui_platform` and `gpui_web`, backed by the Fast 0.1.14 packages from `https://github.com/kangxiaoju/Ely-GPUI-Components.git` at revision `a0a941b84dbe0986575b11cb3c9025e177976c4b` (the `runtime/gpui-fast-0.1.14` branch). Applications must use this exact backend source and revision; mixing registry Fast with git Fast produces incompatible GPUI types.
 
 ## Native HTML email composition
 
@@ -58,7 +60,9 @@ The [mail gallery source](crates/ely-gallery/src/pages/mail/write.rs) pairs the 
 
 ## With GPUI Kit
 
-Ely runs beside Longbridge's [GPUI Kit](https://gpui-kit.com) in one window, on the GPUI snapshot Kit 0.8.1 pins. Pass `Assets::before(gpui_kit::assets::Assets)` as the one asset source, call both `init`s, open the window with `gpui_kit::open_window`, and wrap the view in Ely's root `FocusScope`. The [guide](https://elygpui.com/docs/gpui-kit) covers themes, focus and the inspector; `compat/kit` holds a whole app and the tests behind each claim.
+The independent `compat/kit` workspace pins Longbridge's [GPUI Kit](https://gpui-kit.com) to `=0.9.1` and enables its `gpui-fast` feature, whose published dependency targets Fast 0.1.14. Kit is not part of Ely's product dependency graph. Pass `Assets::before(gpui_kit::assets::Assets)` as the one asset source, call both `init`s, open the window with `gpui_kit::open_window`, and wrap the view in Ely's root `FocusScope`. The [guide](https://elygpui.com/docs/gpui-kit) covers themes, focus and the inspector; `compat/kit` holds the independent app and compatibility tests. Migration compatibility is pending the integration owner's checks, not asserted here.
+
+The independent workspace's `[patch.crates-io]` maps all nine Fast packages to the same runtime git revision as Ely. Copy that patch table from `compat/kit/Cargo.toml` into your application's workspace root when using registry Kit beside Ely; dependency manifests cannot impose patches on their consumers. This unifies Fast's source identity, not a `gpui-pre` shim.
 
 ## On Omarchy
 
@@ -74,6 +78,8 @@ ELY_GALLERY_ASSETS=https://example.com/gallery/assets/ scripts/web.sh dist   # f
 ```
 
 In a browser, `?page=buttons&story=icon-button&theme=dark` draws one section alone; `crates/ely-gallery/stories.json` lists them all.
+
+The web gallery uses `gpui-fast-web` 0.1.14 from the same exact runtime git revision, with default features disabled, as does `gpui-fast-platform`. Its explicit `WebPlatform` constructor keeps multithreading disabled and browser font fallback limited to emoji and CJK; Hebrew remains bundled. No shared-memory deployment requirement is introduced.
 
 ## Website
 
@@ -101,6 +107,8 @@ Ely is built by AI coding agents. A person sets each goal and decides what ships
 ## Build notes
 
 - gpui compiles its Metal shaders at runtime here (`runtime_shaders`, on by default in `ely-gpui-component`), so a full Xcode install is not required. `ely-core` alone turns on no gpui backend; the app's own gpui_platform does. gpui_platform needs `font-kit`, or macOS draws no text, and `wayland` and `x11`, or Linux opens no window.
+- Fast's platform defaults are disabled explicitly. Native applications still enable `font-kit`, `wayland` and `x11`; the root workspace supplies all three for the gallery and examples. The core library's optional-platform boundary and `runtime_shaders` behavior are unchanged.
+- Migration verification is owned by the integrating parent: regenerate the workspace lockfile, check the native workspace and gallery, check the wasm gallery, and run the independent Kit compatibility suite. These checks have not been run as part of this source migration.
 - CI runs `scripts/check.sh` and builds the gallery on GitHub-hosted Linux, Windows and macOS. The capture tool shoots pages on all three; only macOS plays the scripted states.
 
 ## License

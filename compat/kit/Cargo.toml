@@ -4,13 +4,25 @@ version = "0.0.0"
 edition = "2024"
 rust-version = "1.98"
 publish = false
-description = "Ely and the newest GPUI Kit in one app and one window."
+description = "Ely and a Fast-compatible GPUI Kit in one app and one window."
 
 [lib]
 path = "src/lib.rs"
 
 [dev-dependencies]
 ely-gpui-component = { path = "../..", features = ["test-support"] }
-gpui-kit = { version = ">=0.8.0", features = ["test-support"] }
+gpui-kit = { version = "=0.9.1", features = ["gpui-fast", "test-support"] }
 
 [workspace]
+
+# Match Ely's runtime source; these are Fast packages, not pre compatibility shims.
+[patch.crates-io]
+gpui-fast = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
+gpui-fast-platform = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
+gpui-fast-web = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
+gpui-fast-macros = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
+gpui-fast-linux = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
+gpui-fast-macos = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
+gpui-fast-windows = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
+gpui-fast-wgpu = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
+gpui-fast-apple = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }

@@ -11,12 +11,9 @@ cargo test --workspace --exclude ely-gallery --doc --all-features --quiet
 cargo test -p ely-gpui-component --all-features --test '*' --quiet
 # The docs as docs.rs builds them: default features, `docsrs` set.
 RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo doc --workspace --exclude ely-gallery --no-deps --quiet
-# Ely beside the newest GPUI Kit: a release that moves Kit's gpui pin fails to resolve here.
+# Ely beside the pinned Fast-compatible GPUI Kit, isolated from the product workspace.
 kit="--manifest-path compat/kit/Cargo.toml"
-newest=$(cargo search gpui-kit --limit 1 --color never | sed -n 's/^gpui-kit = "\([^"]*\)".*/\1/p')
-[ -n "$newest" ] || { echo "crates.io named no gpui-kit release" >&2; exit 1; }
 cargo generate-lockfile $kit
-cargo update $kit -p gpui-kit --precise "$newest"
 cargo fmt $kit --check
 cargo clippy $kit --all-targets --target-dir target/kit -- -D warnings
 cargo test $kit --target-dir target/kit --quiet
