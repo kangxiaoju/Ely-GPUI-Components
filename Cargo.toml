@@ -46,9 +46,9 @@ ely-core = { path = "crates/ely-core", version = "0.2.0", default-features = fal
 anyhow = "1"
 emojis = "0.9"
 futures = "0.3"
-gpui = { package = "gpui-fast", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b", default-features = false }
-gpui_platform = { package = "gpui-fast-platform", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b", default-features = false, features = ["font-kit", "wayland", "x11"] }
-gpui_web = { package = "gpui-fast-web", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b", default-features = false }
+gpui = { package = "gpui-fast", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30", default-features = false }
+gpui_platform = { package = "gpui-fast-platform", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30", default-features = false, features = ["font-kit", "wayland", "x11"] }
+gpui_web = { package = "gpui-fast-web", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30", default-features = false }
 image = { version = "0.25", default-features = false }
 iso_currency = "0.7"
 isocountry = "0.3"

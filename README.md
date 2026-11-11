@@ -11,10 +11,12 @@ Status: early. `TASKS.md` tracks every component, chapter by chapter. To help, s
 
 ```toml
 [dependencies]
-ely-gpui-component = { git = "https://github.com/ELY-Open-Source/Ely-GPUI-Components" }
-gpui = { package = "gpui-fast", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b", default-features = false }
-gpui_platform = { package = "gpui-fast-platform", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b", default-features = false, features = ["font-kit", "wayland", "x11"] }
+ely-gpui-component = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", branch = "feat/gpui-fast-migration" }
+gpui = { package = "gpui-fast", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30", default-features = false }
+gpui_platform = { package = "gpui-fast-platform", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30", default-features = false, features = ["font-kit", "wayland", "x11"] }
 ```
+
+The component migration branch and the runtime branch are distinct. For deployment, replace the component's `branch` with `rev` set to a full component commit from `feat/gpui-fast-migration`; keep the runtime dependencies at the exact revision shown above. Do not substitute the upstream component main branch, which uses a different backend.
 
 ```rust
 use ely_gpui_component::{Assets, theme::{Mode, Theme}};
@@ -30,7 +32,7 @@ fn main() {
 
 `init` registers the fonts and the theme. It returns an error if the application's asset source cannot load one of Ely's files.
 
-Ely uses GPUI Fast directly, without GPUI Kit or another component/theme layer. The workspace keeps the Rust dependency names `gpui`, `gpui_platform` and `gpui_web`, backed by the Fast 0.1.14 packages from `https://github.com/kangxiaoju/Ely-GPUI-Components.git` at revision `a0a941b84dbe0986575b11cb3c9025e177976c4b` (the `runtime/gpui-fast-0.1.14` branch). Applications must use this exact backend source and revision; mixing registry Fast with git Fast produces incompatible GPUI types.
+Ely uses GPUI Fast directly, without GPUI Kit or another component/theme layer. The workspace keeps the Rust dependency names `gpui`, `gpui_platform` and `gpui_web`, backed by the Fast 0.1.14 packages from `https://github.com/kangxiaoju/Ely-GPUI-Components.git` at revision `40427c396cc92b6946940e0e498612a8b680ce30` (the `runtime/gpui-fast-0.1.14` branch). Applications must use this exact backend source and revision; mixing registry Fast with git Fast produces incompatible GPUI types.
 
 ## Native HTML email composition
 

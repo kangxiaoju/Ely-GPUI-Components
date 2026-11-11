@@ -17,12 +17,12 @@ gpui-kit = { version = "=0.9.1", features = ["gpui-fast", "test-support"] }
 
 # Match Ely's runtime source; these are Fast packages, not pre compatibility shims.
 [patch.crates-io]
-gpui-fast = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
-gpui-fast-platform = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
-gpui-fast-web = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
-gpui-fast-macros = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
-gpui-fast-linux = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
-gpui-fast-macos = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
-gpui-fast-windows = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
-gpui-fast-wgpu = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
-gpui-fast-apple = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b" }
+gpui-fast = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30" }
+gpui-fast-platform = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30" }
+gpui-fast-web = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30" }
+gpui-fast-macros = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30" }
+gpui-fast-linux = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30" }
+gpui-fast-macos = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30" }
+gpui-fast-windows = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30" }
+gpui-fast-wgpu = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30" }
+gpui-fast-apple = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30" }

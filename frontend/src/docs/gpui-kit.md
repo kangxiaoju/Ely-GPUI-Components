@@ -7,13 +7,15 @@ Ely uses GPUI Fast directly; GPUI Kit is not a product dependency. The independe
 ```toml
 [dependencies]
 gpui-kit = { version = "=0.9.1", features = ["gpui-fast"] }
-ely-gpui-component = { git = "https://github.com/ELY-Open-Source/Ely-GPUI-Components" }
-gpui = { package = "gpui-fast", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "a0a941b84dbe0986575b11cb3c9025e177976c4b", default-features = false }
+ely-gpui-component = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", branch = "feat/gpui-fast-migration" }
+gpui = { package = "gpui-fast", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30", default-features = false }
 ```
+
+For deployment, replace the component's `branch` with `rev` set to a full component commit from `feat/gpui-fast-migration`. That component commit is separate from the fixed runtime revision below; upstream component main is not a compatible substitute.
 
 With `gpui-fast` enabled, Kit re-exports its Fast API at its root, so this independent app writes `use gpui_kit::*`. Ely does not follow Kit's default GPUI: all participating libraries must resolve the same Fast version and source. If the app also declares `gpui`, `gpui_platform` or `gpui_web`, use the Fast packages and match Ely's pin and source.
 
-The runtime is fixed to `https://github.com/kangxiaoju/Ely-GPUI-Components.git` at revision `a0a941b84dbe0986575b11cb3c9025e177976c4b` on `runtime/gpui-fast-0.1.14`. Registry Kit's Fast dependencies must resolve to that git source too: copy the complete `[patch.crates-io]` table from `compat/kit/Cargo.toml` into your application's workspace root. It maps `gpui-fast`, `gpui-fast-platform`, `gpui-fast-web`, `gpui-fast-macros`, `gpui-fast-linux`, `gpui-fast-macos`, `gpui-fast-windows`, `gpui-fast-wgpu` and `gpui-fast-apple` to that exact git revision. This is a same-package source override, not a pre compatibility shim. Without the root patch, registry Fast and git Fast remain distinct types even at version 0.1.14.
+The runtime is fixed to `https://github.com/kangxiaoju/Ely-GPUI-Components.git` at revision `40427c396cc92b6946940e0e498612a8b680ce30` on `runtime/gpui-fast-0.1.14`. Registry Kit's Fast dependencies must resolve to that git source too: copy the complete `[patch.crates-io]` table from `compat/kit/Cargo.toml` into your application's workspace root. It maps `gpui-fast`, `gpui-fast-platform`, `gpui-fast-web`, `gpui-fast-macros`, `gpui-fast-linux`, `gpui-fast-macos`, `gpui-fast-windows`, `gpui-fast-wgpu` and `gpui-fast-apple` to that exact git revision. This is a same-package source override, not a pre compatibility shim. Without the root patch, registry Fast and git Fast remain distinct types even at version 0.1.14.
 
 The compatibility gate resolves the fixed Kit version in `compat/kit/Cargo.toml`; it does not search for or upgrade to the newest Kit. This isolated integration does not add Kit's components or theme to an Ely-only product.
 

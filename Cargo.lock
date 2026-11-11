@@ -2890,7 +2890,7 @@ dependencies = [
 [[package]]
 name = "gpui-fast"
 version = "0.1.14"
-source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=a0a941b84dbe0986575b11cb3c9025e177976c4b#a0a941b84dbe0986575b11cb3c9025e177976c4b"
+source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=40427c396cc92b6946940e0e498612a8b680ce30#40427c396cc92b6946940e0e498612a8b680ce30"
 dependencies = [
  "accesskit",
  "anyhow",
@@ -2961,7 +2961,7 @@ dependencies = [
 [[package]]
 name = "gpui-fast-apple"
 version = "0.1.14"
-source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=a0a941b84dbe0986575b11cb3c9025e177976c4b#a0a941b84dbe0986575b11cb3c9025e177976c4b"
+source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=40427c396cc92b6946940e0e498612a8b680ce30#40427c396cc92b6946940e0e498612a8b680ce30"
 dependencies = [
  "anyhow",
  "async-task",
@@ -3000,7 +3000,7 @@ dependencies = [
 [[package]]
 name = "gpui-fast-linux"
 version = "0.1.14"
-source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=a0a941b84dbe0986575b11cb3c9025e177976c4b#a0a941b84dbe0986575b11cb3c9025e177976c4b"
+source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=40427c396cc92b6946940e0e498612a8b680ce30#40427c396cc92b6946940e0e498612a8b680ce30"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -3044,7 +3044,7 @@ dependencies = [
 [[package]]
 name = "gpui-fast-macos"
 version = "0.1.14"
-source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=a0a941b84dbe0986575b11cb3c9025e177976c4b#a0a941b84dbe0986575b11cb3c9025e177976c4b"
+source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=40427c396cc92b6946940e0e498612a8b680ce30#40427c396cc92b6946940e0e498612a8b680ce30"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -3084,7 +3084,7 @@ dependencies = [
 [[package]]
 name = "gpui-fast-macros"
 version = "0.1.14"
-source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=a0a941b84dbe0986575b11cb3c9025e177976c4b#a0a941b84dbe0986575b11cb3c9025e177976c4b"
+source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=40427c396cc92b6946940e0e498612a8b680ce30#40427c396cc92b6946940e0e498612a8b680ce30"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -3095,7 +3095,7 @@ dependencies = [
 [[package]]
 name = "gpui-fast-platform"
 version = "0.1.14"
-source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=a0a941b84dbe0986575b11cb3c9025e177976c4b#a0a941b84dbe0986575b11cb3c9025e177976c4b"
+source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=40427c396cc92b6946940e0e498612a8b680ce30#40427c396cc92b6946940e0e498612a8b680ce30"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -3110,7 +3110,7 @@ dependencies = [
 [[package]]
 name = "gpui-fast-web"
 version = "0.1.14"
-source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=a0a941b84dbe0986575b11cb3c9025e177976c4b#a0a941b84dbe0986575b11cb3c9025e177976c4b"
+source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=40427c396cc92b6946940e0e498612a8b680ce30#40427c396cc92b6946940e0e498612a8b680ce30"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -3138,7 +3138,7 @@ dependencies = [
 [[package]]
 name = "gpui-fast-wgpu"
 version = "0.1.14"
-source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=a0a941b84dbe0986575b11cb3c9025e177976c4b#a0a941b84dbe0986575b11cb3c9025e177976c4b"
+source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=40427c396cc92b6946940e0e498612a8b680ce30#40427c396cc92b6946940e0e498612a8b680ce30"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -3164,7 +3164,7 @@ dependencies = [
 [[package]]
 name = "gpui-fast-windows"
 version = "0.1.14"
-source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=a0a941b84dbe0986575b11cb3c9025e177976c4b#a0a941b84dbe0986575b11cb3c9025e177976c4b"
+source = "git+https://github.com/kangxiaoju/Ely-GPUI-Components.git?rev=40427c396cc92b6946940e0e498612a8b680ce30#40427c396cc92b6946940e0e498612a8b680ce30"
 dependencies = [
  "accesskit",
  "accesskit_windows",

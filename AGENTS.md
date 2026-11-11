@@ -7,7 +7,7 @@ This file holds what every change needs. Before working in a crate or folder, re
 ## Stack
 
 - Rust 1.98, edition 2024. A Cargo workspace (`docs/adr/0001-workspace.md`): `ely-core` (chapters 1–14), one crate per later chapter in `crates/ely-<chapter>`, `ely-desktop`, the root `ely-gpui-component` re-exporting all, and `crates/ely-gallery`.
-- gpui, gpui_platform and gpui_web use the Fast 0.1.14 packages directly from `https://github.com/kangxiaoju/Ely-GPUI-Components.git` at revision `a0a941b84dbe0986575b11cb3c9025e177976c4b`, with default features disabled. Native platform features explicitly include `font-kit`, `wayland` and `x11`; web remains single-threaded. Kit is confined to the independent `compat/kit` workspace, pinned to `=0.9.1` with `gpui-fast` enabled and all nine Fast packages patched to that exact git source. `Cargo.lock` holds the resolved build.
+- gpui, gpui_platform and gpui_web use the Fast 0.1.14 packages directly from `https://github.com/kangxiaoju/Ely-GPUI-Components.git` at revision `40427c396cc92b6946940e0e498612a8b680ce30`, with default features disabled. Native platform features explicitly include `font-kit`, `wayland` and `x11`; web remains single-threaded. Kit is confined to the independent `compat/kit` workspace, pinned to `=0.9.1` with `gpui-fast` enabled and all nine Fast packages patched to that exact git source. `Cargo.lock` holds the resolved build.
 - A dependency beyond gpui is named, with its license and why it is there, in the `AGENTS.md` of the crate that brings it. A new one adds its line there and passes `cargo deny`.
 - `ely_core::init` loads assets and fonts and binds core keys; `ely_gpui_component::init` calls it, then binds the editor's, terminal's and documents' keys.
 
