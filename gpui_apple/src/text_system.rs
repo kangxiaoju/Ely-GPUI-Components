@@ -877,7 +877,7 @@ mod tests {
         let fonts = AppleTextSystem::new();
         fonts
             .add_fonts(vec![
-                include_bytes!("../../../assets/fonts/lilex/Lilex-Regular.ttf")
+                include_bytes!("../../test_support/fonts/Lilex-Regular.ttf")
                     .as_slice()
                     .into(),
             ])

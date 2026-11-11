@@ -17,3 +17,5 @@ macOS/Windows limits are recorded by the integrating Yu migration.
 
 Consumers must pin one full git revision for every Fast package. Upstream Fast is
 experimental; a successful compile does not establish editor, IME or platform parity.
+
+The standalone `gpui_web/examples/hello_web` manifest is migrated to the Fast packages and registry support snapshots; running it with `trunk serve` from that directory requires access to its registry/Git dependencies, nightly Rust with `rust-src` and the `wasm32-unknown-unknown` target, Trunk, and a browser supporting shared WebAssembly memory with the configured cross-origin isolation headers.

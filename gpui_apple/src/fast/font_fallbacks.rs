@@ -91,9 +91,9 @@ mod tests {
 
     use crate::AppleTextSystem;
 
-    const LILEX: &[u8] = include_bytes!("../../../../assets/fonts/lilex/Lilex-Regular.ttf");
+    const LILEX: &[u8] = include_bytes!("../../../test_support/fonts/Lilex-Regular.ttf");
     const PLEX: &[u8] =
-        include_bytes!("../../../../assets/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf");
+        include_bytes!("../../../test_support/fonts/IBMPlexSans-Regular.ttf");
 
     /// Lilex draws `TEXT`, a box-drawing line, and IBM Plex Sans does not.
     /// Neither is a font the system has, so a line drawn with Lilex was
