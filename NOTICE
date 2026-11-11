@@ -1,0 +1,12 @@
+GPUI Fast 0.1.14 runtime source
+Copyright 2022-2025 Zed Industries, Inc.
+Copyright 2026 Longbridge.
+
+Derived from longbridge/gpui-fast commit a427a7d9a6072473ad092b1673cd5235f99284cc
+using upstream's release preparation script. Distributed under Apache-2.0.
+
+Modified for Ely integration: application quit observation, animated image error
+handling, accessibility bounds and native view attachment, topmost control hit
+ordering, Windows language selection, save extensions and window teardown.
+Test helper manifests and bundled font fixture paths are adapted for this source
+workspace; font copyright and license notices are in test_support/fonts.

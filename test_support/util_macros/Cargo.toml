@@ -1,0 +1,21 @@
+[package]
+name = "util_macros"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "src/util_macros.rs"
+proc-macro = true
+test = false
+
+[dependencies]
+quote = "1"
+syn = { version = "2", features = ["full", "extra-traits", "clone-impls", "parsing", "printing"] }
+perf = { path = "../perf", default-features = false }
+
+[features]
+perf-enabled = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(perf_enabled)"] }

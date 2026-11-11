@@ -1,0 +1,19 @@
+[package]
+name = "perf"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+test = false
+doctest = false
+
+[dependencies]
+collections = { package = "gpui-pre-collections", version = "=0.3.12" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
+
+[features]
+default = ["cli"]
+cli = ["dep:serde_json"]
