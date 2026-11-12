@@ -176,3 +176,20 @@ fn a_large_minified_file_uses_lightweight_rendering(cx: &mut TestAppContext) {
     let (editor, _) = editor(&text, cx);
     assert!(editor.read_with(cx, |editor, _| editor.lightweight()));
 }
+
+#[gpui::test]
+fn a_large_source_file_keeps_syntax_colors(cx: &mut TestAppContext) {
+    // A source file over the lightweight threshold must still color each line;
+    // only whole-buffer decoration scans (folds, brackets) are skipped.
+    let mut text = String::with_capacity(200 * 1024);
+    for _ in 0..4000 {
+        text.push_str("let x = 1;\n");
+    }
+    text.push_str("fn main() {}\n");
+    let (editor, cx) = editor(&text, cx);
+    editor.update(cx, |editor, cx| {
+        assert!(editor.lightweight(), "test text must exceed the 128 KiB threshold");
+        let styles = editor.styles(4000, cx);
+        assert!(!styles.is_empty(), "large files must keep per-line syntax colors");
+    });
+}
