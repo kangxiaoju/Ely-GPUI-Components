@@ -1,6 +1,8 @@
 //! Simplified Chinese messages.
 
 pub(super) const TABLE: &[(&str, &str)] = &[
+    ("mindmap.expand", "展开分支"),
+    ("mindmap.collapse", "折叠分支"),
     ("palette.command.placeholder", "输入命令"),
     ("palette.command.empty", "没有匹配的命令"),
     ("palette.recent", "最近"),

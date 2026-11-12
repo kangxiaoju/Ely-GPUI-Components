@@ -173,6 +173,7 @@ pub fn flow(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
 struct Thinking {
     root: Topic,
     selected: Option<SharedString>,
+    collapsed: Vec<SharedString>,
     view: Viewport,
     made: usize,
 }
@@ -191,6 +192,7 @@ impl Thinking {
                 .child(topic("budget", "Budget"))
                 .child(topic("team", "Team").child(topic("roles", "Roles"))),
             selected: Some("site".into()),
+            collapsed: vec!["press".into()],
             view: Viewport::fitting(
                 Frame::new(-520.0, -140.0, 1040.0, 280.0),
                 (620.0, 300.0),
@@ -204,11 +206,13 @@ impl Thinking {
 pub fn mind(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
     let state = keep("canvas-mind", Thinking::new, window, cx);
     let now = state.read(cx);
-    let (root, selected, view) = (now.root.clone(), now.selected.clone(), now.view);
-    let [picked, added, removed, renamed, viewed] = [(); 5].map(|_| state.clone());
+    let (root, selected, view, collapsed) = (
+        now.root.clone(), now.selected.clone(), now.view, now.collapsed.clone(),
+    );
+    let [picked, added, removed, renamed, viewed, toggled] = [(); 6].map(|_| state.clone());
     section(
         "MindMap",
-        "Topics branching from a root, half to each side. Website and Press demonstrate search highlights independently of selection. A press selects; arrows walk, Tab adds a child and Enter a sibling, Delete removes one, and F2 or a double press rewrites it. The owner keeps the map.",
+        "Topics branching from a root, half to each side. Website and Press demonstrate search highlights independently of selection. Chevrons fold branches without selecting or editing; Press starts folded. A press selects; arrows walk visible topics, Tab adds a child and Enter a sibling, Delete removes one, and F2 or a double press rewrites it. The owner keeps the full map and collapsed keys.",
         cx,
     )
     .child(boxed(
@@ -217,6 +221,16 @@ pub fn mind(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
         MindMap::new("canvas-mind-map", root, view)
             .selected(selected)
             .highlighted(["site", "press"])
+            .collapsed(collapsed)
+            .on_toggle(move |key, _, cx| {
+                change(&toggled, cx, |mind| {
+                    if mind.collapsed.contains(key) {
+                        mind.collapsed.retain(|collapsed| collapsed != key);
+                    } else {
+                        mind.collapsed.push(key.clone());
+                    }
+                })
+            })
             .on_select(move |key, _, cx| change(&picked, cx, |mind| mind.selected = key.cloned()))
             .on_add(move |parent, _, cx| {
                 change(&added, cx, |mind| {

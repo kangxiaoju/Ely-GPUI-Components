@@ -7,16 +7,17 @@ use gpui::{
 
 use super::{
     gesture::OnPair,
-    mindmap::{Placed, Topic, laid, stepped},
+    mindmap::{Placed, Topic, laid_collapsed, stepped},
     paint::{finish, in_view, wire},
     plane::{InfiniteCanvas, OnViewport},
     view::Viewport,
     writing,
 };
 use crate::{
+    buttons::IconButton,
     forms::Editing,
-    primitives::{FocusNext, tab_stop},
-    theme::{ActiveTheme, Radius, TextSize},
+    primitives::{FocusNext, IconName, tab_stop},
+    theme::{ActiveTheme, ControlSize, Radius, TextSize},
 };
 use ely_core::typography::Ellipsis;
 
@@ -31,6 +32,8 @@ type OnKey = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
 /// let root = Topic::new("plan", "Plan").child(Topic::new("design", "Design")).child(Topic::new("build", "Build"));
 /// let map = MindMap::new("map", root, Viewport::new(-200.0, -150.0, 1.0))
 ///     .highlighted(["design", "build"])
+///     .collapsed(["build"])
+///     .on_toggle(|_key, _, _| {})
 ///     .on_add(|_parent, _, _| {});
 /// ```
 #[derive(IntoElement)]
@@ -40,6 +43,8 @@ pub struct MindMap {
     viewport: Viewport,
     selected: Option<SharedString>,
     highlighted: HashSet<SharedString>,
+    collapsed: HashSet<SharedString>,
+    on_toggle: Option<OnKey>,
     on_select: Option<OnTopic>,
     on_add: Option<OnKey>,
     on_remove: Option<OnKey>,
@@ -58,6 +63,8 @@ impl MindMap {
             viewport,
             selected: None,
             highlighted: HashSet::new(),
+            collapsed: HashSet::new(),
+            on_toggle: None,
             on_select: None,
             on_add: None,
             on_remove: None,
@@ -77,6 +84,21 @@ impl MindMap {
     /// Accents matching topic keys independently of selection; unknown keys are ignored.
     pub fn highlighted(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
         self.highlighted = keys.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Keeps these topics visible but hides their descendants; unknown keys are ignored.
+    pub fn collapsed(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
+        self.collapsed = keys.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Asks the owner to toggle a branch, independently of selection, activation and editing.
+    pub fn on_toggle(
+        mut self,
+        handler: impl Fn(&SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_toggle = Some(Rc::new(handler));
         self
     }
 
@@ -125,7 +147,7 @@ impl MindMap {
         self
     }
 
-    /// Disables adding, removing and renaming while keeping selection, activation and viewport gestures.
+    /// Disables adding, removing and renaming while keeping selection, activation, folding and viewport gestures.
     pub fn read_only(mut self, read_only: bool) -> Self {
         self.read_only = read_only;
         self
@@ -155,13 +177,13 @@ impl RenderOnce for MindMap {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let id = self.id;
         let view = self.viewport;
-        let placed = Rc::new(laid(&self.root));
+        let placed = Rc::new(laid_collapsed(&self.root, &self.collapsed));
         let focus = tab_stop((id.clone(), "focus").into(), true, window, cx);
         let editing =
             window.use_keyed_state((id.clone(), "editing"), cx, |_, _| Editing::default());
         let selected = self.selected.clone().filter(|key| {
             let placed = placed.iter().any(|topic| topic.key == *key);
-            if !placed {
+            if !placed && self.root.key != *key && self.root.parent_of(key).is_none() {
                 log::error!("mind map {id:?}: no topic {key}; none selected");
             }
             placed
@@ -213,6 +235,9 @@ impl RenderOnce for MindMap {
                 let chosen = selected.as_ref() == Some(&topic.key);
                 let highlighted = self.highlighted.contains(&topic.key);
                 let root = topic.parent.is_none();
+                let folded = self.collapsed.contains(&topic.key);
+                let toggle = self.on_toggle.clone();
+                let toggle_key = topic.key.clone();
                 let (key, pick, write, hold, activate) = (
                     topic.key.clone(),
                     on_select.clone(),
@@ -225,6 +250,7 @@ impl RenderOnce for MindMap {
                     .role(Role::TreeItem)
                     .aria_label(topic.text.clone())
                     .aria_selected(chosen)
+                    .when(topic.has_children, |topic| topic.aria_expanded(!folded))
                     .when(chosen, |topic| topic.aria_active_descendant())
                     .absolute()
                     .left(Pixels::from(frame.x))
@@ -270,6 +296,32 @@ impl RenderOnce for MindMap {
                         }
                     })
                     .child(Ellipsis::new(topic.text.clone()))
+                    .when(topic.has_children, |topic| {
+                        topic.child(
+                            crate::lists::row_action(
+                                IconButton::new(
+                                    (id.clone(), format!("toggle-{}", toggle_key)),
+                                    if folded { IconName::ChevronRight } else { IconName::ChevronDown },
+                                )
+                                .size(ControlSize::Sm)
+                                .tooltip(crate::i18n::text(
+                                    cx,
+                                    if folded { "mindmap.expand" } else { "mindmap.collapse" },
+                                    &[],
+                                ))
+                                .disabled(toggle.is_none())
+                                .on_click(move |_, window, cx| {
+                                    cx.stop_propagation();
+                                    if let Some(toggle) = &toggle {
+                                        toggle(&toggle_key, window, cx);
+                                    }
+                                }),
+                            )
+                            .absolute()
+                            .left(Pixels::from(frame.w))
+                            .top_0(),
+                        )
+                    })
                     .into_any_element()
             })
             .collect();

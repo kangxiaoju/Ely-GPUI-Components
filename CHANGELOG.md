@@ -3,6 +3,7 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
+- `ely-canvas`: `MindMap::collapsed` and `on_toggle` provide owner-controlled folded branches over the full topic tree. Localized chevron buttons fold without selecting, activating or editing, including read-only maps; layout, connectors and keyboard navigation include only visible topics. Folding preserves the viewport, independent search highlights and controlled selection for later expansion. The gallery demonstrates folding.
 - `ely-charts`, `ely-canvas`: `NetworkGraph::highlighted` and `MindMap::highlighted` accent multiple matching node indices or topic keys without changing layout, hover, activation or viewport; mind-map selection remains independently outlined. Empty matches restore normal styling and unknown matches are ignored.
 - `ely-charts`: `NetworkGraph::on_activate` reports a node's index and name after a non-drag press or keyboard activation; arrow keys walk the focused graph's nodes. Without a callback, graphs retain drag and hover without activation overlays or Tab stops.
 - `ely-canvas`: `MindMap::on_activate` reports Enter or a double press on a topic; `read_only` disables editing commands while retaining selection, activation and viewport gestures.

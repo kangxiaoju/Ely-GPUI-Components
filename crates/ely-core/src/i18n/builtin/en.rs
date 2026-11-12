@@ -1,6 +1,8 @@
 //! English messages; en-US and en-GB read them.
 
 pub(super) const TABLE: &[(&str, &str)] = &[
+    ("mindmap.expand", "Expand branch"),
+    ("mindmap.collapse", "Collapse branch"),
     ("palette.command.placeholder", "Type a command"),
     ("palette.command.empty", "No matching commands"),
     ("palette.recent", "Recent"),
