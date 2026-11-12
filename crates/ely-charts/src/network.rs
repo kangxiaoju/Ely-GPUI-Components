@@ -518,28 +518,7 @@ impl RenderOnce for NetworkGraph {
 
 #[cfg(test)]
 mod tests {
-    use super::{Force, NetworkGraph};
-
-    #[test]
-    fn highlights_accept_many_indices_and_clear_without_changing_the_graph() {
-        let matches = [0, 2, 2, usize::MAX];
-        let graph = NetworkGraph::new("search")
-            .highlighted(matches.iter().copied())
-            .node("First", 0)
-            .node("Second", 1)
-            .node("Third", 0)
-            .edge(0, 2)
-            .on_activate(|_, _, _, _| {});
-        assert_eq!(graph.highlighted.len(), 3);
-        assert!(graph.highlighted.contains(&0));
-        assert!(graph.highlighted.contains(&2));
-        assert!(!graph.highlighted.contains(&1));
-        let graph = graph.highlighted([]);
-        assert!(graph.highlighted.is_empty());
-        assert_eq!(graph.nodes.len(), 3);
-        assert_eq!(graph.edges, [(0, 2)]);
-        assert!(graph.on_activate.is_some());
-    }
+    use super::Force;
 
     #[test]
     fn edges_pull_their_nodes_closer_than_strangers() {

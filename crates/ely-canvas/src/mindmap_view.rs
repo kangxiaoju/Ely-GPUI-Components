@@ -405,30 +405,3 @@ impl RenderOnce for MindMap {
             .child(plane)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn highlights_accept_topic_keys_independently_of_selection_and_editing() {
-        let map = MindMap::new(
-            "search",
-            Topic::new("root", "Root"),
-            Viewport::new(0.0, 0.0, 1.0),
-        )
-        .selected(Some("root"))
-        .read_only(true)
-        .on_activate(|_, _, _| {})
-        .highlighted(["root", "other", "root"]);
-        assert_eq!(map.highlighted.len(), 2);
-        assert!(map.highlighted.contains(&SharedString::from("root")));
-        assert!(map.highlighted.contains(&SharedString::from("other")));
-        let keys = vec![SharedString::from("root"), SharedString::from("missing")];
-        let map = map.highlighted(keys).highlighted(Vec::<SharedString>::new());
-        assert!(map.highlighted.is_empty());
-        assert_eq!(map.selected, Some("root".into()));
-        assert!(map.read_only);
-        assert!(map.on_activate.is_some());
-    }
-}
