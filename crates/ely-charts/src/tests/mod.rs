@@ -6,8 +6,8 @@ use std::{
 };
 
 use gpui::{
-    Context, IntoElement, KeyUpEvent, Keystroke, Modifiers, MouseMoveEvent, ParentElement, Render,
-    SharedString, Styled, TestAppContext, VisualTestContext, Window, black, div, point, px,
+    Context, IntoElement, KeyUpEvent, Keystroke, Modifiers, MouseButton, MouseMoveEvent, ParentElement,
+    Render, SharedString, Styled, TestAppContext, VisualTestContext, Window, black, div, point, px,
 };
 use jiff::civil::date;
 
@@ -215,19 +215,24 @@ fn tab_reaches_a_legend_entry_and_enter_toggles_it(cx: &mut TestAppContext) {
 }
 
 /// A graph that records pointer and keyboard activations.
-struct Activated(Rc<RefCell<Vec<(usize, SharedString)>>>);
+struct Activated {
+    heard: Rc<RefCell<Vec<(usize, SharedString)>>>,
+    enabled: bool,
+}
 
 impl Render for Activated {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let heard = self.0.clone();
-        div().w(px(400.0)).h(px(TALL)).child(
-            NetworkGraph::new("network")
-                .node("Project", 0)
-                .node("Document", 1)
-                .edge(0, 1)
-                .on_activate(move |ix, name, _, _| heard.borrow_mut().push((ix, name.clone())))
-                .h_full(),
-        )
+        let heard = self.heard.clone();
+        let mut graph = NetworkGraph::new("network")
+            .node("Project", 0)
+            .node("Document", 1)
+            .edge(0, 1);
+        if self.enabled {
+            graph = graph.on_activate(move |ix, name, _, _| {
+                heard.borrow_mut().push((ix, name.clone()));
+            });
+        }
+        div().w(px(400.0)).h(px(TALL)).child(graph.h_full())
     }
 }
 
@@ -238,7 +243,10 @@ fn a_graph_activates_a_node_by_pointer_and_keyboard(cx: &mut TestAppContext) {
         Theme::update(cx, |theme| theme.reduced_motion = true);
     });
     let heard = Rc::new(RefCell::new(Vec::new()));
-    let (_, cx) = cx.add_window_view(|_, _| Activated(heard.clone()));
+    let (_, cx) = cx.add_window_view(|_, _| Activated {
+        heard: heard.clone(),
+        enabled: true,
+    });
     cx.update(|window, _| window.activate_window());
     settle(cx);
     let bounds = cx.debug_bounds("network-node-0").expect("the first node");
@@ -255,6 +263,63 @@ fn a_graph_activates_a_node_by_pointer_and_keyboard(cx: &mut TestAppContext) {
         *heard.borrow(),
         [(0, "Project".into()), (0, "Project".into())]
     );
+}
+
+#[gpui::test]
+fn a_graph_without_activation_has_no_button_overlays_or_tab_stops_but_still_drags(
+    cx: &mut TestAppContext,
+) {
+    cx.update(|cx| {
+        Theme::init(cx);
+        Theme::update(cx, |theme| theme.reduced_motion = true);
+    });
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let (view, cx) = cx.add_window_view(|_, _| Activated {
+        heard: heard.clone(),
+        enabled: true,
+    });
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    let start = cx
+        .debug_bounds("network-node-0")
+        .expect("an activation target")
+        .center();
+    view.update(cx, |view, cx| {
+        view.enabled = false;
+        cx.notify();
+    });
+    settle(cx);
+    assert!(cx.debug_bounds("network-node-0").is_none());
+    assert!(cx.debug_bounds("network-node-1").is_none());
+    cx.update(|window, cx| {
+        window.blur(cx);
+        window.focus_next(cx);
+        assert!(
+            window.focused(cx).is_none(),
+            "no activation means no Tab stop"
+        );
+    });
+    let target = point(px(200.0), px(100.0));
+    cx.simulate_mouse_move(start, None, Modifiers::none());
+    cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    cx.simulate_mouse_move(target, Some(MouseButton::Left), Modifiers::none());
+    cx.simulate_mouse_up(target, MouseButton::Left, Modifiers::none());
+    settle(cx);
+    assert!(heard.borrow().is_empty());
+    view.update(cx, |view, cx| {
+        view.enabled = true;
+        cx.notify();
+    });
+    settle(cx);
+    let moved = cx
+        .debug_bounds("network-node-0")
+        .expect("activation restored")
+        .center();
+    assert!((moved.x - target.x).abs() < px(1.0));
+    assert!((moved.y - target.y).abs() < px(1.0));
+    cx.simulate_click(moved, Modifiers::none());
+    settle(cx);
+    assert_eq!(*heard.borrow(), [(0, "Project".into())]);
 }
 
 #[gpui::test]

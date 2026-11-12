@@ -278,6 +278,7 @@ impl RenderOnce for NetworkGraph {
             .iter()
             .zip(&self.nodes)
             .enumerate()
+            .filter(|_| self.on_activate.is_some())
             .map(|(ix, (place, (name, _)))| {
                 let (x, y) = spot(*place);
                 let hitbox = radii[ix] + dot;
@@ -351,10 +352,10 @@ impl RenderOnce for NetworkGraph {
             graph.clone(),
             graph.clone(),
         );
-        let focus = window.use_keyed_state((self.id.clone(), "focus"), cx, |_, cx| {
-            cx.focus_handle().tab_stop(self.on_activate.is_some())
-        });
-        let focused = focus.read(cx).is_focused(window);
+        let focus = window.use_keyed_state((self.id.clone(), "focus"), cx, |_, cx| cx.focus_handle());
+        let activatable = self.on_activate.is_some();
+        let focus = focus.read(cx).clone().tab_stop(activatable);
+        let focused = activatable && focus.is_focused(window);
         let keyboard_hover = (hover.is_none() && focused && !self.nodes.is_empty()).then_some(0);
         let hover = hover.or(keyboard_hover);
         let keyboard = (self.on_activate.clone(), graph.clone());
@@ -365,7 +366,7 @@ impl RenderOnce for NetworkGraph {
             .h(sizes.height);
         root.style().refine(self.base.style());
         root.id((self.id.clone(), "network"))
-            .track_focus(&focus.read(cx).clone())
+            .when(activatable, |graph| graph.track_focus(&focus))
             .when(focused, |graph| graph.aria_active_descendant())
             .on_key_down(move |event, window, cx| {
                 let Some(activate) = &keyboard.0 else {
