@@ -1,10 +1,10 @@
-use std::{collections::HashSet, f32::consts::TAU};
+use std::{collections::HashSet, f32::consts::TAU, rc::Rc};
 
 use gpui::{
     App, Bounds, Div, ElementId, Entity, HoverListenerMode, InteractiveElement, IntoElement,
     MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, PathBuilder, Pixels,
-    Refineable, RenderOnce, SharedString, StatefulInteractiveElement, StyleRefinement, Styled,
-    Window, canvas, div, prelude::*,
+    Refineable, RenderOnce, Role, SharedString, Stateful, StatefulInteractiveElement,
+    StyleRefinement, Styled, Window, canvas, div, prelude::*, transparent_black,
 };
 
 use super::{
@@ -12,7 +12,12 @@ use super::{
     paint::{at, finish, measure, ring, tint},
     parts::ChartTooltip,
 };
-use crate::theme::{ActiveTheme, TextSize};
+use crate::{
+    primitives::FocusRing,
+    theme::{ActiveTheme, TextSize},
+};
+
+type OnNode = Rc<dyn Fn(usize, &SharedString, &mut Window, &mut App)>;
 
 /// Places for a graph's nodes in a unit square, pushed apart by every other node and pulled along their edges (Fruchterman and Reingold), cooling a step at a time.
 #[derive(Clone, Debug, PartialEq)]
@@ -120,6 +125,7 @@ pub struct NetworkGraph {
     id: ElementId,
     nodes: Vec<(SharedString, usize)>,
     edges: Vec<(usize, usize)>,
+    on_activate: Option<OnNode>,
 }
 
 impl NetworkGraph {
@@ -130,6 +136,7 @@ impl NetworkGraph {
             id: id.into(),
             nodes: Vec::new(),
             edges: Vec::new(),
+            on_activate: None,
         }
     }
 
@@ -149,6 +156,15 @@ impl NetworkGraph {
             return self;
         }
         self.edges.push((a, b));
+        self
+    }
+
+    /// Enter or Space on a focused node, or a press that did not drag it.
+    pub fn on_activate(
+        mut self,
+        handler: impl Fn(usize, &SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_activate = Some(Rc::new(handler));
         self
     }
 }
@@ -230,6 +246,7 @@ impl RenderOnce for NetworkGraph {
                 .collect()
         });
         let lit = move |ix: usize| hover.is_none() || near.contains(&ix);
+        let names: Vec<SharedString> = self.nodes.iter().map(|(name, _)| name.clone()).collect();
         let labels: Vec<Div> = self
             .nodes
             .iter()
@@ -255,6 +272,39 @@ impl RenderOnce for NetworkGraph {
                     .pl_1()
                     .when(!lit(ix), |label| label.opacity(0.35))
                     .child(label.child(name.clone()))
+            })
+            .collect();
+        let nodes: Vec<Stateful<Div>> = places
+            .iter()
+            .zip(&self.nodes)
+            .enumerate()
+            .map(|(ix, (place, (name, _)))| {
+                let (x, y) = spot(*place);
+                let hitbox = radii[ix] + dot;
+                let activate = self.on_activate.clone();
+                let name = name.clone();
+                div()
+                    .id((self.id.clone(), format!("node-{ix}")))
+                    .debug_selector(move || format!("network-node-{ix}"))
+                    .role(Role::Button)
+                    .aria_label(name.clone())
+                    .absolute()
+                    .left(Pixels::from(x - hitbox))
+                    .top(Pixels::from(y - hitbox))
+                    .w(Pixels::from(hitbox * 2.0))
+                    .h(Pixels::from(hitbox * 2.0))
+                    .rounded_full()
+                    .border_1()
+                    .border_color(transparent_black())
+                    .tab_index(0)
+                    .focus_ring(cx)
+                    .cursor_pointer()
+                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                        window.prevent_default();
+                    })
+                    .when_some(activate, |node, activate| {
+                        node.on_click(move |_, window, cx| activate(ix, &name, window, cx))
+                    })
             })
             .collect();
         let tooltip = hover.map(|ix| {
@@ -301,6 +351,13 @@ impl RenderOnce for NetworkGraph {
             graph.clone(),
             graph.clone(),
         );
+        let focus = window.use_keyed_state((self.id.clone(), "focus"), cx, |_, cx| {
+            cx.focus_handle().tab_stop(self.on_activate.is_some())
+        });
+        let focused = focus.read(cx).is_focused(window);
+        let keyboard_hover = (hover.is_none() && focused && !self.nodes.is_empty()).then_some(0);
+        let hover = hover.or(keyboard_hover);
+        let keyboard = (self.on_activate.clone(), graph.clone());
         let press_hit = hit.clone();
         let mut root = div()
             .debug_selector(|| "chart-root".into())
@@ -308,22 +365,56 @@ impl RenderOnce for NetworkGraph {
             .h(sizes.height);
         root.style().refine(self.base.style());
         root.id((self.id.clone(), "network"))
-            .on_mouse_down(MouseButton::Left, move |event: &MouseDownEvent, _, cx| {
-                let place = local(event.position, pressed.read(cx).bounds);
-                if let Some(ix) = press_hit(place) {
-                    log::info!("network graph: dragging node {ix}");
-                    pressed.update(cx, |graph, cx| {
-                        graph.drag = Some(ix);
+            .track_focus(&focus.read(cx).clone())
+            .when(focused, |graph| graph.aria_active_descendant())
+            .on_key_down(move |event, window, cx| {
+                let Some(activate) = &keyboard.0 else {
+                    return;
+                };
+                let key = event.keystroke.key.as_str();
+                let current = keyboard
+                    .1
+                    .read(cx)
+                    .hover
+                    .unwrap_or(0)
+                    .min(count.saturating_sub(1));
+                let next = match key {
+                    "right" | "down" => Some((current + 1).min(count.saturating_sub(1))),
+                    "left" | "up" => Some(current.saturating_sub(1)),
+                    _ => None,
+                };
+                if let Some(next) = next {
+                    cx.stop_propagation();
+                    keyboard.1.update(cx, |graph, cx| {
+                        graph.hover = Some(next);
                         cx.notify();
-                    })
+                    });
+                } else if matches!(key, "enter" | "space") && count > 0 {
+                    cx.stop_propagation();
+                    activate(current, &names[current], window, cx);
                 }
             })
+            .on_mouse_down(
+                MouseButton::Left,
+                move |event: &MouseDownEvent, window, cx| {
+                    let place = local(event.position, pressed.read(cx).bounds);
+                    if let Some(ix) = press_hit(place) {
+                        window.prevent_default();
+                        log::info!("network graph: dragging node {ix}");
+                        pressed.update(cx, |graph, cx| {
+                            graph.drag = Some(ix);
+                            cx.notify();
+                        })
+                    }
+                },
+            )
             .on_mouse_move(move |event: &MouseMoveEvent, _, cx| {
                 let place = local(event.position, moved.read(cx).bounds);
                 moved.update(cx, |graph, cx| {
-                    if let (Some(ix), Some(MouseButton::Left)) =
-                        (graph.drag.filter(|ix| *ix < count), event.pressed_button)
-                    {
+                    if let (Some(ix), Some(MouseButton::Left)) = (
+                        graph.drag.filter(|ix| *ix < count),
+                        event.pressed_button,
+                    ) {
                         graph
                             .force
                             .as_mut()
@@ -392,6 +483,7 @@ impl RenderOnce for NetworkGraph {
                 .inset_0(),
             )
             .children(labels)
+            .children(nodes)
             .children(tooltip)
             .child(measure(measured, |graph| &mut graph.bounds))
     }

@@ -653,11 +653,13 @@ pub fn ely_canvas::LinkAnimation::fmt(&self, &mut core::fmt::Formatter<'_>) -> c
 pub fn ely_canvas::MindMap::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_canvas::MindMap::into_element(self) -> Self::Element
 pub fn ely_canvas::MindMap::new(impl core::convert::Into<gpui::window::ElementId>, ely_canvas::Topic, ely_canvas::Viewport) -> Self
+pub fn ely_canvas::MindMap::on_activate(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_canvas::MindMap::on_add(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_canvas::MindMap::on_remove(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_canvas::MindMap::on_rename(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_canvas::MindMap::on_select(self, impl core::ops::function::Fn(core::option::Option<&gpui_shared_string::SharedString>, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_canvas::MindMap::on_viewport(self, impl core::ops::function::Fn(ely_canvas::Viewport, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
+pub fn ely_canvas::MindMap::read_only(self, bool) -> Self
 pub fn ely_canvas::MindMap::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_canvas::MindMap::selected(self, core::option::Option<impl core::convert::Into<gpui_shared_string::SharedString>>) -> Self
 pub fn ely_canvas::MiniMap::into_any_element(self) -> gpui::element::AnyElement

@@ -103,6 +103,35 @@ fn map(_: &Stage, owner: Entity<Stage>) -> AnyElement {
         .into_any_element()
 }
 
+fn read_only_map(_: &Stage, owner: Entity<Stage>) -> AnyElement {
+    let [picked, opened] = [(); 2].map(|_| owner.clone());
+    MindMap::new(
+        "map",
+        Topic::new("root", "Project").child(Topic::new("doc", "Document")),
+        Viewport::new(-60.0, -150.0, 1.0),
+    )
+    .selected(Some("doc"))
+    .read_only(true)
+    .on_select(move |key, _, cx| say(&picked, format!("select {key:?}"), cx))
+    .on_activate(move |key, _, cx| say(&opened, format!("open {key}"), cx))
+    .on_add(|_, _, _| panic!("a read-only map adds nothing"))
+    .on_remove(|_, _, _| panic!("a read-only map removes nothing"))
+    .on_rename(|_, _, _, _| panic!("a read-only map renames nothing"))
+    .into_any_element()
+}
+
+#[gpui::test]
+fn a_read_only_map_activates_topics_without_editing(cx: &mut TestAppContext) {
+    let (host, cx) = stage(read_only_map, cx);
+    cx.update(|window, _| window.activate_window());
+    press(276.0, 126.0, 1, cx);
+    for key in ["enter", "f2", "tab", "enter", "backspace"] {
+        tap(key, cx);
+    }
+    press(276.0, 126.0, 2, cx);
+    assert_eq!(said(&host, cx), ["open doc", "open doc"]);
+}
+
 #[gpui::test]
 fn keys_on_a_mind_map_ask_for_children_siblings_and_removals(cx: &mut TestAppContext) {
     let (host, cx) = stage(map, cx);

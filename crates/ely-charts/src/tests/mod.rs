@@ -214,6 +214,49 @@ fn tab_reaches_a_legend_entry_and_enter_toggles_it(cx: &mut TestAppContext) {
     assert_eq!(*heard.borrow(), ["Held out"]);
 }
 
+/// A graph that records pointer and keyboard activations.
+struct Activated(Rc<RefCell<Vec<(usize, SharedString)>>>);
+
+impl Render for Activated {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let heard = self.0.clone();
+        div().w(px(400.0)).h(px(TALL)).child(
+            NetworkGraph::new("network")
+                .node("Project", 0)
+                .node("Document", 1)
+                .edge(0, 1)
+                .on_activate(move |ix, name, _, _| heard.borrow_mut().push((ix, name.clone())))
+                .h_full(),
+        )
+    }
+}
+
+#[gpui::test]
+fn a_graph_activates_a_node_by_pointer_and_keyboard(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        Theme::init(cx);
+        Theme::update(cx, |theme| theme.reduced_motion = true);
+    });
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let (_, cx) = cx.add_window_view(|_, _| Activated(heard.clone()));
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    let bounds = cx.debug_bounds("network-node-0").expect("the first node");
+    cx.simulate_click(bounds.center(), Modifiers::none());
+    settle(cx);
+    cx.update(|window, cx| {
+        window.focus_next(cx);
+        window.focus_next(cx);
+    });
+    settle(cx);
+    cx.simulate_keystrokes("enter");
+    settle(cx);
+    assert_eq!(
+        *heard.borrow(),
+        [(0, "Project".into()), (0, "Project".into())]
+    );
+}
+
 #[gpui::test]
 fn every_chart_fills_a_column_its_block_measures_by_content(cx: &mut TestAppContext) {
     cx.update(Theme::init);

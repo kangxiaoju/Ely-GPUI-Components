@@ -41,6 +41,8 @@ pub struct MindMap {
     on_add: Option<OnKey>,
     on_remove: Option<OnKey>,
     on_rename: Option<OnPair>,
+    on_activate: Option<OnKey>,
+    read_only: bool,
     on_viewport: Option<OnViewport>,
 }
 
@@ -56,6 +58,8 @@ impl MindMap {
             on_add: None,
             on_remove: None,
             on_rename: None,
+            on_activate: None,
+            read_only: false,
             on_viewport: None,
         }
     }
@@ -99,6 +103,21 @@ impl MindMap {
         handler: impl Fn(&SharedString, &SharedString, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_rename = Some(Rc::new(handler));
+        self
+    }
+
+    /// Enter or a double press on a topic.
+    pub fn on_activate(
+        mut self,
+        handler: impl Fn(&SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_activate = Some(Rc::new(handler));
+        self
+    }
+
+    /// Disables adding, removing and renaming while keeping selection, activation and viewport gestures.
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
         self
     }
 
@@ -162,7 +181,13 @@ impl RenderOnce for MindMap {
             }
         };
         let rename = Rc::new(rename);
-        let (on_select, on_add, on_remove) = (self.on_select, self.on_add, self.on_remove);
+        let (on_select, on_add, on_remove, on_activate) = (
+            self.on_select,
+            self.on_add.filter(|_| !self.read_only),
+            self.on_remove.filter(|_| !self.read_only),
+            self.on_activate,
+        );
+        let can_rename = !self.read_only && self.on_rename.is_some();
         let theme = cx.theme();
         let rem = window.rem_size();
         let text = theme.text_size(TextSize::Sm).to_pixels(rem) * view.zoom;
@@ -177,11 +202,12 @@ impl RenderOnce for MindMap {
                 let frame = in_view(&view, &topic.frame);
                 let chosen = selected.as_ref() == Some(&topic.key);
                 let root = topic.parent.is_none();
-                let (key, pick, write, hold) = (
+                let (key, pick, write, hold, activate) = (
                     topic.key.clone(),
                     on_select.clone(),
                     rename.clone(),
                     focus.clone(),
+                    on_activate.clone(),
                 );
                 div()
                     .id((id.clone(), format!("topic-{}", topic.key)))
@@ -221,7 +247,11 @@ impl RenderOnce for MindMap {
                         }
                         if event.click_count >= 2 {
                             window.prevent_default();
-                            write(&key, window, cx);
+                            if let Some(activate) = &activate {
+                                activate(&key, window, cx);
+                            } else if can_rename {
+                                write(&key, window, cx);
+                            }
                         }
                     })
                     .child(Ellipsis::new(topic.text.clone()))
@@ -259,7 +289,15 @@ impl RenderOnce for MindMap {
         let field = selected
             .as_ref()
             .and_then(|key| placed.iter().find(|topic| topic.key == *key))
-            .and_then(|topic| writing::field(&editing, in_view(&view, &topic.frame), super::ShapeAppearance::default(), view.zoom, cx));
+            .and_then(|topic| {
+                writing::field(
+                    &editing,
+                    in_view(&view, &topic.frame),
+                    super::ShapeAppearance::default(),
+                    view.zoom,
+                    cx,
+                )
+            });
         let layer = div()
             .absolute()
             .inset_0()
@@ -274,6 +312,7 @@ impl RenderOnce for MindMap {
             None => plane,
         };
         let (keys, tabbed, parent_of) = (placed.clone(), selected.clone(), self.root.clone());
+        let activating = on_activate.clone();
         let root_name = parent_of.text.clone();
         let (adding, writing_tab, writing_keys) =
             (on_add.clone(), editing.clone(), editing.clone());
@@ -318,10 +357,14 @@ impl RenderOnce for MindMap {
                     }
                     "enter" => {
                         cx.stop_propagation();
-                        let under = parent_of.parent_of(at).unwrap_or_else(|| at.clone());
-                        log::info!("mind map: a topic under {under}");
-                        if let Some(on_add) = &on_add {
-                            on_add(&under, window, cx);
+                        if let Some(activate) = &activating {
+                            activate(at, window, cx);
+                        } else {
+                            let under = parent_of.parent_of(at).unwrap_or_else(|| at.clone());
+                            log::info!("mind map: a topic under {under}");
+                            if let Some(on_add) = &on_add {
+                                on_add(&under, window, cx);
+                            }
                         }
                     }
                     "backspace" | "delete" if parent_of.key != *at => {
@@ -331,7 +374,7 @@ impl RenderOnce for MindMap {
                             on_remove(at, window, cx);
                         }
                     }
-                    "f2" => {
+                    "f2" if can_rename => {
                         cx.stop_propagation();
                         rename(at, window, cx);
                     }
