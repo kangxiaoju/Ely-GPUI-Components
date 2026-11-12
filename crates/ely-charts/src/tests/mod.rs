@@ -226,7 +226,8 @@ impl Render for Activated {
         let mut graph = NetworkGraph::new("network")
             .node("Project", 0)
             .node("Document", 1)
-            .edge(0, 1);
+            .edge(0, 1)
+            .highlighted([0, 1, usize::MAX]);
         if self.enabled {
             graph = graph.on_activate(move |ix, name, _, _| {
                 heard.borrow_mut().push((ix, name.clone()));

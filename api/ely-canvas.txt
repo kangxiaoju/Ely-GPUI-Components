@@ -650,6 +650,7 @@ pub fn ely_canvas::Link::new(impl core::convert::Into<gpui_shared_string::Shared
 pub fn ely_canvas::LinkAnimation::clone(&self) -> Self
 pub fn ely_canvas::LinkAnimation::eq(&self, &Self) -> bool
 pub fn ely_canvas::LinkAnimation::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_canvas::MindMap::highlighted(self, impl core::iter::traits::collect::IntoIterator<Item = impl core::convert::Into<gpui_shared_string::SharedString>>) -> Self
 pub fn ely_canvas::MindMap::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_canvas::MindMap::into_element(self) -> Self::Element
 pub fn ely_canvas::MindMap::new(impl core::convert::Into<gpui::window::ElementId>, ely_canvas::Topic, ely_canvas::Viewport) -> Self

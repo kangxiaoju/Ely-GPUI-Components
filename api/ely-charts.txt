@@ -243,6 +243,7 @@ pub fn ely_charts::LineChart::style(&mut self) -> &mut gpui::style::StyleRefinem
 pub fn ely_charts::LineChart::svg(&self, f32, f32, &gpui::app::App) -> alloc::string::String
 pub fn ely_charts::LineChart::zoom(self) -> Self
 pub fn ely_charts::NetworkGraph::edge(self, usize, usize) -> Self
+pub fn ely_charts::NetworkGraph::highlighted(self, impl core::iter::traits::collect::IntoIterator<Item = usize>) -> Self
 pub fn ely_charts::NetworkGraph::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_charts::NetworkGraph::into_element(self) -> Self::Element
 pub fn ely_charts::NetworkGraph::new(impl core::convert::Into<gpui::window::ElementId>) -> Self

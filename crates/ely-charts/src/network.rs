@@ -1,4 +1,4 @@
-use std::{collections::HashSet, f32::consts::TAU, rc::Rc};
+use std::{collections::HashSet, f32::consts::TAU, rc::Rc, sync::Arc};
 
 use gpui::{
     App, Bounds, Div, ElementId, Entity, HoverListenerMode, InteractiveElement, IntoElement,
@@ -117,7 +117,8 @@ struct Graph {
 ///     .node("Ben", 0)
 ///     .node("Cy", 1)
 ///     .edge(0, 1)
-///     .edge(1, 2);
+///     .edge(1, 2)
+///     .highlighted([0, 2]);
 /// ```
 #[derive(IntoElement)]
 pub struct NetworkGraph {
@@ -125,6 +126,7 @@ pub struct NetworkGraph {
     id: ElementId,
     nodes: Vec<(SharedString, usize)>,
     edges: Vec<(usize, usize)>,
+    highlighted: Arc<HashSet<usize>>,
     on_activate: Option<OnNode>,
 }
 
@@ -136,6 +138,7 @@ impl NetworkGraph {
             id: id.into(),
             nodes: Vec::new(),
             edges: Vec::new(),
+            highlighted: Arc::default(),
             on_activate: None,
         }
     }
@@ -143,6 +146,12 @@ impl NetworkGraph {
     /// A node, colored by its group.
     pub fn node(mut self, name: impl Into<SharedString>, group: usize) -> Self {
         self.nodes.push((name.into(), group));
+        self
+    }
+
+    /// Accents matching node indices without changing hover, activation or forces; unknown indices are ignored.
+    pub fn highlighted(mut self, nodes: impl IntoIterator<Item = usize>) -> Self {
+        self.highlighted = Arc::new(nodes.into_iter().collect());
         self
     }
 
@@ -257,7 +266,9 @@ impl RenderOnce for NetworkGraph {
                     .flex_none()
                     .whitespace_nowrap()
                     .text_size(theme.text_size(TextSize::Xs))
-                    .text_color(if hover == Some(ix) {
+                    .text_color(if self.highlighted.contains(&ix) {
+                        colors.accent
+                    } else if hover == Some(ix) {
                         colors.fg
                     } else {
                         colors.fg_muted
@@ -270,7 +281,9 @@ impl RenderOnce for NetworkGraph {
                     .flex()
                     .items_center()
                     .pl_1()
-                    .when(!lit(ix), |label| label.opacity(0.35))
+                    .when(!lit(ix) && !self.highlighted.contains(&ix), |label| {
+                        label.opacity(0.35)
+                    })
                     .child(label.child(name.clone()))
             })
             .collect();
@@ -322,6 +335,7 @@ impl RenderOnce for NetworkGraph {
         let (stroke, hairline, palette) =
             (sizes.stroke.to_pixels(rem), sizes.hairline, colors.clone());
         let (points, sized) = (places.clone(), radii.clone());
+        let highlighted = self.highlighted;
         let hit = move |place: (f32, f32)| {
             (0..points.len())
                 .map(|ix| {
@@ -468,12 +482,24 @@ impl RenderOnce for NetworkGraph {
                             finish(line, color, window);
                         }
                         for (ix, place) in places.iter().enumerate() {
-                            let ink = tint(&palette, groups[ix]);
-                            let fill = if lit(ix) { ink } else { ink.opacity(0.3) };
+                            let matched = highlighted.contains(&ix);
+                            let ink = if matched {
+                                palette.accent
+                            } else {
+                                tint(&palette, groups[ix])
+                            };
+                            let fill = if lit(ix) || matched {
+                                ink
+                            } else {
+                                ink.opacity(0.3)
+                            };
                             ring(
                                 at(origin, spot(*place)),
                                 Pixels::from(radii[ix]),
-                                (fill, palette.bg),
+                                (
+                                    fill,
+                                    if matched { palette.accent_hover } else { palette.bg },
+                                ),
                                 stroke / 2.0,
                                 window,
                             );
@@ -492,7 +518,28 @@ impl RenderOnce for NetworkGraph {
 
 #[cfg(test)]
 mod tests {
-    use super::Force;
+    use super::{Force, NetworkGraph};
+
+    #[test]
+    fn highlights_accept_many_indices_and_clear_without_changing_the_graph() {
+        let matches = [0, 2, 2, usize::MAX];
+        let graph = NetworkGraph::new("search")
+            .highlighted(matches.iter().copied())
+            .node("First", 0)
+            .node("Second", 1)
+            .node("Third", 0)
+            .edge(0, 2)
+            .on_activate(|_, _, _, _| {});
+        assert_eq!(graph.highlighted.len(), 3);
+        assert!(graph.highlighted.contains(&0));
+        assert!(graph.highlighted.contains(&2));
+        assert!(!graph.highlighted.contains(&1));
+        let graph = graph.highlighted([]);
+        assert!(graph.highlighted.is_empty());
+        assert_eq!(graph.nodes.len(), 3);
+        assert_eq!(graph.edges, [(0, 2)]);
+        assert!(graph.on_activate.is_some());
+    }
 
     #[test]
     fn edges_pull_their_nodes_closer_than_strangers() {

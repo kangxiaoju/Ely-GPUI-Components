@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{collections::HashSet, rc::Rc};
 
 use gpui::{
     AnyElement, App, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
@@ -29,7 +29,9 @@ type OnKey = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
 /// use ely_canvas::{MindMap, Topic, Viewport};
 ///
 /// let root = Topic::new("plan", "Plan").child(Topic::new("design", "Design")).child(Topic::new("build", "Build"));
-/// let map = MindMap::new("map", root, Viewport::new(-200.0, -150.0, 1.0)).on_add(|_parent, _, _| {});
+/// let map = MindMap::new("map", root, Viewport::new(-200.0, -150.0, 1.0))
+///     .highlighted(["design", "build"])
+///     .on_add(|_parent, _, _| {});
 /// ```
 #[derive(IntoElement)]
 pub struct MindMap {
@@ -37,6 +39,7 @@ pub struct MindMap {
     root: Topic,
     viewport: Viewport,
     selected: Option<SharedString>,
+    highlighted: HashSet<SharedString>,
     on_select: Option<OnTopic>,
     on_add: Option<OnKey>,
     on_remove: Option<OnKey>,
@@ -54,6 +57,7 @@ impl MindMap {
             root,
             viewport,
             selected: None,
+            highlighted: HashSet::new(),
             on_select: None,
             on_add: None,
             on_remove: None,
@@ -67,6 +71,12 @@ impl MindMap {
     /// The topic selected now, by key.
     pub fn selected(mut self, key: Option<impl Into<SharedString>>) -> Self {
         self.selected = key.map(Into::into);
+        self
+    }
+
+    /// Accents matching topic keys independently of selection; unknown keys are ignored.
+    pub fn highlighted(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
+        self.highlighted = keys.into_iter().map(Into::into).collect();
         self
     }
 
@@ -201,6 +211,7 @@ impl RenderOnce for MindMap {
             .map(|topic| {
                 let frame = in_view(&view, &topic.frame);
                 let chosen = selected.as_ref() == Some(&topic.key);
+                let highlighted = self.highlighted.contains(&topic.key);
                 let root = topic.parent.is_none();
                 let (key, pick, write, hold, activate) = (
                     topic.key.clone(),
@@ -226,17 +237,21 @@ impl RenderOnce for MindMap {
                     .px(text * 0.75)
                     .rounded(radius)
                     .border_1()
-                    .border_color(if chosen {
+                    .border_color(if chosen && highlighted {
+                        colors.on_accent
+                    } else if chosen {
                         colors.accent
+                    } else if highlighted {
+                        colors.accent_hover
                     } else if root {
                         colors.border_strong
                     } else {
                         colors.border
                     })
-                    .bg(colors.surface)
+                    .bg(if highlighted { colors.accent } else { colors.surface })
                     .text_size(text)
                     .line_height(text * 1.3)
-                    .text_color(colors.fg)
+                    .text_color(if highlighted { colors.on_accent } else { colors.fg })
                     .when(root, |topic| topic.font_weight(FontWeight::SEMIBOLD))
                     .cursor_pointer()
                     .on_mouse_down(MouseButton::Left, move |event, window, cx| {
@@ -388,5 +403,32 @@ impl RenderOnce for MindMap {
                 }
             })
             .child(plane)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn highlights_accept_topic_keys_independently_of_selection_and_editing() {
+        let map = MindMap::new(
+            "search",
+            Topic::new("root", "Root"),
+            Viewport::new(0.0, 0.0, 1.0),
+        )
+        .selected(Some("root"))
+        .read_only(true)
+        .on_activate(|_, _, _| {})
+        .highlighted(["root", "other", "root"]);
+        assert_eq!(map.highlighted.len(), 2);
+        assert!(map.highlighted.contains(&SharedString::from("root")));
+        assert!(map.highlighted.contains(&SharedString::from("other")));
+        let keys = vec![SharedString::from("root"), SharedString::from("missing")];
+        let map = map.highlighted(keys).highlighted(Vec::<SharedString>::new());
+        assert!(map.highlighted.is_empty());
+        assert_eq!(map.selected, Some("root".into()));
+        assert!(map.read_only);
+        assert!(map.on_activate.is_some());
     }
 }

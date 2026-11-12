@@ -208,7 +208,7 @@ pub fn mind(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
     let [picked, added, removed, renamed, viewed] = [(); 5].map(|_| state.clone());
     section(
         "MindMap",
-        "Topics branching from a root, half to each side. A press selects; arrows walk, Tab adds a child and Enter a sibling, Delete removes one, and F2 or a double press rewrites it. The owner keeps the map.",
+        "Topics branching from a root, half to each side. Website and Press demonstrate search highlights independently of selection. A press selects; arrows walk, Tab adds a child and Enter a sibling, Delete removes one, and F2 or a double press rewrites it. The owner keeps the map.",
         cx,
     )
     .child(boxed(
@@ -216,6 +216,7 @@ pub fn mind(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
         300.0,
         MindMap::new("canvas-mind-map", root, view)
             .selected(selected)
+            .highlighted(["site", "press"])
             .on_select(move |key, _, cx| change(&picked, cx, |mind| mind.selected = key.cloned()))
             .on_add(move |parent, _, cx| {
                 change(&added, cx, |mind| {

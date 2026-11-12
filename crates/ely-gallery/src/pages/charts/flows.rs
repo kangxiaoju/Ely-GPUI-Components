@@ -113,7 +113,8 @@ pub fn relations(cx: &mut App) -> impl IntoElement + use<> {
         (5, 6),
     ]
     .into_iter()
-    .fold(graph, |graph, (a, b)| graph.edge(a, b));
+    .fold(graph, |graph, (a, b)| graph.edge(a, b))
+    .highlighted([0, 1, 11]);
     let regions = ["Europe", "Americas", "Asia", "Africa", "Oceania"];
     let trade = vec![
         vec![0.0, 42.0, 31.0, 12.0, 5.0],
@@ -140,7 +141,7 @@ pub fn relations(cx: &mut App) -> impl IntoElement + use<> {
         });
     section(
         "NetworkGraph / ForceGraph / ChordDiagram / ParallelCoordinates",
-        "People and who they work with, settling as forces pull and push: drag a node, hover one to light its ties. Trade between regions around a circle, and cars on five measures at once.",
+        "People and who they work with, settling as forces pull and push: drag a node, hover one to light its ties; three matching people stay accented independently. Trade between regions around a circle, and cars on five measures at once.",
         cx,
     )
     .child(probe("network", div().w(px(720.)).child(graph)))

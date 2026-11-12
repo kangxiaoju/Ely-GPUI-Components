@@ -112,6 +112,7 @@ fn read_only_map(_: &Stage, owner: Entity<Stage>) -> AnyElement {
     )
     .selected(Some("doc"))
     .read_only(true)
+    .highlighted(["root", "doc", "missing"])
     .on_select(move |key, _, cx| say(&picked, format!("select {key:?}"), cx))
     .on_activate(move |key, _, cx| say(&opened, format!("open {key}"), cx))
     .on_add(|_, _, _| panic!("a read-only map adds nothing"))
