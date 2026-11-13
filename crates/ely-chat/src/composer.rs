@@ -229,6 +229,24 @@ impl RenderOnce for DragDropOverlay {
     }
 }
 
+/// Slash commands own the first line up to the caret, including argument spaces.
+/// File and project mentions still use their normal single-token trigger.
+fn composer_trigger(text: &str, caret: usize) -> Option<(usize, char)> {
+    let token = active_trigger(text, caret, &['@', '#'], |ch| !ch.is_whitespace());
+    if token.is_some() { return token; }
+    let before = text.get(..caret)?;
+    (before.starts_with('/') && !before.contains(['\n', '\r'])).then_some((0, '/'))
+}
+
+fn matches_offer(label: &str, query: &str, slash: bool) -> bool {
+    let label = label.to_lowercase();
+    if slash {
+        query.split_whitespace().all(|word| label.contains(word))
+    } else {
+        label.contains(query)
+    }
+}
+
 /// The rows a composer offers at `/`, `@` or `#`, and what a pick does.
 fn offers(
     id: ElementId,
@@ -243,8 +261,7 @@ fn offers(
 ) -> Suggestions {
     let input = field.read(cx);
     let (text, caret) = (input.text().to_string(), input.cursor());
-    let active = active_trigger(&text, caret, &['/', '@', '#'], |ch| !ch.is_whitespace())
-        .filter(|(at, mark)| *mark == '@' || *mark == '#' || *at == 0);
+    let active = composer_trigger(&text, caret);
     let query = active.map_or(String::new(), |(at, mark)| {
         text[at + mark.len_utf8()..caret].to_lowercase()
     });
@@ -256,7 +273,7 @@ fn offers(
     };
     let found: Vec<Choice> = listed
         .iter()
-        .filter(|choice| choice.label.to_lowercase().contains(&query))
+        .filter(|choice| matches_offer(&choice.label, &query, active.is_some_and(|(_, mark)| mark == '/')))
         .cloned()
         .collect();
     let rows = if run.is_some() {
@@ -459,5 +476,38 @@ impl RenderOnce for PromptInput {
         body.when_some(self.on_drop, |body, take| {
             body.child(DragDropOverlay { on_drop: take })
         })
+    }
+}
+
+#[cfg(test)]
+mod command_query_tests {
+    use super::*;
+
+    #[test]
+    fn slash_arguments_keep_the_original_trigger_and_filter_all_words() {
+        for (query, label) in [
+            ("/project car", "/project card-job"),
+            ("/Bug login fails", "/Bug Login form fails"),
+            ("/Task 修复 登录", "/Task 修复账号登录"),
+            ("/skills  yu-todo", "/skills yu-todo · Yu 待办任务规则"),
+            ("/mcp server", "/mcp server-tools"),
+            ("/role review", "/role code-reviewer"),
+        ] {
+            assert_eq!(composer_trigger(query, query.len()), Some((0, '/')));
+            assert!(matches_offer(label, &query[1..].to_lowercase(), true));
+        }
+        assert!(!matches_offer("/Task Login", "bug login", true));
+        assert!(!matches_offer("/project card-job", "project missing", true));
+    }
+
+    #[test]
+    fn slash_stays_on_first_line_and_does_not_capture_mentions() {
+        assert_eq!(composer_trigger("text /Task", 10), None);
+        assert_eq!(composer_trigger("/Task\nquery", 11), None);
+        assert_eq!(composer_trigger("/Task @src", 10), Some((6, '@')));
+        assert_eq!(composer_trigger("/Task #name", 11), Some((6, '#')));
+        assert_eq!(composer_trigger("/Task query suffix", 11), Some((0, '/')));
+        assert!(matches_offer("src/main.rs", "main", false));
+        assert!(!matches_offer("src/main.rs", "src main", false));
     }
 }
