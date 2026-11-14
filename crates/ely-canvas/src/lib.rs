@@ -35,6 +35,8 @@
 //! geometry. `CanvasScene::with_link_presentations` binds prepared world-space routes
 //! and independent stroke/head styles, including self-loops. `hit_link` uses those
 //! same routes. `RouteEditor` drags stored waypoints and commits once on release.
+//! `CanvasScene::with_link_fonts` sets connector label families independently by key;
+//! omitted entries retain the original inherited UI font.
 #![deny(missing_docs)]
 
 use ely_core::{buttons, feedback, forms, i18n, layout, lists, overlays, primitives, shell, theme};

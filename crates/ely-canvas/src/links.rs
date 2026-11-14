@@ -115,6 +115,7 @@ pub struct CanvasScene {
     pub(crate) routes: Vec<Option<Vec<(f32, f32)>>>,
     pub(crate) images: HashMap<SharedString, Arc<gpui::Image>>,
     pub(crate) presentations: HashMap<SharedString, LinkPresentation>,
+    pub(crate) link_fonts: HashMap<SharedString, super::CanvasFont>,
 }
 
 impl CanvasScene {
@@ -145,7 +146,7 @@ impl CanvasScene {
                 image.format.mime_type(), base64::engine::general_purpose::STANDARD.encode(&image.bytes));
             Some((shape.key.clone(), Arc::new(gpui::Image::from_bytes(gpui::ImageFormat::Svg, svg.into_bytes()))))
         }).collect();
-        Self { shapes: Arc::new(shapes), links: Arc::new(links), routes, images, presentations: HashMap::new() }
+        Self { shapes: Arc::new(shapes), links: Arc::new(links), routes, images, presentations: HashMap::new(), link_fonts: HashMap::new() }
     }
 
     /// Replaces routes and styles by link key; empty routes intentionally hide a link.
@@ -158,6 +159,13 @@ impl CanvasScene {
                 *route=(visible(&link.from) && visible(&link.to) && p.points.len()>=2).then(||p.points.clone());
             }
         }
+        self
+    }
+
+    /// Sets label font families by connector key, without changing existing `Link` literals.
+    /// Connectors without an entry retain the surrounding UI font.
+    pub fn with_link_fonts(mut self, fonts: impl IntoIterator<Item=(SharedString,super::CanvasFont)>) -> Self {
+        self.link_fonts.extend(fonts);
         self
     }
 

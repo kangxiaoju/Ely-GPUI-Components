@@ -21,7 +21,7 @@ pub(crate) type OnViewport = Rc<dyn Fn(Viewport, &mut Window, &mut App)>;
 type OnLinkSelect = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
 
 /// A link's run in view pixels, with its words.
-type Drawn = (Vec<(f32, f32)>, Option<SharedString>, Option<LinkAnimation>, Option<super::LinkPresentation>);
+type Drawn = (Vec<(f32, f32)>, Option<SharedString>, Option<LinkAnimation>, Option<super::LinkPresentation>, Option<SharedString>);
 
 /// A drag that pans a canvas, and whose canvas it is.
 struct Pan {
@@ -226,14 +226,19 @@ impl RenderOnce for InfiniteCanvas {
             let animation = self.link_animations.iter().find(|a| a.key == link.key).cloned()
                 .or_else(|| self.link_hues.get(&link.key).map(|hue| LinkAnimation { key:link.key.clone(), mode:FlowMode::Dashes, direction:FlowDirection::Forward, speed:0.0, paused:true, hue:*hue, glow:false }));
             let presentation=scene.presentations.get(&link.key).map(|p|super::LinkPresentation {key:p.key.clone(),points:Vec::new(),stroke:p.stroke,stroke_width:p.stroke_width,dash:p.dash,start_arrow:p.start_arrow,end_arrow:p.end_arrow});
-            Some((points, link.label.clone(), animation, presentation))
+            let font=scene.link_fonts.get(&link.key).map(|font|font.family(cx));
+            Some((points, link.label.clone(), animation, presentation, font))
         }).collect();
-        let flowing = self.animations_active && !self.reduced_motion && !theme.reduced_motion && routes.iter().any(|(_,_,a,_)| a.as_ref().is_some_and(|a| !a.paused && a.speed > 0.0));
+        let flowing = self.animations_active && !self.reduced_motion && !theme.reduced_motion && routes.iter().any(|(_,_,a,_,_)| a.as_ref().is_some_and(|a| !a.paused && a.speed > 0.0));
         let chip = theme.text_size(TextSize::Sm).to_pixels(rem) * view.zoom;
         let chips: Vec<AnyElement> = routes
             .iter()
-            .filter_map(|(points, label, _, _)| {
+            .filter_map(|(points, label, _, _, font)| {
                 let (x, y) = halfway(points);
+                let chip_label=div().flex_none().whitespace_nowrap().px(chip*0.5)
+                    .rounded(theme.radius(Radius::Sm)).bg(colors.bg).border_1().border_color(colors.border)
+                    .text_size(chip).line_height(chip*1.4).text_color(colors.fg_muted).child(label.clone()?);
+                let chip_label=if let Some(font)=font {chip_label.font_family(font.clone())} else {chip_label};
                 Some(
                     div()
                         .absolute()
@@ -243,20 +248,7 @@ impl RenderOnce for InfiniteCanvas {
                         .flex()
                         .items_center()
                         .justify_center()
-                        .child(
-                            div()
-                                .flex_none()
-                                .whitespace_nowrap()
-                                .px(chip * 0.5)
-                                .rounded(theme.radius(Radius::Sm))
-                                .bg(colors.bg)
-                                .border_1()
-                                .border_color(colors.border)
-                                .text_size(chip)
-                                .line_height(chip * 1.4)
-                                .text_color(colors.fg_muted)
-                                .child(label.clone()?),
-                        )
+                        .child(chip_label)
                         .into_any_element(),
                 )
             })
@@ -268,7 +260,7 @@ impl RenderOnce for InfiniteCanvas {
         surface.update(cx, |surface, _| {
             let elapsed = surface.started.elapsed().as_secs_f32();
             let previous = std::mem::take(&mut surface.lines);
-            surface.lines = lines.into_iter().map(|(points,_,animation,presentation)| {
+            surface.lines = lines.into_iter().map(|(points,_,animation,presentation,_)| {
                 let phase = animation.as_ref().and_then(|next| previous.iter().find(|old| old.animation.as_ref().is_some_and(|old| old.key == next.key)))
                     .map_or(0.0, |old| super::link_surface::advanced_phase(old.phase,elapsed,old.animation.as_ref(),surface.active,surface.zoom));
                 super::link_surface::SurfaceLine {points,animation,phase,presentation}
