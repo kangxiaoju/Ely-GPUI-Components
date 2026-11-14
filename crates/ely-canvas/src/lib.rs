@@ -108,7 +108,7 @@ pub use plane::InfiniteCanvas;
 pub use shape::{Artboard, CanvasFont, Corner, Guide, Shape, ShapeKind, ShapeAppearance};
 pub use rounded::rounded_rectangle_outline;
 pub use sketch::{sketch_outline, sketch_seed};
-pub use symbol::{SymbolKind, symbol_paths};
+pub use symbol::{SymbolKind, symbol_paths, symbol_label_frame};
 pub use route_editor::RouteEditor;
 pub use style::{Border, BorderEditor, ColorPanel, Dash, Shadow, ShadowEditor};
 pub use tools::ToolLayer;

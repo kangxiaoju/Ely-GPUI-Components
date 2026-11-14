@@ -283,7 +283,7 @@ impl RenderOnce for InfiniteCanvas {
             .filter_map(|shape| {
                 let frame = in_view(&view, &shape.frame);
                 let label_frame=if let ShapeKind::Symbol(kind)=shape.kind {
-                    let local=super::symbol::label_frame(kind,shape.frame.w,shape.frame.h);
+                    let local=super::symbol_label_frame(kind,shape.frame.w,shape.frame.h);
                     in_view(&view,&super::Frame::new(shape.frame.x+local.x,shape.frame.y+local.y,local.w,local.h))
                 } else {frame};
                 let size = shape.appearance.map_or(base_text_size, |s| Pixels::from(s.font_size)) * view.zoom;

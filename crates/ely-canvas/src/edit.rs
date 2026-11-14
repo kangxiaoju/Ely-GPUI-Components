@@ -185,7 +185,7 @@ pub(crate) fn hit(shapes: &[Shape], at: (f32, f32), reach: f32) -> Option<usize>
         let contains = match &shape.kind {
             ShapeKind::Symbol(kind @ (super::SymbolKind::Container | super::SymbolKind::SwimlaneHorizontal | super::SymbolKind::SwimlaneVertical)) => {
                 let local=(at.0-frame.x,at.1-frame.y);
-                let title=super::symbol::label_frame(*kind,frame.w,frame.h);
+                let title=super::symbol_label_frame(*kind,frame.w,frame.h);
                 let header=if *kind==super::SymbolKind::SwimlaneHorizontal {local.0<=title.right()+8.0} else {local.1<=title.bottom()};
                 grown.contains(at) && (header || local.0<=reach || local.1<=reach || local.0>=frame.w-reach || local.1>=frame.h-reach)
             }

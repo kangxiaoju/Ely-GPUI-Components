@@ -124,7 +124,9 @@ pub fn symbol_paths(kind:SymbolKind,width:f32,height:f32) -> Vec<Vec<(f32,f32)>>
 fn title_height(height:f32)->f32 {(height*0.22).clamp(0.0,32.0)}
 fn title_width(width:f32)->f32 {(width*0.22).clamp(0.0,100.0)}
 
-pub(crate) fn label_frame(kind:SymbolKind,w:f32,h:f32)->Frame {
+/// The local-coordinate area reserved for a symbol's label in native and SVG output.
+/// Container and vertical-lane titles occupy the top strip; horizontal lanes use the left strip.
+pub fn symbol_label_frame(kind:SymbolKind,w:f32,h:f32)->Frame {
     use SymbolKind::*;
     match kind {
         Container | SwimlaneVertical => Frame::new(8.0,0.0,(w-16.0).max(0.0),title_height(h)),
