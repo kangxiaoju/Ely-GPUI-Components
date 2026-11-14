@@ -49,6 +49,25 @@ impl Link {
     }
 }
 
+/// Prepared world-space geometry and stroke style, independent of flow animation.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LinkPresentation {
+    /// The link to override.
+    pub key: SharedString,
+    /// Full route in canvas coordinates, including endpoint attachments.
+    pub points: Vec<(f32,f32)>,
+    /// Theme hue slot.
+    pub stroke: usize,
+    /// Width in canvas units.
+    pub stroke_width: f32,
+    /// Static or animated stroke pattern.
+    pub dash: super::Dash,
+    /// Arrow head at the route's first point.
+    pub start_arrow: bool,
+    /// Arrow head at the route's last point.
+    pub end_arrow: bool,
+}
+
 /// The moving pattern painted along a connector.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FlowMode {
@@ -95,6 +114,7 @@ pub struct CanvasScene {
     pub links: Arc<Vec<Link>>,
     pub(crate) routes: Vec<Option<Vec<(f32, f32)>>>,
     pub(crate) images: HashMap<SharedString, Arc<gpui::Image>>,
+    pub(crate) presentations: HashMap<SharedString, LinkPresentation>,
 }
 
 impl CanvasScene {
@@ -125,7 +145,28 @@ impl CanvasScene {
                 image.format.mime_type(), base64::engine::general_purpose::STANDARD.encode(&image.bytes));
             Some((shape.key.clone(), Arc::new(gpui::Image::from_bytes(gpui::ImageFormat::Svg, svg.into_bytes()))))
         }).collect();
-        Self { shapes: Arc::new(shapes), links: Arc::new(links), routes, images }
+        Self { shapes: Arc::new(shapes), links: Arc::new(links), routes, images, presentations: HashMap::new() }
+    }
+
+    /// Replaces routes and styles by link key; empty routes intentionally hide a link.
+    /// Missing or hidden endpoint shapes remain invisible. `Link` literals are unchanged.
+    pub fn with_link_presentations(mut self, presentations: impl IntoIterator<Item=LinkPresentation>) -> Self {
+        self.presentations.extend(presentations.into_iter().map(|p|(p.key.clone(),p)));
+        for (link,route) in self.links.iter().zip(&mut self.routes) {
+            if let Some(p)=self.presentations.get(&link.key) {
+                let visible=|key:&SharedString|self.shapes.iter().any(|shape|shape.key==*key && !shape.hidden);
+                *route=(visible(&link.from) && visible(&link.to) && p.points.len()>=2).then(||p.points.clone());
+            }
+        }
+        self
+    }
+
+    /// Topmost prepared connector within `reach` canvas units of its actual stroke.
+    pub fn hit_link(&self, at:(f32,f32), reach:f32) -> Option<&SharedString> {
+        self.links.iter().zip(&self.routes).rev().find_map(|(link,route)| {
+            let width=self.presentations.get(&link.key).map_or(2.0,|p|p.stroke_width);
+            route.as_ref()?.windows(2).any(|p| super::edit::distance_to_segment(at,p[0],p[1])<=reach+width*0.5).then_some(&link.key)
+        })
     }
 }
 

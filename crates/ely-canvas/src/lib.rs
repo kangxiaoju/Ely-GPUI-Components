@@ -30,6 +30,11 @@
 //! `NodeEmphasis` overlays viewport-visible `NodeEmphasisPath` outlines in view pixels.
 //! Hosts refresh paths on layout/pan/zoom, clip the canvas, and hide the layer explicitly;
 //! only running paths animate, below 30fps, with theme hues and reduced-motion support.
+//!
+//! Architecture nodes use `ShapeKind::Symbol` and `symbol_paths` for shared native/SVG
+//! geometry. `CanvasScene::with_link_presentations` binds prepared world-space routes
+//! and independent stroke/head styles, including self-loops. `hit_link` uses those
+//! same routes. `RouteEditor` drags stored waypoints and commits once on release.
 #![deny(missing_docs)]
 
 use ely_core::{buttons, feedback, forms, i18n, layout, lists, overlays, primitives, shell, theme};
@@ -63,6 +68,8 @@ mod rounded;
 mod shape;
 mod sketch;
 mod style;
+mod symbol;
+mod route_editor;
 mod text_outline;
 mod tools;
 mod typography;
@@ -87,7 +94,7 @@ pub use graph::{Edge, Node, Port};
 pub use history::HistoryPanel;
 pub use inspector::InspectorPanel;
 pub use layers::LayerPanel;
-pub use links::{Link, LinkAnimation, FlowMode, FlowDirection, CanvasScene};
+pub use links::{Link, LinkPresentation, LinkAnimation, FlowMode, FlowDirection, CanvasScene};
 pub use marks::{SelectionBox, SnapIndicator, TransformHandles};
 pub use mindmap::Topic;
 pub use mindmap_view::MindMap;
@@ -101,6 +108,8 @@ pub use plane::InfiniteCanvas;
 pub use shape::{Artboard, CanvasFont, Corner, Guide, Shape, ShapeKind, ShapeAppearance};
 pub use rounded::rounded_rectangle_outline;
 pub use sketch::{sketch_outline, sketch_seed};
+pub use symbol::{SymbolKind, symbol_paths};
+pub use route_editor::RouteEditor;
 pub use style::{Border, BorderEditor, ColorPanel, Dash, Shadow, ShadowEditor};
 pub use tools::ToolLayer;
 pub use text_outline::register_canvas_text_outliner;

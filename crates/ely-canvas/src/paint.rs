@@ -82,6 +82,26 @@ pub(crate) fn paint_shape(
     };
     let stroke = style.map_or(stroke, |s| Pixels::from(s.stroke_width * view.zoom));
     let frame = &shape.frame;
+    if let ShapeKind::Symbol(kind) = shape.kind {
+        for (index,mut points) in super::symbol_paths(kind,frame.w,frame.h).into_iter().enumerate() {
+            let closed=points.len()>2 && points.first()==points.last();
+            if closed { points.pop(); }
+            for p in &mut points {p.0+=frame.x;p.1+=frame.y;}
+            let roughness=style.map_or(0.0,|s|s.roughness);
+            let seed=super::sketch_seed(&shape.key).wrapping_add(index as u64);
+            let second=(roughness>0.0).then(||super::sketch_outline(&points,closed,roughness,seed^0x9e3779b97f4a7c15));
+            let mut points=super::sketch_outline(&points,closed,roughness,seed);
+            for p in &mut points {*p=view.to_view(shape.rotate_point(*p,shape.rotation));}
+            if index==0 && closed {if let Some(wash)=wash {finish(solid(&points,origin),wash,window);}}
+            let dash=style.map_or(super::Dash::Solid,|s|s.dash);
+            patterned(&points,origin,stroke,closed,dash,0.0,ink,window);
+            if let Some(mut second)=second {
+                for p in &mut second {*p=view.to_view(shape.rotate_point(*p,shape.rotation));}
+                patterned(&second,origin,stroke*0.65,closed,dash,0.0,ink.opacity(0.45),window);
+            }
+        }
+        return;
+    }
     let mut closed = false;
     let mut points = match &shape.kind {
         ShapeKind::Rect | ShapeKind::Note(_) => {
@@ -100,7 +120,7 @@ pub(crate) fn paint_shape(
         }
         ShapeKind::Line(end) | ShapeKind::Arrow(end) => vec![end.opposite().of(frame), end.of(frame)],
         ShapeKind::Path { points, .. } | ShapeKind::Polyline { points, .. } => points.iter().map(|(x,y)| (frame.x + x, frame.y + y)).collect(),
-        ShapeKind::Text(_) | ShapeKind::Image(_) => return,
+        ShapeKind::Text(_) | ShapeKind::Image(_) | ShapeKind::Symbol(_) => return,
     };
     let roughness = style.map_or(0.0, |style| style.roughness);
     let second = (roughness > 0.0).then(|| super::sketch_outline(&points,closed,roughness,super::sketch_seed(&shape.key)^0x9e3779b97f4a7c15));

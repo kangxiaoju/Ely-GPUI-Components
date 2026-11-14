@@ -13,6 +13,8 @@ pub enum ShapeKind {
     RoundedRect,
     /// A diamond with vertices at the frame's side centers.
     Diamond,
+    /// A native architecture symbol with reusable export geometry.
+    Symbol(super::SymbolKind),
     /// An embedded image; the host retains this shared resource between renders.
     Image(Arc<gpui::Image>),
     /// A connected line with frame-relative points and an optional arrow head.
@@ -50,6 +52,7 @@ impl ShapeKind {
             ShapeKind::Rect => IconName::Square,
             ShapeKind::RoundedRect => IconName::SquareRoundCorner,
             ShapeKind::Diamond => IconName::Hexagon,
+            ShapeKind::Symbol(_) => IconName::Hexagon,
             ShapeKind::Image(_) => IconName::Square,
             ShapeKind::Polyline { .. } => IconName::Spline,
             ShapeKind::Ellipse => IconName::Circle,
@@ -68,6 +71,7 @@ impl ShapeKind {
             ShapeKind::Rect => "Rectangle",
             ShapeKind::RoundedRect => "Rounded rectangle",
             ShapeKind::Diamond => "Diamond",
+            ShapeKind::Symbol(_) => "Architecture symbol",
             ShapeKind::Image(_) => "Image",
             ShapeKind::Polyline { .. } => "Polyline",
             ShapeKind::Ellipse => "Ellipse",
@@ -83,6 +87,7 @@ impl ShapeKind {
     /// Its localized type name, without changing the user's layer name or text.
     pub fn words(&self, cx: &gpui::App) -> SharedString {
         let key = match self {
+            Self::Symbol(_) => "polygon",
             Self::Rect => "rect", Self::RoundedRect => "rounded_rect", Self::Diamond => "diamond", Self::Image(_) => "image",
             Self::Polyline { .. } => "polyline", Self::Ellipse => "ellipse",
             Self::Polygon(_) => "polygon", Self::Line(_) => "line", Self::Arrow(_) => "arrow",
@@ -281,6 +286,24 @@ impl Shape {
                 let c = ox * ox + oy * oy - radius * radius;
                 let t = (b + (b * b - a * c).max(0.0).sqrt()) / a;
                 return self.rotate_point((cx + dx * t, cy + dy * t), self.rotation);
+            }
+        }
+        if let ShapeKind::Symbol(kind)=self.kind {
+            let paths=super::symbol_paths(kind,self.frame.w,self.frame.h);
+            if let Some(points)=paths.first().filter(|p|p.first()==p.last()) {
+                let start=(cx-self.frame.x,cy-self.frame.y);
+                let mut nearest=f32::INFINITY;
+                for pair in points.windows(2) {
+                    let (a,b)=(pair[0],pair[1]);
+                    let edge=(b.0-a.0,b.1-a.1);
+                    let cross=dx*edge.1-dy*edge.0;
+                    if cross.abs()<0.000001 {continue;}
+                    let offset=(a.0-start.0,a.1-start.1);
+                    let t=(offset.0*edge.1-offset.1*edge.0)/cross;
+                    let u=(offset.0*dy-offset.1*dx)/cross;
+                    if t>0.0 && (0.0..=1.0).contains(&u) {nearest=nearest.min(t);}
+                }
+                if nearest.is_finite() {return self.rotate_point((cx+dx*nearest,cy+dy*nearest),self.rotation);}
             }
         }
         let divisor = match self.kind {

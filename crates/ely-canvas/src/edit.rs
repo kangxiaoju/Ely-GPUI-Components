@@ -183,6 +183,26 @@ pub(crate) fn hit(shapes: &[Shape], at: (f32, f32), reach: f32) -> Option<usize>
             frame.h + reach * 2.0,
         );
         let contains = match &shape.kind {
+            ShapeKind::Symbol(kind @ (super::SymbolKind::Container | super::SymbolKind::SwimlaneHorizontal | super::SymbolKind::SwimlaneVertical)) => {
+                let local=(at.0-frame.x,at.1-frame.y);
+                let title=super::symbol::label_frame(*kind,frame.w,frame.h);
+                let header=if *kind==super::SymbolKind::SwimlaneHorizontal {local.0<=title.right()+8.0} else {local.1<=title.bottom()};
+                grown.contains(at) && (header || local.0<=reach || local.1<=reach || local.0>=frame.w-reach || local.1>=frame.h-reach)
+            }
+            ShapeKind::Symbol(kind) => {
+                let local=(at.0-frame.x,at.1-frame.y);
+                super::symbol_paths(*kind,frame.w,frame.h).iter().any(|points| {
+                    let edge=points.windows(2).any(|p|distance_to_segment(local,p[0],p[1])<=reach+shape.appearance.map_or(1.0,|s|s.stroke_width/2.0));
+                    let mut inside=false;
+                    if points.first()==points.last() {
+                        for p in points.windows(2) {
+                            let (a,b)=(p[0],p[1]);
+                            if (a.1>local.1)!=(b.1>local.1) && local.0<(b.0-a.0)*(local.1-a.1)/(b.1-a.1)+a.0 {inside=!inside;}
+                        }
+                    }
+                    edge || inside
+                })
+            }
             ShapeKind::Line(end) | ShapeKind::Arrow(end) => {
                 distance_to_segment(at,end.opposite().of(frame),end.of(frame)) <= reach + shape.appearance.map_or(1.0,|s|s.stroke_width/2.0)
             }
@@ -212,7 +232,7 @@ pub(crate) fn hit(shapes: &[Shape], at: (f32, f32), reach: f32) -> Option<usize>
     })
 }
 
-fn distance_to_segment(p:(f32,f32),a:(f32,f32),b:(f32,f32)) -> f32 {
+pub(crate) fn distance_to_segment(p:(f32,f32),a:(f32,f32),b:(f32,f32)) -> f32 {
     let (dx,dy)=(b.0-a.0,b.1-a.1);
     let t=(((p.0-a.0)*dx+(p.1-a.1)*dy)/(dx*dx+dy*dy).max(0.000001)).clamp(0.0,1.0);
     (p.0-a.0-t*dx).hypot(p.1-a.1-t*dy)

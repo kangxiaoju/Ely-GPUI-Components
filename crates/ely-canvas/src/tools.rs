@@ -26,6 +26,7 @@ struct Tracing {
     owner: EntityId,
 }
 
+type OnLinkSelect=Rc<dyn Fn(&SharedString,&mut Window,&mut App)>;
 /// A layer over an InfiniteCanvas where its tools work. Select presses a shape, Shift adds to the selection, a drag moves it and snaps its edges to others, a handle resizes it, and a drag on empty space draws a SelectionBox. The shape tools draw by a drag, Shift keeping them square; the pen adds a point per press and a double press ends the path; text drops a line where pressed; the brush strokes a path; a note drops where pressed; the connector links the shape pressed to the one released on. A double press with Select writes on a shape: a text's or a note's words, or any other's label. A press focuses the layer, where Delete or Backspace asks to delete the selection and Escape lets it go. A drag may end anywhere, in the layer or out of it. Everything asks the owner; the hand leaves the canvas to pan.
 ///
 /// ```
@@ -53,6 +54,7 @@ pub struct ToolLayer {
     on_text: Option<OnPair>,
     on_delete: Option<OnKeys>,
     on_rotate: Option<super::gesture::OnRotate>,
+    link_selection: Option<(Arc<super::CanvasScene>,OnLinkSelect)>,
 }
 
 impl ToolLayer {
@@ -79,6 +81,7 @@ impl ToolLayer {
             on_text: None,
             on_delete: None,
             on_rotate: None,
+            link_selection: None,
         }
     }
 
@@ -102,6 +105,11 @@ impl ToolLayer {
 
     /// Uses the scene's shared shapes without cloning the document each frame.
     pub fn shared_shapes(mut self, shapes: Arc<Vec<Shape>>) -> Self { self.shapes = shapes; self }
+
+    /// Selects prepared connector strokes before empty-space selection starts.
+    pub fn link_scene(mut self,scene:Arc<super::CanvasScene>,on_select:impl Fn(&SharedString,&mut Window,&mut App)+'static)->Self {
+        self.link_selection=Some((scene,Rc::new(on_select)));self
+    }
 
     /// Gets clockwise radians after dragging a shape's rotation handle.
     pub fn on_rotate(mut self, handler: impl Fn(&SharedString, f32, &mut Window, &mut App) + 'static) -> Self {
@@ -385,6 +393,7 @@ impl RenderOnce for ToolLayer {
         let brush = self.brush;
         let (out_hand, out_scene, out_handlers) = (hand.clone(), scene.clone(), handlers.clone());
         let measured = hand.clone();
+        let link_selection=self.link_selection;
         div()
             .id(self.id)
             .role(Role::Canvas)
@@ -420,6 +429,13 @@ impl RenderOnce for ToolLayer {
                 let at = point_of(event.position, bounds);
                 let local = event.position - bounds.origin;
                 let view_at = (f32::from(local.x), f32::from(local.y));
+                if tool==Tool::Select {
+                    if let Some((links,select))=&link_selection {
+                        if super::edit::hit(&press_scene.shapes,at,REACH/view.zoom).is_none() {
+                            if let Some(key)=links.hit_link(at,REACH/view.zoom) {select(key,window,cx);return;}
+                        }
+                    }
+                }
                 let press = Press {
                     tool,
                     at,

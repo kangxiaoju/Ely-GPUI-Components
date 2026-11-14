@@ -3,8 +3,14 @@ use gpui::{Context, IntoElement, Render, Styled, Window, canvas, fill, point, si
 use super::{links::{LinkAnimation, FlowMode, FlowDirection}, paint::{at, patterned, finish, solid, head}, style::Dash};
 use crate::theme::Palette;
 
+pub(crate) struct SurfaceLine {
+    pub points: Vec<(f32,f32)>,
+    pub animation: Option<LinkAnimation>,
+    pub phase: f32,
+    pub presentation: Option<super::LinkPresentation>,
+}
 pub(crate) struct LinkSurface {
-    pub lines: Vec<(Vec<(f32,f32)>, Option<LinkAnimation>, f32)>,
+    pub lines: Vec<SurfaceLine>,
     pub palette: Palette,
     pub stroke: gpui::Pixels,
     pub zoom: f32,
@@ -47,18 +53,30 @@ impl Render for LinkSurface {
             move |bounds,_,window,cx| {
                 let state = entity.read(cx);
                 let elapsed = state.started.elapsed().as_secs_f32();
-                for (points, animation, frozen) in &state.lines {
-                    let ink = animation.as_ref().map_or(state.palette.fg_muted, |a| state.palette.hue(a.hue,"connector"));
-                    let phase=advanced_phase(*frozen,elapsed,animation.as_ref(),state.active,state.zoom);
+                for line in &state.lines {
+                    let (points,animation)=(&line.points,&line.animation);
+                    let ink = line.presentation.as_ref().map_or_else(||animation.as_ref().map_or(state.palette.fg_muted, |a| state.palette.hue(a.hue,"connector")),|p|state.palette.hue(p.stroke,"connector"));
+                    let width=line.presentation.as_ref().map_or(state.stroke,|p|Pixels::from(p.stroke_width*state.zoom));
+                    let phase=advanced_phase(line.phase,elapsed,animation.as_ref(),state.active,state.zoom);
                     let (dash,sign) = animation.as_ref().map_or((Dash::Solid,1.0), |a| {
                         let dash = if a.speed == 0.0 { Dash::Solid } else { match a.mode { FlowMode::Dashes => Dash::Dashed, FlowMode::Dots => Dash::Dotted } };
                         (dash,if a.direction==FlowDirection::Forward {1.0} else {-1.0})
                     });
-                    patterned(points,bounds.origin,state.stroke,false,dash,phase*sign,ink,window);
-                    if points.len() >= 2 { finish(solid(&head(points[points.len()-2],points[points.len()-1],state.stroke),bounds.origin),ink,window); }
+                    let dash=line.presentation.as_ref().map_or(dash,|p|p.dash);
+                    patterned(points,bounds.origin,width,false,dash,phase*sign,ink,window);
+                    if let Some(first)=points.first() {
+                        if line.presentation.as_ref().is_some_and(|p|p.start_arrow) {
+                            if let Some(next)=points.iter().find(|p|*p!=first) {finish(solid(&head(*next,*first,width),bounds.origin),ink,window);}
+                        }
+                    }
+                    if let Some(last)=points.last() {
+                        if line.presentation.as_ref().is_none_or(|p|p.end_arrow) {
+                            if let Some(previous)=points.iter().rev().find(|p|*p!=last) {finish(solid(&head(*previous,*last,width),bounds.origin),ink,window);}
+                        }
+                    }
                     if let Some(animation)=animation.as_ref().filter(|a|a.glow) {
                         if let Some(position)=particle(points,phase,animation.direction==FlowDirection::Reverse) {
-                            let radius=f32::from(state.stroke).max(1.0)*2.0;
+                            let radius=f32::from(width).max(1.0)*2.0;
                             for (scale,alpha) in [(3.0,0.06),(2.0,0.14),(1.0,0.45),(0.45,1.0)] {
                                 let r=Pixels::from(radius*scale);
                                 window.paint_quad(fill(Bounds::new(at(bounds.origin,position)-point(r,r),size(r*2.0,r*2.0)),ink.opacity(alpha)).corner_radii(r));

@@ -18,9 +18,10 @@ use crate::{
 };
 
 pub(crate) type OnViewport = Rc<dyn Fn(Viewport, &mut Window, &mut App)>;
+type OnLinkSelect = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
 
 /// A link's run in view pixels, with its words.
-type Drawn = (Vec<(f32, f32)>, Option<SharedString>, Option<LinkAnimation>);
+type Drawn = (Vec<(f32, f32)>, Option<SharedString>, Option<LinkAnimation>, Option<super::LinkPresentation>);
 
 /// A drag that pans a canvas, and whose canvas it is.
 struct Pan {
@@ -62,6 +63,7 @@ pub struct InfiniteCanvas {
     animations_active: bool,
     reduced_motion: bool,
     link_hues: std::collections::HashMap<SharedString,usize>,
+    on_link_select: Option<OnLinkSelect>,
 }
 
 impl InfiniteCanvas {
@@ -82,6 +84,7 @@ impl InfiniteCanvas {
             animations_active: true,
             reduced_motion: false,
             link_hues: Default::default(),
+            on_link_select: None,
         }
     }
 
@@ -114,6 +117,11 @@ impl InfiniteCanvas {
     /// Theme hue slots for static connectors, keyed by link.
     pub fn link_hues(mut self, hues: impl IntoIterator<Item=(SharedString,usize)>) -> Self {
         self.link_hues = hues.into_iter().collect(); self
+    }
+
+    /// Receives the key of a prepared connector pressed with the primary pointer.
+    pub fn on_link_select(mut self, handler:impl Fn(&SharedString,&mut Window,&mut App)+'static)->Self {
+        self.on_link_select=Some(Rc::new(handler));self
     }
 
     /// Boards drawn under the shapes.
@@ -217,13 +225,14 @@ impl RenderOnce for InfiniteCanvas {
             if bounds.right() < 0.0 || bounds.bottom() < 0.0 || bounds.x > w || bounds.y > h { return None; }
             let animation = self.link_animations.iter().find(|a| a.key == link.key).cloned()
                 .or_else(|| self.link_hues.get(&link.key).map(|hue| LinkAnimation { key:link.key.clone(), mode:FlowMode::Dashes, direction:FlowDirection::Forward, speed:0.0, paused:true, hue:*hue, glow:false }));
-            Some((points, link.label.clone(), animation))
+            let presentation=scene.presentations.get(&link.key).map(|p|super::LinkPresentation {key:p.key.clone(),points:Vec::new(),stroke:p.stroke,stroke_width:p.stroke_width,dash:p.dash,start_arrow:p.start_arrow,end_arrow:p.end_arrow});
+            Some((points, link.label.clone(), animation, presentation))
         }).collect();
-        let flowing = self.animations_active && !self.reduced_motion && !theme.reduced_motion && routes.iter().any(|(_,_,a)| a.as_ref().is_some_and(|a| !a.paused && a.speed > 0.0));
+        let flowing = self.animations_active && !self.reduced_motion && !theme.reduced_motion && routes.iter().any(|(_,_,a,_)| a.as_ref().is_some_and(|a| !a.paused && a.speed > 0.0));
         let chip = theme.text_size(TextSize::Sm).to_pixels(rem) * view.zoom;
         let chips: Vec<AnyElement> = routes
             .iter()
-            .filter_map(|(points, label, _)| {
+            .filter_map(|(points, label, _, _)| {
                 let (x, y) = halfway(points);
                 Some(
                     div()
@@ -259,10 +268,10 @@ impl RenderOnce for InfiniteCanvas {
         surface.update(cx, |surface, _| {
             let elapsed = surface.started.elapsed().as_secs_f32();
             let previous = std::mem::take(&mut surface.lines);
-            surface.lines = lines.into_iter().map(|(points,_,animation)| {
-                let phase = animation.as_ref().and_then(|next| previous.iter().find(|(_,old,_)| old.as_ref().is_some_and(|old| old.key == next.key)))
-                    .map_or(0.0, |(_,old,phase)| super::link_surface::advanced_phase(*phase,elapsed,old.as_ref(),surface.active,surface.zoom));
-                (points,animation,phase)
+            surface.lines = lines.into_iter().map(|(points,_,animation,presentation)| {
+                let phase = animation.as_ref().and_then(|next| previous.iter().find(|old| old.animation.as_ref().is_some_and(|old| old.key == next.key)))
+                    .map_or(0.0, |old| super::link_surface::advanced_phase(old.phase,elapsed,old.animation.as_ref(),surface.active,surface.zoom));
+                super::link_surface::SurfaceLine {points,animation,phase,presentation}
             }).collect();
             surface.started=Instant::now();
             surface.palette=colors.clone(); surface.stroke=stroke; surface.zoom=view.zoom; surface.active=flowing;
@@ -273,6 +282,10 @@ impl RenderOnce for InfiniteCanvas {
             .filter(|shape| { let frame=in_view(&view,&shape.bounds()); frame.right()>=0.0 && frame.bottom()>=0.0 && frame.x<=w && frame.y<=h })
             .filter_map(|shape| {
                 let frame = in_view(&view, &shape.frame);
+                let label_frame=if let ShapeKind::Symbol(kind)=shape.kind {
+                    let local=super::symbol::label_frame(kind,shape.frame.w,shape.frame.h);
+                    in_view(&view,&super::Frame::new(shape.frame.x+local.x,shape.frame.y+local.y,local.w,local.h))
+                } else {frame};
                 let size = shape.appearance.map_or(base_text_size, |s| Pixels::from(s.font_size)) * view.zoom;
                 let font_family = shape.appearance.map_or(super::CanvasFont::Default,|style|style.font).family(cx);
                 if shape.rotation != 0.0 && !matches!(shape.kind, ShapeKind::Image(_)) {
@@ -289,10 +302,10 @@ impl RenderOnce for InfiniteCanvas {
                 let placed = |text: &str| {
                     div()
                         .absolute()
-                        .left(Pixels::from(frame.x))
-                        .top(Pixels::from(frame.y))
-                        .w(Pixels::from(frame.w))
-                        .h(Pixels::from(frame.h))
+                        .left(Pixels::from(label_frame.x))
+                        .top(Pixels::from(label_frame.y))
+                        .w(Pixels::from(label_frame.w))
+                        .h(Pixels::from(label_frame.h))
                         .overflow_hidden()
                         .text_size(size)
                         .font_family(font_family.clone())
@@ -436,6 +449,7 @@ impl RenderOnce for InfiniteCanvas {
         let (wheel, pan, drop) = (set.clone(), set, plane.clone());
         let (scrolled, dragged, pressed) = (plane.clone(), plane.clone(), plane);
         let (live, held) = (local.clone(), local.clone());
+        let on_link_select=self.on_link_select;
         div()
             .id(id)
             .relative()
@@ -465,8 +479,14 @@ impl RenderOnce for InfiniteCanvas {
                 cx.stop_propagation();
                 wheel(next, window, cx);
             })
-            .on_mouse_down(gpui::MouseButton::Left, move |event, _, cx| {
+            .on_mouse_down(gpui::MouseButton::Left, move |event, window, cx| {
                 let now = held.read(cx).value;
+                if let Some(handler)=&on_link_select {
+                    let position=event.position-pressed.read(cx).bounds.origin;
+                    if let Some(key)=scene.hit_link(now.to_canvas((f32::from(position.x),f32::from(position.y))),6.0/now.zoom) {
+                        handler(key,window,cx);cx.stop_propagation();return;
+                    }
+                }
                 pressed.update(cx, |plane, _| plane.grip = Some((event.position, now)))
             })
             .on_drag(Pan { owner }, |_, _, _, cx| cx.new(|_| EmptyView))
