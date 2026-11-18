@@ -93,6 +93,7 @@ fn a_long_line_scrolls_horizontally(cx: &mut TestAppContext) {
         delta: ScrollDelta::Pixels(point(px(-240.0), px(0.0))),
         modifiers: Modifiers::none(),
         touch_phase: TouchPhase::Moved,
+        source: gpui::ScrollSource::Pointer,
     });
     cx.run_until_parked();
 
@@ -130,6 +131,7 @@ fn a_vertical_wheel_does_not_shift_a_long_line_sideways(cx: &mut TestAppContext)
         delta: ScrollDelta::Pixels(point(px(0.0), px(-240.0))),
         modifiers: Modifiers::none(),
         touch_phase: TouchPhase::Moved,
+        source: gpui::ScrollSource::Pointer,
     });
     cx.run_until_parked();
 

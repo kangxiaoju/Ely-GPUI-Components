@@ -451,7 +451,7 @@ mod tests {
     impl gpui::Render for MenuFixture {
         fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
             div().size_full().child(CompletionMenu::new("width-fixture", [
-                CompletionItem::new(self.label, SymbolKind::Class),
+                CompletionItem::new(self.label, SymbolKind::Variable),
             ]).max_width(self.limit))
         }
     }
