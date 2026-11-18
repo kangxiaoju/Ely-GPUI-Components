@@ -993,6 +993,14 @@ pub struct App {
     _ref_counts: Arc<RwLock<EntityRefCounts>>,
 }
 
+impl Drop for App {
+    fn drop(&mut self) {
+        // Platform windows must release their GPU surfaces before the display connection.
+        self.windows.clear();
+        self.window_handles.clear();
+    }
+}
+
 impl App {
     #[allow(clippy::new_ret_no_self)]
     pub(crate) fn new_app(
