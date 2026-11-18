@@ -13,8 +13,8 @@ Depend on Ely by git and use its direct GPUI Fast backend. Keep the dependency n
 ```toml
 [dependencies]
 ely-gpui-component = { git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", branch = "feat/gpui-fast-migration" }
-gpui = { package = "gpui-fast", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30", default-features = false }
-gpui_platform = { package = "gpui-fast-platform", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30", default-features = false, features = ["font-kit", "wayland", "x11"] }
+gpui = { package = "gpui-fast", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "65bc1fced7a56d91142671c01fea3eaa22cf1024", default-features = false }
+gpui_platform = { package = "gpui-fast-platform", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "65bc1fced7a56d91142671c01fea3eaa22cf1024", default-features = false, features = ["font-kit", "wayland", "x11"] }
 ```
 
 These are Fast 0.1.14 packages from the fixed runtime revision on `runtime/gpui-fast-0.1.14`. Do not replace these git dependencies with registry packages of the same version: Cargo treats the two sources as distinct types.
@@ -25,7 +25,7 @@ These are Fast 0.1.14 packages from the fixed runtime revision on `runtime/gpui-
 | `gpui` | The same Fast version and source as Ely's, under the name `gpui`. A different backend or source builds a second GPUI, whose types do not match the ones Ely takes. |
 | `gpui_platform` | Opens windows on each platform. Without `font-kit`, macOS falls back to GPUI's no-op text system and draws no text. Without `wayland` and `x11`, Linux runs headless and opens no window; building them needs `libxkbcommon-x11-dev` and `libfontconfig-dev`. |
 
-The browser gallery uses `gpui_web = { package = "gpui-fast-web", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "40427c396cc92b6946940e0e498612a8b680ce30", default-features = false }` on wasm targets. Keep both web and platform default features disabled: the gallery explicitly creates a single-threaded `WebPlatform`, retaining its browser emoji/CJK fallback and bundled Hebrew font without requiring shared memory.
+The browser gallery uses `gpui_web = { package = "gpui-fast-web", git = "https://github.com/kangxiaoju/Ely-GPUI-Components.git", rev = "65bc1fced7a56d91142671c01fea3eaa22cf1024", default-features = false }` on wasm targets. Keep both web and platform default features disabled: the gallery explicitly creates a single-threaded `WebPlatform`, retaining its browser emoji/CJK fallback and bundled Hebrew font without requiring shared memory.
 
 ## Shaders
 
@@ -49,5 +49,5 @@ A window opens with a counter and a Press button. From a clone of the repository
 | `init` error: `ely: embedded fonts failed to register` | GPUI's text system refused Ely's fonts. File a bug with the log. |
 | `init` error: `ely: the platform has no text system` | `gpui_platform` lacks `font-kit` on macOS, or `wayland` and `x11` on Linux. `ely-core`'s `platform` feature turns on all three. |
 | No window opens on Linux, and the log says nothing failed | `gpui_platform` lacks the `wayland` and `x11` features. |
-| `mismatched types`, with the note ``there are multiple different versions of crate `gpui` in the dependency graph`` | The app selected another backend, version or source. Match Ely's Fast 0.1.14 packages from `https://github.com/kangxiaoju/Ely-GPUI-Components.git` at `40427c396cc92b6946940e0e498612a8b680ce30` across core, platform and web; do not mix registry Fast, git Fast or `gpui-pre`. |
+| `mismatched types`, with the note ``there are multiple different versions of crate `gpui` in the dependency graph`` | The app selected another backend, version or source. Match Ely's Fast 0.1.14 packages from `https://github.com/kangxiaoju/Ely-GPUI-Components.git` at `65bc1fced7a56d91142671c01fea3eaa22cf1024` across core, platform and web; do not mix registry Fast, git Fast or `gpui-pre`. |
 | `metal shader compilation failed` | Default features are off and Xcode's Metal compiler is missing. Keep `runtime_shaders`. |

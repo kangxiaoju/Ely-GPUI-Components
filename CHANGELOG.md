@@ -3,6 +3,7 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
+- GPUI Fast runtime `65bc1fced7a56d91142671c01fea3eaa22cf1024`: destroy app windows and their GPU surfaces before the Wayland platform connection during final teardown, preventing Mesa Vulkan swapchain destruction from dereferencing a disconnected `wl_display`.
 - `ely-editor`: per-line syntax colors no longer drop for large sources; a buffer over the `lightweight()` threshold (128 KiB, or a 16 KiB line) kept keywords, types and function names colored while only the whole-buffer fold/bracket scans stayed skipped.
 - `ely-canvas`: `MindMap::collapsed` and `on_toggle` provide owner-controlled folded branches over the full topic tree. Localized chevron buttons fold without selecting, activating or editing, including read-only maps; layout, connectors and keyboard navigation include only visible topics. Folding preserves the viewport, independent search highlights and controlled selection for later expansion. The gallery demonstrates folding.
 - `ely-charts`, `ely-canvas`: `NetworkGraph::highlighted` and `MindMap::highlighted` accent multiple matching node indices or topic keys without changing layout, hover, activation or viewport; mind-map selection remains independently outlined. Empty matches restore normal styling and unknown matches are ignored.
