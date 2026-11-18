@@ -3,7 +3,7 @@ use std::{ops::Range, rc::Rc};
 use gpui::{
     AnyElement, App, ElementId, FontWeight, HighlightStyle, InteractiveElement, IntoElement,
     MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled,
-    StyledText, Window, div, prelude::*,
+    StyledText, Window, Pixels, TextRun, div, font, px, rems, prelude::*,
 };
 
 use super::{symbols::SymbolKind, syntax};
@@ -94,6 +94,7 @@ pub struct CompletionMenu {
     typed: SharedString,
     selected: usize,
     on_pick: Option<OnPick>,
+    max_width: Option<Pixels>,
 }
 
 impl CompletionMenu {
@@ -105,6 +106,7 @@ impl CompletionMenu {
             typed: SharedString::default(),
             selected: 0,
             on_pick: None,
+            max_width: None,
         }
     }
 
@@ -120,6 +122,12 @@ impl CompletionMenu {
         self
     }
 
+    /// Caps the whole menu to the host's available width, including documentation.
+    pub fn max_width(mut self, width: Pixels) -> Self {
+        self.max_width = Some(width.max(px(0.0)));
+        self
+    }
+
     /// Runs with the item picked.
     pub fn on_pick(
         mut self,
@@ -131,7 +139,7 @@ impl CompletionMenu {
 }
 
 impl RenderOnce for CompletionMenu {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         let colors = theme.colors.clone();
         let fits = completions(&self.items, &self.typed);
@@ -139,6 +147,26 @@ impl RenderOnce for CompletionMenu {
         let docs = fits
             .get(chosen)
             .and_then(|(item, _)| item.docs.clone().map(|docs| (item.detail.clone(), docs)));
+        let gap = rems(0.25).to_pixels(window.rem_size());
+        let available = self.max_width.unwrap_or(window.viewport_size().width - gap * 2.0)
+            .min(window.viewport_size().width - gap * 2.0).max(px(0.0));
+        let font_size = theme.text_size(TextSize::Sm).to_pixels(window.rem_size());
+        let measure = |text: &str| {
+            let run = TextRun {
+                len: text.len(), font: gpui::Font { weight: FontWeight::BOLD, ..font(theme.mono_family.clone()) },
+                color: colors.fg, background_color: None, underline: None, strikethrough: None,
+            };
+            window.text_system().layout_line(text, font_size, &[run], None).width
+        };
+        let chrome = theme.icon_size(IconSize::Sm).to_pixels(window.rem_size())
+            + rems(2.0).to_pixels(window.rem_size());
+        let preferred = fits.iter().map(|(item, _)| {
+            measure(&item.label) + item.detail.as_ref().map_or(px(0.0), |detail| measure(detail) + gap * 2.0) + chrome
+        }).fold(theme.label_width().to_pixels(window.rem_size()) * 2.75, Pixels::max);
+        let docs_width = docs.as_ref().map_or(px(0.0), |_| {
+            (theme.label_width().to_pixels(window.rem_size()) * 2.5).min(available * 0.4)
+        });
+        let list_width = preferred.min((available - docs_width - if docs.is_some() { gap } else { px(0.0) }).max(px(0.0)));
         let rows: Vec<AnyElement> = fits
             .iter()
             .enumerate()
@@ -148,6 +176,9 @@ impl RenderOnce for CompletionMenu {
                 div()
                     .id((self.id.clone(), format!("item-{ix}")))
                     .flex()
+                    .w_full()
+                    .min_w_0()
+                    .overflow_hidden()
                     .items_center()
                     .gap_2()
                     .px_2()
@@ -170,7 +201,10 @@ impl RenderOnce for CompletionMenu {
                     )
                     .child(
                         div()
-                            .flex_none()
+                            .flex_shrink(1.0)
+                            .min_w_0()
+                            .debug_selector(|| "completion-label".into())
+                            .text_ellipsis()
                             .font_family(theme.mono_family.clone())
                             .child(marked(item.label.clone(), hits.clone(), cx)),
                     )
@@ -188,12 +222,18 @@ impl RenderOnce for CompletionMenu {
         let empty = rows.is_empty();
         div()
             .flex()
+            .w(list_width + docs_width + if docs.is_some() { gap } else { px(0.0) })
+            .max_w(available)
             .items_start()
             .gap_1()
             .text_size(theme.text_size(TextSize::Sm))
             .child(
                 div()
-                    .w(theme.label_width() * 2.75)
+                    .debug_selector(|| "completion-panel".into())
+                    .w(list_width)
+                    .flex_none()
+                    .min_w_0()
+                    .overflow_hidden()
                     .p_1()
                     .rounded(theme.radius(Radius::Md))
                     .border_1()
@@ -213,7 +253,9 @@ impl RenderOnce for CompletionMenu {
             )
             .children(docs.map(|(detail, docs)| {
                 div()
-                    .w(theme.label_width() * 2.5)
+                    .w(docs_width)
+                    .min_w_0()
+                    .overflow_hidden()
                     .p_3()
                     .flex()
                     .flex_col()
@@ -403,5 +445,36 @@ mod tests {
         assert_eq!(labels, ["render", "request_layout"]);
         assert!(!found[0].1.is_empty(), "the typed letters are marked");
         assert_eq!(completions(&items, "").len(), 3);
+    }
+
+    struct MenuFixture { label: &'static str, limit: Pixels }
+    impl gpui::Render for MenuFixture {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            div().size_full().child(CompletionMenu::new("width-fixture", [
+                CompletionItem::new(self.label, SymbolKind::Class),
+            ]).max_width(self.limit))
+        }
+    }
+
+    #[gpui::test]
+    fn long_candidates_grow_the_menu_but_narrow_limits_contain_labels(cx: &mut gpui::TestAppContext) {
+        cx.update(ely_core::init_for_tests);
+        let (view, cx) = cx.add_window_view(|_, _| MenuFixture { label: "Spring", limit: px(1500.0) });
+        let short = cx.debug_bounds("completion-panel").unwrap();
+        view.update(cx, |view, cx| {
+            view.label = "SpringApplicationAdminJmxAutoConfiguration - org.springframework.boot.autoconfigure.admin";
+            cx.notify();
+        });
+        cx.run_until_parked();
+        let long = cx.debug_bounds("completion-panel").unwrap();
+        assert!(long.size.width > short.size.width, "long labels must expand the panel");
+        let label = cx.debug_bounds("completion-label").unwrap();
+        assert!(label.left() >= long.left() && label.right() <= long.right());
+        view.update(cx, |view, cx| { view.limit = px(280.0); cx.notify(); });
+        cx.run_until_parked();
+        let narrow = cx.debug_bounds("completion-panel").unwrap();
+        let label = cx.debug_bounds("completion-label").unwrap();
+        assert!(narrow.size.width <= px(280.0));
+        assert!(label.left() >= narrow.left() && label.right() <= narrow.right());
     }
 }
