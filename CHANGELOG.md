@@ -3,7 +3,7 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
-- `ely-editor`: `CompletionMenu` uses a fixed compact viewport with Ely two-axis scrollbars; candidate count and long labels no longer enlarge the panel. Selection changes reveal the selected row without resetting manual scrolling. `max_width` and `max_height` cap the viewport to the host's available space.
+- `ely-editor`: `CompletionMenu` fits its candidate rows and measured label width until the compact maximum viewport is reached; overflow retains Ely two-axis scrollbars. Selection changes reveal the selected row without resetting manual scrolling. `max_width` and `max_height` also cap the viewport to the host's available space.
 - `ely-editor`: `CodeEditor::caret_bounds` exposes the same drawn caret geometry used by IME range bounds, so completion hosts can anchor below the true cursor through wide characters, folds, and scrolling.
 - GPUI Fast runtime `65bc1fced7a56d91142671c01fea3eaa22cf1024`: destroy app windows and their GPU surfaces before the Wayland platform connection during final teardown, preventing Mesa Vulkan swapchain destruction from dereferencing a disconnected `wl_display`.
 - `ely-editor`: per-line syntax colors no longer drop for large sources; a buffer over the `lightweight()` threshold (128 KiB, or a 16 KiB line) kept keywords, types and function names colored while only the whole-buffer fold/bracket scans stayed skipped.

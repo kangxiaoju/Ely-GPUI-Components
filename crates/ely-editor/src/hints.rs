@@ -179,14 +179,18 @@ impl RenderOnce for CompletionMenu {
             + rems(2.0).to_pixels(window.rem_size());
         let preferred = fits.iter().map(|(item, _)| {
             measure(&item.label) + item.detail.as_ref().map_or(px(0.0), |detail| measure(detail) + gap * 2.0) + chrome
-        }).fold(theme.label_width().to_pixels(window.rem_size()) * 2.75, Pixels::max);
+        }).fold(chrome, Pixels::max);
         let docs_width = docs.as_ref().map_or(px(0.0), |_| {
             (theme.label_width().to_pixels(window.rem_size()) * 2.5).min(available * 0.4)
         });
-        let list_width = (theme.label_width().to_pixels(window.rem_size()) * 2.75)
+        let list_width = preferred.min(theme.label_width().to_pixels(window.rem_size()) * 2.75)
             .min((available - docs_width - if docs.is_some() { gap } else { px(0.0) }).max(px(0.0)));
-        let height = theme.list_max_height().to_pixels(window.rem_size())
-            .min(self.max_height.unwrap_or(window.viewport_size().height));
+        let row_height = theme.control_height(ControlSize::Sm).to_pixels(window.rem_size());
+        let padding = rems(0.5).to_pixels(window.rem_size()) + px(2.0);
+        let horizontal = if preferred > list_width { theme.scrollbar_thickness().to_pixels(window.rem_size()) * 2.0 } else { px(0.0) };
+        let height = (row_height * fits.len().max(1) as f32 + padding + horizontal)
+            .min(theme.list_max_height().to_pixels(window.rem_size()))
+            .min(self.max_height.unwrap_or(window.viewport_size().height)).max(px(0.0));
         let rows: Vec<AnyElement> = fits
             .iter()
             .enumerate()
@@ -474,14 +478,20 @@ mod tests {
     }
 
     #[gpui::test]
-    fn completion_viewport_is_fixed_and_scrolls_to_keyboard_selection(cx: &mut gpui::TestAppContext) {
+    fn completion_viewport_fits_content_caps_overflow_and_scrolls_to_selection(cx: &mut gpui::TestAppContext) {
         cx.update(ely_core::init_for_tests);
         let (view, cx) = cx.add_window_view(|_, _| MenuFixture { count: 1, selected: 0, limit: px(1500.0) });
         let short = cx.debug_bounds("completion-panel").unwrap();
         view.update(cx, |view, cx| { view.count = 50; cx.notify(); });
         cx.run_until_parked();
         let full = cx.debug_bounds("completion-panel").unwrap();
-        assert_eq!(full.size, short.size, "candidate count must not resize the menu");
+        assert!(full.size.height > short.size.height, "one row must not reserve the maximum viewport");
+        assert_eq!(full.size.width, short.size.width, "long labels stay capped");
+        view.update(cx, |view, cx| { view.count = 40; cx.notify(); });
+        cx.run_until_parked();
+        assert_eq!(cx.debug_bounds("completion-panel").unwrap().size, full.size);
+        view.update(cx, |view, cx| { view.count = 50; cx.notify(); });
+        cx.run_until_parked();
         assert!(full.size.height <= px(300.0) && full.size.width <= px(500.0));
         view.update(cx, |view, cx| { view.selected = 49; cx.notify(); });
         cx.run_until_parked();
