@@ -13,8 +13,8 @@ use crate::{
     navigation::{fuzzy, marked},
     primitives::{Icon, IconName},
     theme::{ActiveTheme, ControlSize, Elevation, IconSize, Radius, TextSize},
-    typography::Ellipsis,
 };
+use ely_core::layout::ScrollArea;
 
 /// A completion: what it inserts, its kind, a detail such as its type, and its documentation.
 #[derive(Clone, Debug, PartialEq)]
@@ -95,6 +95,7 @@ pub struct CompletionMenu {
     selected: usize,
     on_pick: Option<OnPick>,
     max_width: Option<Pixels>,
+    max_height: Option<Pixels>,
 }
 
 impl CompletionMenu {
@@ -107,6 +108,7 @@ impl CompletionMenu {
             selected: 0,
             on_pick: None,
             max_width: None,
+            max_height: None,
         }
     }
 
@@ -128,6 +130,12 @@ impl CompletionMenu {
         self
     }
 
+    /// Caps the fixed-height viewport to the space available below its anchor.
+    pub fn max_height(mut self, height: Pixels) -> Self {
+        self.max_height = Some(height.max(px(0.0)));
+        self
+    }
+
     /// Runs with the item picked.
     pub fn on_pick(
         mut self,
@@ -140,10 +148,19 @@ impl CompletionMenu {
 
 impl RenderOnce for CompletionMenu {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let theme = cx.theme();
-        let colors = theme.colors.clone();
         let fits = completions(&self.items, &self.typed);
+        let scroll_state = window.use_keyed_state((self.id.clone(), "viewport"), cx, |_, _| {
+            (gpui::ScrollHandle::new(), None::<(usize, SharedString)>)
+        });
+        let scroll = scroll_state.read(cx).0.clone();
         let chosen = self.selected.min(fits.len().saturating_sub(1));
+        let selection = (chosen, self.typed.clone());
+        if scroll_state.read(cx).1.as_ref() != Some(&selection) {
+            scroll.scroll_to_item(chosen);
+            scroll_state.update(cx, |state, _| state.1 = Some(selection));
+        }
+        let theme = cx.theme().clone();
+        let colors = theme.colors.clone();
         let docs = fits
             .get(chosen)
             .and_then(|(item, _)| item.docs.clone().map(|docs| (item.detail.clone(), docs)));
@@ -166,7 +183,10 @@ impl RenderOnce for CompletionMenu {
         let docs_width = docs.as_ref().map_or(px(0.0), |_| {
             (theme.label_width().to_pixels(window.rem_size()) * 2.5).min(available * 0.4)
         });
-        let list_width = preferred.min((available - docs_width - if docs.is_some() { gap } else { px(0.0) }).max(px(0.0)));
+        let list_width = (theme.label_width().to_pixels(window.rem_size()) * 2.75)
+            .min((available - docs_width - if docs.is_some() { gap } else { px(0.0) }).max(px(0.0)));
+        let height = theme.list_max_height().to_pixels(window.rem_size())
+            .min(self.max_height.unwrap_or(window.viewport_size().height));
         let rows: Vec<AnyElement> = fits
             .iter()
             .enumerate()
@@ -176,9 +196,10 @@ impl RenderOnce for CompletionMenu {
                 div()
                     .id((self.id.clone(), format!("item-{ix}")))
                     .flex()
-                    .w_full()
-                    .min_w_0()
-                    .overflow_hidden()
+                    .w(preferred.max(list_width))
+                    .h(theme.control_height(ControlSize::Sm))
+                    .flex_none()
+                    .debug_selector(move || format!("completion-item-{ix}").into())
                     .items_center()
                     .gap_2()
                     .px_2()
@@ -201,20 +222,16 @@ impl RenderOnce for CompletionMenu {
                     )
                     .child(
                         div()
-                            .flex_shrink(1.0)
-                            .min_w_0()
+                            .flex_none()
                             .debug_selector(|| "completion-label".into())
-                            .text_ellipsis()
                             .font_family(theme.mono_family.clone())
                             .child(marked(item.label.clone(), hits.clone(), cx)),
                     )
                     .child(
                         div()
-                            .flex_1()
-                            .min_w_0()
-                            .text_right()
+                            .flex_none()
                             .text_color(colors.fg_subtle)
-                            .children(item.detail.clone().map(Ellipsis::new)),
+                            .children(item.detail.clone()),
                     )
                     .into_any_element()
             })
@@ -231,6 +248,7 @@ impl RenderOnce for CompletionMenu {
                 div()
                     .debug_selector(|| "completion-panel".into())
                     .w(list_width)
+                    .h(height)
                     .flex_none()
                     .min_w_0()
                     .overflow_hidden()
@@ -240,20 +258,18 @@ impl RenderOnce for CompletionMenu {
                     .border_color(colors.border)
                     .bg(colors.overlay)
                     .shadow(theme.elevation(Elevation::Floating))
-                    .when(empty, |list| {
-                        list.child(
-                            div()
-                                .px_2()
-                                .py_1()
-                                .text_color(colors.fg_subtle)
-                                .child(i18n::text(cx, "completion.empty", &[])),
-                        )
-                    })
-                    .children(rows),
+                    .child(ScrollArea::new((self.id.clone(), "scroll"))
+                        .track_scroll(&scroll)
+                        .size_full()
+                        .when(empty, |area| area.child(div().px_2().py_1()
+                            .text_color(colors.fg_subtle)
+                            .child(i18n::text(cx, "completion.empty", &[]))))
+                        .children(rows)),
             )
             .children(docs.map(|(detail, docs)| {
                 div()
                     .w(docs_width)
+                    .h(height)
                     .min_w_0()
                     .overflow_hidden()
                     .p_3()
@@ -271,7 +287,8 @@ impl RenderOnce for CompletionMenu {
                             .text_color(colors.fg)
                             .child(detail)
                     }))
-                    .child(div().text_color(colors.fg_muted).child(docs))
+                    .child(ScrollArea::new((self.id.clone(), "docs-scroll")).vertical().flex_1().min_h_0()
+                        .child(div().text_color(colors.fg_muted).child(docs)))
             }))
     }
 }
@@ -447,34 +464,40 @@ mod tests {
         assert_eq!(completions(&items, "").len(), 3);
     }
 
-    struct MenuFixture { label: &'static str, limit: Pixels }
+    struct MenuFixture { count: usize, selected: usize, limit: Pixels }
     impl gpui::Render for MenuFixture {
         fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
-            div().size_full().child(CompletionMenu::new("width-fixture", [
-                CompletionItem::new(self.label, SymbolKind::Variable),
-            ]).max_width(self.limit))
+            div().size_full().child(CompletionMenu::new("width-fixture", (0..self.count).map(|ix| {
+                CompletionItem::new(format!("SpringApplicationAdminJmxAutoConfiguration{ix:02} - org.springframework.boot.autoconfigure.admin"), SymbolKind::Variable)
+            })).selected(self.selected).max_width(self.limit))
         }
     }
 
     #[gpui::test]
-    fn long_candidates_grow_the_menu_but_narrow_limits_contain_labels(cx: &mut gpui::TestAppContext) {
+    fn completion_viewport_is_fixed_and_scrolls_to_keyboard_selection(cx: &mut gpui::TestAppContext) {
         cx.update(ely_core::init_for_tests);
-        let (view, cx) = cx.add_window_view(|_, _| MenuFixture { label: "Spring", limit: px(1500.0) });
+        let (view, cx) = cx.add_window_view(|_, _| MenuFixture { count: 1, selected: 0, limit: px(1500.0) });
         let short = cx.debug_bounds("completion-panel").unwrap();
-        view.update(cx, |view, cx| {
-            view.label = "SpringApplicationAdminJmxAutoConfiguration - org.springframework.boot.autoconfigure.admin";
-            cx.notify();
+        view.update(cx, |view, cx| { view.count = 50; cx.notify(); });
+        cx.run_until_parked();
+        let full = cx.debug_bounds("completion-panel").unwrap();
+        assert_eq!(full.size, short.size, "candidate count must not resize the menu");
+        assert!(full.size.height <= px(300.0) && full.size.width <= px(500.0));
+        view.update(cx, |view, cx| { view.selected = 49; cx.notify(); });
+        cx.run_until_parked();
+        let last = cx.debug_bounds("completion-item-49").unwrap();
+        assert!(last.top() >= full.top() && last.bottom() <= full.bottom(), "last selected row must scroll into view");
+        let before = last.left();
+        cx.simulate_mouse_move(full.center(), None, gpui::Modifiers::none());
+        cx.simulate_event(gpui::ScrollEvent {
+            position: full.center(), delta: gpui::ScrollDelta::Pixels(gpui::point(-px(100.0), px(0.0))),
+            modifiers: gpui::Modifiers::none(), touch_phase: gpui::TouchPhase::Moved,
+            source: gpui::ScrollSource::Pointer,
         });
         cx.run_until_parked();
-        let long = cx.debug_bounds("completion-panel").unwrap();
-        assert!(long.size.width > short.size.width, "long labels must expand the panel");
-        let label = cx.debug_bounds("completion-label").unwrap();
-        assert!(label.left() >= long.left() && label.right() <= long.right());
+        assert!(cx.debug_bounds("completion-item-49").unwrap().left() < before, "long rows must scroll horizontally");
         view.update(cx, |view, cx| { view.limit = px(280.0); cx.notify(); });
         cx.run_until_parked();
-        let narrow = cx.debug_bounds("completion-panel").unwrap();
-        let label = cx.debug_bounds("completion-label").unwrap();
-        assert!(narrow.size.width <= px(280.0));
-        assert!(label.left() >= narrow.left() && label.right() <= narrow.right());
+        assert!(cx.debug_bounds("completion-panel").unwrap().size.width <= px(280.0));
     }
 }

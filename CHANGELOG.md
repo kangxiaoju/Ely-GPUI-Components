@@ -3,7 +3,8 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
-- `ely-editor`: `CompletionMenu` measures candidate labels to grow beyond its default width, caps the menu to the viewport or host `max_width`, and ellipsizes clipped labels instead of painting outside the panel. Documentation shares the same total width budget.
+- `ely-editor`: `CompletionMenu` uses a fixed compact viewport with Ely two-axis scrollbars; candidate count and long labels no longer enlarge the panel. Selection changes reveal the selected row without resetting manual scrolling. `max_width` and `max_height` cap the viewport to the host's available space.
+- `ely-editor`: `CodeEditor::caret_bounds` exposes the same drawn caret geometry used by IME range bounds, so completion hosts can anchor below the true cursor through wide characters, folds, and scrolling.
 - GPUI Fast runtime `65bc1fced7a56d91142671c01fea3eaa22cf1024`: destroy app windows and their GPU surfaces before the Wayland platform connection during final teardown, preventing Mesa Vulkan swapchain destruction from dereferencing a disconnected `wl_display`.
 - `ely-editor`: per-line syntax colors no longer drop for large sources; a buffer over the `lightweight()` threshold (128 KiB, or a 16 KiB line) kept keywords, types and function names colored while only the whole-buffer fold/bracket scans stayed skipped.
 - `ely-canvas`: `MindMap::collapsed` and `on_toggle` provide owner-controlled folded branches over the full topic tree. Localized chevron buttons fold without selecting, activating or editing, including read-only maps; layout, connectors and keyboard navigation include only visible topics. Folding preserves the viewport, independent search highlights and controlled selection for later expansion. The gallery demonstrates folding.

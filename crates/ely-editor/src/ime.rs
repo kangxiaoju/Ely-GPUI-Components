@@ -17,6 +17,24 @@ use crate::{
 };
 
 impl CodeEditor {
+    /// The primary caret's drawn window bounds, including folds and scrolling.
+    /// Returns `None` when its row is not laid out.
+    pub fn caret_bounds(&self, window: &mut Window, cx: &Context<Self>) -> Option<Bounds<Pixels>> {
+        self.bounds_at_offset(self.primary().head, window, cx)
+    }
+
+    fn bounds_at_offset(&self, offset: usize, window: &mut Window, cx: &Context<Self>) -> Option<Bounds<Pixels>> {
+        let line = self.buffer.line_of(offset);
+        let row = self.frame.rows.iter().position(|row| *row == Row::Line(line))?;
+        let text = self.row_text(line);
+        let (shown, measured) = self.measured(line, window, cx);
+        let column = shown.column(text, self.buffer.point(offset).1.min(text.len()));
+        let scrolled = -self.scroll.0.borrow().base_handle.offset().y;
+        let origin = point(self.metrics.left + measured.x(column),
+            self.metrics.top + self.metrics.line * row as f32 - scrolled);
+        Some(Bounds::new(origin, gpui::size(measured.x(column + 1) - measured.x(column), self.metrics.line)))
+    }
+
     /// Notes set into a line: inlay hints, and the ghost text's first line.
     pub(crate) fn notes(&self, line: usize, cx: &App) -> Vec<(usize, String, HighlightStyle)> {
         let colors = &cx.theme().colors;
@@ -238,23 +256,7 @@ impl EntityInputHandler for CodeEditor {
         cx: &mut Context<Self>,
     ) -> Option<Bounds<Pixels>> {
         let range = self.byte_range(&range_utf16);
-        let line = self.buffer.line_of(range.start);
-        let row = self
-            .frame
-            .rows
-            .iter()
-            .position(|row| *row == Row::Line(line))?;
-        let text = self.row_text(line);
-        let (shown, measured) = self.measured(line, window, cx);
-        let column = shown.column(text, self.buffer.point(range.start).1.min(text.len()));
-        let metrics = self.metrics;
-        let scrolled = -self.scroll.0.borrow().base_handle.offset().y;
-        let origin = point(
-            metrics.left + measured.x(column),
-            metrics.top + metrics.line * row as f32 - scrolled,
-        );
-        let wide = measured.x(column + 1) - measured.x(column);
-        Some(Bounds::new(origin, gpui::size(wide, metrics.line)))
+        self.bounds_at_offset(range.start, window, cx)
     }
 
     fn character_index_for_point(
