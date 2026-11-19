@@ -183,11 +183,13 @@ impl RenderOnce for CompletionMenu {
         let docs_width = docs.as_ref().map_or(px(0.0), |_| {
             (theme.label_width().to_pixels(window.rem_size()) * 2.5).min(available * 0.4)
         });
-        let list_width = preferred.min(theme.label_width().to_pixels(window.rem_size()) * 2.75)
-            .min((available - docs_width - if docs.is_some() { gap } else { px(0.0) }).max(px(0.0)));
-        let row_height = theme.control_height(ControlSize::Sm).to_pixels(window.rem_size());
         let padding = rems(0.5).to_pixels(window.rem_size()) + px(2.0);
-        let horizontal = if preferred > list_width { theme.scrollbar_thickness().to_pixels(window.rem_size()) * 2.0 } else { px(0.0) };
+        let content_width = if fits.is_empty() { measure(i18n::text(cx, "completion.empty", &[]).as_ref()) + chrome } else { preferred };
+        let list_width = (content_width + padding).min(theme.label_width().to_pixels(window.rem_size()) * 2.75)
+            .min((available - docs_width - if docs.is_some() { gap } else { px(0.0) }).max(px(0.0)));
+        let row_width = preferred.max((list_width - padding).max(px(0.0)));
+        let row_height = theme.control_height(ControlSize::Sm).to_pixels(window.rem_size());
+        let horizontal = if row_width + padding > list_width { theme.scrollbar_thickness().to_pixels(window.rem_size()) * 2.0 } else { px(0.0) };
         let height = (row_height * fits.len().max(1) as f32 + padding + horizontal)
             .min(theme.list_max_height().to_pixels(window.rem_size()))
             .min(self.max_height.unwrap_or(window.viewport_size().height)).max(px(0.0));
@@ -200,7 +202,7 @@ impl RenderOnce for CompletionMenu {
                 div()
                     .id((self.id.clone(), format!("item-{ix}")))
                     .flex()
-                    .w(preferred.max(list_width))
+                    .w(row_width)
                     .h(theme.control_height(ControlSize::Sm))
                     .flex_none()
                     .debug_selector(move || format!("completion-item-{ix}").into())
