@@ -22,6 +22,32 @@ pub(super) fn editor<'a>(
 }
 
 #[gpui::test]
+fn parser_snapshot_keeps_history_and_rejects_stale_offsets(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("fn 示例() {}", cx);
+    editor.update(cx, |editor, cx| {
+        editor.enable_syntax(cx);
+        let stamp = editor.syntax_stamp();
+        let caret = editor.text().len() - 1;
+        let selection = caret..caret;
+        editor.select([selection], cx);
+        let snapshot = crate::SyntaxSnapshot {
+            indents: vec![(caret - 1..caret + 1, 0)],
+            symbols: vec![crate::Symbol::new("示例", crate::SymbolKind::Function, 0)],
+            ..Default::default()
+        };
+        assert!(editor.set_syntax(stamp, snapshot.clone(), cx));
+        assert_eq!(editor.primary().head, caret);
+        assert!(!editor.can_undo());
+        editor.newline(cx);
+        assert_eq!(editor.text(), "fn 示例() {\n    \n}");
+        assert!(editor.syntax_symbols().is_empty());
+        assert!(!editor.set_syntax(stamp, snapshot, cx));
+        editor.undo(cx);
+        assert_eq!(editor.text(), "fn 示例() {}");
+    });
+}
+
+#[gpui::test]
 fn typed_pairs_close_and_one_undo_takes_back_the_burst(cx: &mut TestAppContext) {
     let (editor, cx) = editor("let x = ", cx);
     editor.update(cx, |editor, cx| {

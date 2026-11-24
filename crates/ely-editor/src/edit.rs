@@ -145,7 +145,13 @@ impl CodeEditor {
                     .collect();
                 let before = self.buffer.text()[..at].trim_end().chars().next_back();
                 let after = self.buffer.text()[selection.range().end..].chars().next();
-                let opens = before.is_some_and(|ch| "{[(:".contains(ch));
+                let structural = self.current_syntax().and_then(|syntax| syntax.indent_at(at));
+                let opens = if self.local_syntax.is_some() {
+                    structural.is_some()
+                } else {
+                    before.is_some_and(|ch| "{[(:".contains(ch))
+                };
+                let indent = structural.map_or(indent, |columns| " ".repeat(columns));
                 let text = match (opens, after) {
                     (true, Some(close)) if "}])".contains(close) => {
                         format!("\n{indent}{}\n{indent}", " ".repeat(tab))

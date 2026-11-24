@@ -33,8 +33,7 @@ impl CodeEditor {
         let touches = |span: &Range<usize>| {
             span.start < range.end.max(range.start + 1) && range.start < span.end
         };
-        // Syntax colors are per-line; only whole-buffer scans (folds, brackets) stay gated by `lightweight()`.
-        let mut spans = self.line_colors(self.row_text(line), cx);
+        let mut spans = self.syntax_colors(range.clone(), cx);
         // Offsets found in an older text are left out.
         let fresh = self.frame.stamp == self.buffer.stamp();
         let brackets = self

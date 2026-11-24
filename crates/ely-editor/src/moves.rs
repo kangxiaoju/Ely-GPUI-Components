@@ -4,13 +4,12 @@ use super::{
     cursor::{Motion, Selection, merged, moved},
     layout::{Row, hidden, rows},
     state::CodeEditor,
-    syntax::folds,
 };
 
 impl CodeEditor {
     /// Moves every cursor. Up and down step over folded lines.
     pub(crate) fn motion(&mut self, motion: Motion, extend: bool, cx: &mut Context<Self>) {
-        let hide = hidden(self.buffer.lines(), &folds(&self.buffer), &self.folded);
+        let hide = hidden(self.buffer.lines(), &self.syntax_folds(), &self.folded);
         let vertical = matches!(motion, Motion::Up | Motion::Down | Motion::Page(_));
         let moved: Vec<Selection> = self
             .selections
@@ -105,7 +104,7 @@ impl CodeEditor {
     /// Folds the block that opens on a line, or opens it again; cursors inside move to its header.
     pub(crate) fn toggle_fold(&mut self, line: usize, cx: &mut Context<Self>) {
         if !self.folded.remove(&line) {
-            let Some((_, end)) = folds(&self.buffer)
+            let Some((_, end)) = self.syntax_folds()
                 .into_iter()
                 .find(|(header, _)| *header == line)
             else {
@@ -135,7 +134,7 @@ impl CodeEditor {
         if self.folded.is_empty() {
             return;
         }
-        let folds = folds(&self.buffer);
+        let folds = self.syntax_folds();
         let lines: Vec<usize> = self
             .selections
             .iter()
@@ -153,7 +152,7 @@ impl CodeEditor {
     /// The row the primary cursor draws on, or the fold header above it when a fold hides it.
     pub(crate) fn primary_row(&self) -> usize {
         let line = self.buffer.line_of(self.primary().head);
-        let hide = hidden(self.buffer.lines(), &folds(&self.buffer), &self.folded);
+        let hide = hidden(self.buffer.lines(), &self.syntax_folds(), &self.folded);
         rows(&self.buffer, &hide, &self.marks)
             .iter()
             .rposition(|row| matches!(row, Row::Line(shown) if *shown <= line))

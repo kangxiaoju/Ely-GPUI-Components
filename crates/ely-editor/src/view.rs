@@ -12,7 +12,7 @@ use super::{
     keys::{CONTEXT, listen},
     layout::{Row, around, hidden, rows},
     state::{CodeEditor, EditorEvent},
-    syntax::{self, Bracket, brackets, folds},
+    syntax::{self, Bracket},
 };
 use crate::{
     i18n,
@@ -96,7 +96,7 @@ impl CodeEditor {
         }
         let rows = headers.into_iter().map(|line| {
             let text = self.buffer.line(line).to_string();
-            let styles = self.line_colors(&text, cx);
+            let styles = self.syntax_colors(self.buffer.line_range(line), cx);
             let jump = cx.entity();
             div()
                 .id(("sticky", line))
@@ -160,7 +160,7 @@ impl CodeEditor {
                             .nth(MINIMAP_COLUMNS)
                             .map_or(text.len(), |(offset, _)| offset);
                         let text = &text[..end];
-                        self.line_colors(text, cx)
+                        self.syntax_colors(self.buffer.line_range(*at).start..self.buffer.line_range(*at).start + end, cx)
                             .into_iter()
                             .filter_map(|(range, style)| {
                                 let start = text[..range.start].chars().count();
@@ -304,16 +304,16 @@ impl Render for CodeEditor {
         // Reserve that much vertical room so the last row stays selectable above it.
         let scrollbar_clearance = theme.scrollbar_thickness().to_pixels(window.rem_size()) * 2.0;
         let lightweight = self.lightweight();
-        let found = if lightweight {
+        let found = if lightweight && self.local_syntax.is_none() {
             Vec::new()
         } else {
-            folds(&self.buffer)
+            self.syntax_folds()
         };
         let hide = hidden(self.buffer.lines(), &found, &self.folded);
-        let found_brackets = if lightweight {
+        let found_brackets = if lightweight && self.local_syntax.is_none() {
             Vec::new()
         } else {
-            brackets(&self.buffer)
+            self.syntax_brackets()
         };
         let matched = syntax::matched(&found_brackets, self.primary().head);
         let occurrences = match self.needle() {

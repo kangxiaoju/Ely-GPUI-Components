@@ -5,6 +5,145 @@ use gpui::{App, HighlightStyle};
 use super::buffer::Buffer;
 use crate::forms::{Kind, Syntax, code_highlights_with, lex};
 
+/// A theme-independent syntax class supplied by a local parser.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SyntaxToken {
+    /// A language keyword.
+    Keyword,
+    /// A string literal.
+    String,
+    /// A numeric literal.
+    Number,
+    /// A comment.
+    Comment,
+    /// A function name.
+    Function,
+    /// A type name.
+    Type,
+    /// A constant name.
+    Constant,
+    /// A property name.
+    Property,
+    /// A markup tag.
+    Tag,
+    /// An attribute.
+    Attribute,
+    /// An operator.
+    Operator,
+    /// Punctuation.
+    Punctuation,
+    /// A variable name.
+    Variable,
+}
+
+impl SyntaxToken {
+    fn color(self, cx: &App) -> gpui::Hsla {
+        use crate::theme::ActiveTheme;
+        let syntax = &cx.theme().colors.syntax;
+        match self {
+            Self::Keyword => syntax.keyword,
+            Self::String => syntax.string,
+            Self::Number => syntax.number,
+            Self::Comment => syntax.comment,
+            Self::Function => syntax.function,
+            Self::Type => syntax.type_name,
+            Self::Constant => syntax.constant,
+            Self::Property => syntax.property,
+            Self::Tag => syntax.tag,
+            Self::Attribute => syntax.attribute,
+            Self::Operator => syntax.operator,
+            Self::Punctuation => syntax.punctuation,
+            Self::Variable => syntax.variable,
+        }
+    }
+}
+
+/// A parser's immutable projection for one exact buffer stamp.
+#[derive(Clone, Debug, Default)]
+pub struct SyntaxSnapshot {
+    /// Disjoint UTF-8 byte spans, sorted by start.
+    pub highlights: Vec<(Range<usize>, SyntaxToken)>,
+    /// Inclusive first and last lines of structural folds, sorted by header.
+    pub folds: Vec<(usize, usize)>,
+    /// Bracket byte offset, depth and partner byte offset, sorted by offset.
+    pub brackets: Vec<(usize, usize, Option<usize>)>,
+    /// Disjoint byte regions and base indentation in columns, sorted by start.
+    pub indents: Vec<(Range<usize>, usize)>,
+    /// Locally parsed symbols, independent of language servers.
+    pub symbols: Vec<crate::Symbol>,
+}
+
+impl SyntaxSnapshot {
+    fn spans(&self, range: Range<usize>) -> Vec<(Range<usize>, SyntaxToken)> {
+        let first = self.highlights.partition_point(|(span, _)| span.end <= range.start);
+        self.highlights[first..]
+            .iter()
+            .take_while(|(span, _)| span.start < range.end)
+            .map(|(span, token)| {
+                (span.start.max(range.start) - range.start..span.end.min(range.end) - range.start, *token)
+            })
+            .collect()
+    }
+
+    pub(crate) fn indent_at(&self, offset: usize) -> Option<usize> {
+        let index = self.indents.partition_point(|(range, _)| range.end <= offset);
+        self.indents.get(index).and_then(|(range, indent)| range.contains(&offset).then_some(*indent))
+    }
+}
+
+impl crate::CodeEditor {
+    /// The exact text identity for accepting asynchronous parser results.
+    pub fn syntax_stamp(&self) -> u64 {
+        self.buffer.stamp()
+    }
+
+    /// Enables parser-owned syntax; stale results never decorate newer text.
+    pub fn enable_syntax(&mut self, cx: &mut gpui::Context<Self>) {
+        self.local_syntax = Some((0, std::sync::Arc::new(SyntaxSnapshot::default())));
+        cx.notify();
+    }
+
+    /// Publishes a parser result without changing text, selections or undo history.
+    pub fn set_syntax(&mut self, stamp: u64, syntax: SyntaxSnapshot, cx: &mut gpui::Context<Self>) -> bool {
+        if stamp != self.buffer.stamp() {
+            return false;
+        }
+        self.local_syntax = Some((stamp, std::sync::Arc::new(syntax)));
+        cx.notify();
+        true
+    }
+
+    /// The current local outline, empty while its text is being parsed.
+    pub fn syntax_symbols(&self) -> &[crate::Symbol] {
+        self.current_syntax().map_or(&[], |syntax| syntax.symbols.as_slice())
+    }
+
+    pub(crate) fn current_syntax(&self) -> Option<&SyntaxSnapshot> {
+        self.local_syntax.as_ref().and_then(|(stamp, syntax)| (*stamp == self.buffer.stamp()).then_some(syntax.as_ref()))
+    }
+
+    pub(crate) fn syntax_folds(&self) -> Vec<(usize, usize)> {
+        if self.local_syntax.is_some() {
+            return self.current_syntax().map_or_else(Vec::new, |syntax| syntax.folds.clone());
+        }
+        folds(&self.buffer)
+    }
+
+    pub(crate) fn syntax_brackets(&self) -> Vec<Bracket> {
+        if self.local_syntax.is_some() {
+            return self.current_syntax().map_or_else(Vec::new, |syntax| syntax.brackets.iter().map(|&(offset, depth, partner)| Bracket { offset, depth, partner }).collect());
+        }
+        brackets(&self.buffer)
+    }
+
+    pub(crate) fn syntax_colors(&self, range: Range<usize>, cx: &App) -> Vec<(Range<usize>, HighlightStyle)> {
+        if self.local_syntax.is_some() {
+            return self.current_syntax().map_or_else(Vec::new, |syntax| syntax.spans(range).into_iter().map(|(range, token)| (range, token.color(cx).into())).collect());
+        }
+        self.line_colors(&self.buffer.text()[range], cx)
+    }
+}
+
 /// Each line that opens a block, and the last line the block holds, read from indentation.
 pub(crate) fn folds(buffer: &Buffer) -> Vec<(usize, usize)> {
     let mut out = Vec::new();
@@ -172,6 +311,25 @@ pub(crate) fn occurrences(buffer: &Buffer, needle: &str, lines: Range<usize>) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn syntax_snapshot_clips_multiline_tokens() {
+        let snapshot = super::SyntaxSnapshot {
+            highlights: vec![(0..20, super::SyntaxToken::Comment)],
+            ..Default::default()
+        };
+        assert_eq!(snapshot.spans(5..10), vec![(0..5, super::SyntaxToken::Comment)]);
+    }
+
+    #[test]
+    fn syntax_snapshot_uses_innermost_indent_region() {
+        let snapshot = super::SyntaxSnapshot {
+            indents: vec![(0..10, 0), (10..20, 2), (20..30, 0)],
+            ..Default::default()
+        };
+        assert_eq!(snapshot.indent_at(15), Some(2));
+        assert_eq!(snapshot.indent_at(25), Some(0));
+        assert_eq!(snapshot.indent_at(30), None);
+    }
 
     #[test]
     fn blocks_fold_by_indentation_and_skip_blank_lines() {
