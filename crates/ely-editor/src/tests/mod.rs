@@ -22,6 +22,73 @@ pub(super) fn editor<'a>(
 }
 
 #[gpui::test]
+fn parser_newline_does_not_indent_literal_openers(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("    // {", cx);
+    editor.update(cx, |editor, cx| {
+        editor.enable_syntax(cx);
+        let stamp = editor.syntax_stamp();
+        let end = editor.text().len();
+        let selection = end..end;
+        editor.select([selection], cx);
+        editor.set_syntax(stamp, crate::SyntaxSnapshot {
+            highlights: vec![(4..end, crate::SyntaxToken::Comment)],
+            indents: vec![(0..end + 1, 0)],
+            ..Default::default()
+        }, cx);
+        editor.newline(cx);
+        assert_eq!(editor.text(), "    // {\n    ");
+        editor.reset("    \"{", cx);
+        let stamp = editor.syntax_stamp();
+        let end = editor.text().len();
+        let selection = end..end;
+        editor.select([selection], cx);
+        editor.set_syntax(stamp, crate::SyntaxSnapshot {
+            highlights: vec![(4..end, crate::SyntaxToken::String)],
+            indents: vec![(0..end + 1, 0)],
+            ..Default::default()
+        }, cx);
+        editor.newline(cx);
+        assert_eq!(editor.text(), "    \"{\n    ");
+    });
+}
+
+#[gpui::test]
+fn parser_newline_indents_before_async_results_arrive(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("", cx);
+    editor.update(cx, |editor, cx| {
+        editor.enable_syntax(cx);
+        editor.type_text("{", cx);
+        editor.newline(cx);
+        assert_eq!(editor.text(), "{\n    \n}");
+        editor.reset("if ready", cx);
+        let end = editor.text().len();
+        let selection = end..end;
+        editor.select([selection], cx);
+        editor.type_text(":", cx);
+        editor.newline(cx);
+        assert_eq!(editor.text(), "if ready:\n    ");
+    });
+}
+
+#[gpui::test]
+fn parser_newline_preserves_body_continuation_indent(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("fn a() {\n        call();\n}", cx);
+    editor.update(cx, |editor, cx| {
+        editor.enable_syntax(cx);
+        let stamp = editor.syntax_stamp();
+        let end = editor.buffer().line_range(1).end;
+        let selection = end..end;
+        editor.select([selection], cx);
+        editor.set_syntax(stamp, crate::SyntaxSnapshot {
+            indents: vec![(7..editor.text().len(), 0)],
+            ..Default::default()
+        }, cx);
+        editor.newline(cx);
+        assert_eq!(editor.text(), "fn a() {\n        call();\n        \n}");
+    });
+}
+
+#[gpui::test]
 fn parser_snapshot_keeps_history_and_rejects_stale_offsets(cx: &mut TestAppContext) {
     let (editor, cx) = editor("fn 示例() {}", cx);
     editor.update(cx, |editor, cx| {
