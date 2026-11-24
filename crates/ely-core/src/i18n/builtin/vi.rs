@@ -1,6 +1,12 @@
 //! Vietnamese component messages.
 
 pub(super) const TABLE: &[(&str, &str)] = &[
+    ("canvas.fill_style", "Kiểu tô"),
+    ("canvas.fill_opacity", "Độ mờ phần tô"),
+    ("canvas.fill.hachure", "Gạch chéo"),
+    ("canvas.fill.cross_hatch", "Gạch chéo đan"),
+    ("canvas.fill.zigzag", "Zíc zắc"),
+    ("canvas.text_align", "Căn chữ"),
     ("palette.command.placeholder", "Gõ một lệnh"),
     ("palette.command.empty", "Không có lệnh nào khớp"),
     ("palette.recent", "Gần đây"),

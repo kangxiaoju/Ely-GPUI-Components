@@ -1,3 +1,36 @@
+impl core::clone::Clone for ely_canvas::CanvasTextAlign
+impl core::clone::Clone for ely_canvas::FillStyle
+impl core::cmp::Eq for ely_canvas::CanvasTextAlign
+impl core::cmp::Eq for ely_canvas::FillStyle
+impl core::cmp::PartialEq for ely_canvas::CanvasTextAlign
+impl core::cmp::PartialEq for ely_canvas::FillStyle
+impl core::default::Default for ely_canvas::CanvasTextAlign
+impl core::default::Default for ely_canvas::FillStyle
+impl core::fmt::Debug for ely_canvas::CanvasTextAlign
+impl core::fmt::Debug for ely_canvas::FillStyle
+impl core::marker::Copy for ely_canvas::CanvasTextAlign
+impl core::marker::Copy for ely_canvas::FillStyle
+impl core::marker::StructuralPartialEq for ely_canvas::CanvasTextAlign
+impl core::marker::StructuralPartialEq for ely_canvas::FillStyle
+pub ely_canvas::CanvasTextAlign::Left
+pub ely_canvas::CanvasTextAlign::Center
+pub ely_canvas::CanvasTextAlign::Right
+pub ely_canvas::FillStyle::Solid
+pub ely_canvas::FillStyle::Hachure
+pub ely_canvas::FillStyle::CrossHatch
+pub ely_canvas::FillStyle::Zigzag
+pub enum ely_canvas::CanvasTextAlign
+pub enum ely_canvas::FillStyle
+pub ely_canvas::ShapeAppearance::stroke_color: core::option::Option<gpui::Hsla>
+pub ely_canvas::ShapeAppearance::fill_color: core::option::Option<gpui::Hsla>
+pub ely_canvas::ShapeAppearance::fill_opacity: f32
+pub ely_canvas::ShapeAppearance::fill_style: ely_canvas::FillStyle
+pub ely_canvas::ShapeAppearance::seed: u64
+pub ely_canvas::ShapeAppearance::text_align: ely_canvas::CanvasTextAlign
+pub fn ely_canvas::ShapeAppearance::select_stroke(&mut self, hue: usize)
+pub fn ely_canvas::ShapeAppearance::select_fill(&mut self, hue: core::option::Option<usize>)
+pub fn ely_canvas::fill_pattern_segments(points: &[(f32, f32)], style: ely_canvas::FillStyle, seed: u64, spacing: f32) -> alloc::vec::Vec<[(f32, f32); 2]>
+impl ely_canvas::ShapeAppearance
 impl core::clone::Clone for ely_canvas::Align
 impl core::clone::Clone for ely_canvas::Artboard
 impl core::clone::Clone for ely_canvas::AutoLayout

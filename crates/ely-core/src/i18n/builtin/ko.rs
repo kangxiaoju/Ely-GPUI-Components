@@ -1,6 +1,12 @@
 //! Korean messages.
 
 pub(super) const TABLE: &[(&str, &str)] = &[
+    ("canvas.fill_style", "채우기 스타일"),
+    ("canvas.fill_opacity", "채우기 불투명도"),
+    ("canvas.fill.hachure", "빗금"),
+    ("canvas.fill.cross_hatch", "교차 빗금"),
+    ("canvas.fill.zigzag", "지그재그"),
+    ("canvas.text_align", "텍스트 정렬"),
     ("palette.command.placeholder", "명령 입력"),
     ("palette.command.empty", "일치하는 명령 없음"),
     ("palette.recent", "최근"),

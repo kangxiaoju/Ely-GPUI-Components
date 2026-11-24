@@ -280,19 +280,22 @@ impl RenderOnce for InfiniteCanvas {
                 } else {frame};
                 let size = shape.appearance.map_or(base_text_size, |s| Pixels::from(s.font_size)) * view.zoom;
                 let font_family = shape.appearance.map_or(super::CanvasFont::Default,|style|style.font).family(cx);
+                let alignment = shape.appearance.map_or(super::CanvasTextAlign::Center, |s| s.text_align);
+                let text_ink = shape.appearance.map_or(colors.fg, |s| s.stroke_color.unwrap_or_else(|| colors.hue(s.stroke,"shape text")));
                 if shape.rotation != 0.0 && !matches!(shape.kind, ShapeKind::Image(_)) {
                     if let Some(text) = shape.words() {
                         let font_size = shape.appearance.map_or(16.0, |s| s.font_size);
                         let escaped = |s:&str| s.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;").replace('"',"&quot;").replace('\'',"&apos;");
-                        let spans = text.lines().enumerate().map(|(ix,line)| format!("<tspan x='0' y='{}'>{}</tspan>", font_size*(1.0+ix as f32*1.3),escaped(line))).collect::<String>();
-                        let data = format!("<svg xmlns='http://www.w3.org/2000/svg' width='{}' height='{}'><text font-family='{}' font-size='{}'>{}</text></svg>",shape.frame.w,shape.frame.h,escaped(&font_family),font_size,spans);
+                        let (x,anchor) = match alignment { super::CanvasTextAlign::Left => (0.0,"start"), super::CanvasTextAlign::Center => (shape.frame.w*0.5,"middle"), super::CanvasTextAlign::Right => (shape.frame.w,"end") };
+                        let spans = text.lines().enumerate().map(|(ix,line)| format!("<tspan x='{x}' y='{}'>{}</tspan>", font_size*(1.0+ix as f32*1.3),escaped(line))).collect::<String>();
+                        let data = format!("<svg xmlns='http://www.w3.org/2000/svg' width='{}' height='{}'><text text-anchor='{anchor}' font-family='{}' font-size='{}'>{}</text></svg>",shape.frame.w,shape.frame.h,escaped(&font_family),font_size,spans);
                         return Some(gpui::svg().data(&super::text_outline::outlined(&data,cx)).with_transformation(gpui::Transformation::rotate(gpui::radians(shape.rotation)))
                             .absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y)).w(Pixels::from(frame.w)).h(Pixels::from(frame.h))
-                            .text_color(colors.fg).opacity(shape.appearance.map_or(1.0,|s|s.opacity)).into_any_element());
+                            .text_color(text_ink).opacity(shape.appearance.map_or(1.0,|s|s.opacity.clamp(0.0,1.0))).into_any_element());
                     }
                 }
                 let placed = |text: &str| {
-                    div()
+                    let placed = div()
                         .absolute()
                         .left(Pixels::from(label_frame.x))
                         .top(Pixels::from(label_frame.y))
@@ -302,8 +305,9 @@ impl RenderOnce for InfiniteCanvas {
                         .text_size(size)
                         .font_family(font_family.clone())
                         .line_height(size * 1.3)
-                        .opacity(shape.appearance.map_or(1.0, |s| s.opacity))
-                        .child(text.to_string())
+                        .opacity(shape.appearance.map_or(1.0, |s| s.opacity.clamp(0.0,1.0)))
+                        .child(text.to_string());
+                    match alignment { super::CanvasTextAlign::Left => placed.text_left(), super::CanvasTextAlign::Center => placed.text_center(), super::CanvasTextAlign::Right => placed.text_right() }
                 };
                 match &shape.kind {
                     ShapeKind::Image(_) => {
@@ -311,28 +315,23 @@ impl RenderOnce for InfiniteCanvas {
                         scene.images.get(&shape.key).map(|image| gpui::img(image.clone())
                             .absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y))
                             .w(Pixels::from(frame.w)).h(Pixels::from(frame.h))
-                            .opacity(shape.appearance.map_or(1.0, |s| s.opacity)).into_any_element())
+                            .opacity(shape.appearance.map_or(1.0, |s| s.opacity.clamp(0.0,1.0)*s.fill_opacity.clamp(0.0,1.0))).into_any_element())
                     }
                     ShapeKind::Text(text) => {
-                        Some(placed(text).text_color(colors.fg).into_any_element())
+                        Some(placed(text).text_color(text_ink).into_any_element())
                     }
                     ShapeKind::Note(text) => {
-                        let paper = colors.hue(shape.hue, format_args!("note {}", shape.key));
                         Some(
                             placed(text)
                                 .p(sizes.note_inset.to_pixels(rem) * view.zoom)
                                 .rounded(sizes.note_corner.to_pixels(rem) * view.zoom)
-                                .text_color(colors.fg)
+                                .text_color(text_ink)
                                 .into_any_element(),
                         )
                     }
                     _ => shape.label.as_ref().map(|label| {
                         placed(label)
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .text_center()
-                            .text_color(colors.fg)
+                            .text_color(text_ink)
                             .into_any_element()
                     }),
                 }

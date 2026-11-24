@@ -98,15 +98,13 @@ impl RenderOnce for InspectorPanel {
         let frame = shape.frame;
         let theme = cx.theme();
         let chart = theme.colors.chart;
-        let fill = theme
-            .colors
-            .hue(shape.hue, format_args!("layer {}", shape.key));
+        let fill = shape.appearance.and_then(|s| s.stroke_color).unwrap_or_else(|| theme.colors.hue(shape.hue, format_args!("layer {}", shape.key)));
         let hue = editing("inspector", shape, on_change, move |shape, color: Hsla| {
             shape.hue = chart
                 .iter()
                 .position(|hue| *hue == color)
                 .expect("the fill is a chart hue");
-            if let Some(style) = &mut shape.appearance { style.stroke = shape.hue; }
+            if let Some(style) = &mut shape.appearance { style.select_stroke(shape.hue); }
         });
         let shown = editing("inspector", shape, on_change, |shape, on: bool| {
             shape.hidden = !on
@@ -124,10 +122,20 @@ impl RenderOnce for InspectorPanel {
             if value.as_ref() == "standard" { style.roughness = 0.0; }
             else if style.roughness <= 0.0 { style.roughness = 1.2; }
         });
+        let rounded = editing("inspector",shape,on_change,|s,on:bool| { s.kind=if on {super::ShapeKind::RoundedRect}else{super::ShapeKind::Rect}; });
+        let exact_stroke = editing("inspector",shape,on_change,|s,color:Hsla| s.appearance.get_or_insert_with(Default::default).stroke_color=Some(color));
+        let exact_fill = editing("inspector",shape,on_change,|s,color:Hsla| s.appearance.get_or_insert_with(Default::default).fill_color=Some(color));
         let font = editing("inspector", shape, on_change, |s, v:f64| s.appearance.get_or_insert_with(Default::default).font_size = v as f32);
         let rotate = editing("inspector", shape, on_change, |s, v:f64| s.rotation = (v as f32).to_radians());
-        let filled = editing("inspector", shape, on_change, |s, v:bool| { let hue=s.hue; s.appearance.get_or_insert_with(Default::default).fill = v.then_some(hue); });
-        let fill_hue = editing("inspector", shape, on_change, move |s, color:Hsla| { s.appearance.get_or_insert_with(Default::default).fill = chart.iter().position(|h| *h == color); });
+        let filled = editing("inspector", shape, on_change, |s, v:bool| { let hue=s.hue; let style=s.appearance.get_or_insert_with(Default::default); if !v { style.select_fill(None); } else if style.fill.is_none() && style.fill_color.is_none() { style.select_fill(Some(hue)); } });
+        let fill_hue = editing("inspector", shape, on_change, move |s, color:Hsla| { s.appearance.get_or_insert_with(Default::default).select_fill(chart.iter().position(|h| *h == color)); });
+        let fill_opacity = editing("inspector", shape, on_change, |s, v:f64| s.appearance.get_or_insert_with(Default::default).fill_opacity = v as f32);
+        let fill_style = editing("inspector", shape, on_change, |s, value:SharedString| {
+            s.appearance.get_or_insert_with(Default::default).fill_style = match value.as_ref() { "hachure" => super::FillStyle::Hachure, "cross_hatch" => super::FillStyle::CrossHatch, "zigzag" => super::FillStyle::Zigzag, _ => super::FillStyle::Solid };
+        });
+        let text_align = editing("inspector", shape, on_change, |s, value:SharedString| {
+            s.appearance.get_or_insert_with(Default::default).text_align = match value.as_ref() { "left" => super::CanvasTextAlign::Left, "right" => super::CanvasTextAlign::Right, _ => super::CanvasTextAlign::Center };
+        });
         let dash = editing("inspector", shape, on_change, |s, value:SharedString| {
             s.appearance.get_or_insert_with(Default::default).dash = match value.as_ref() { "dashed" => super::style::Dash::Dashed, "dotted" => super::style::Dash::Dotted, _ => super::style::Dash::Solid };
         });
@@ -177,19 +185,31 @@ impl RenderOnce for InspectorPanel {
                         .on_change(hue),
                 ),
             )
+            .child(super::panel::color_well(cx,(id.clone(),"exact-stroke").into(),fill,exact_stroke))
             .child(div().flex().flex_col().gap_2().child(caption(word("canvas.appearance"),cx))
                 .child(caption(word("canvas.geometry"),cx))
                 .child(crate::buttons::SegmentedControl::new((id.clone(), "geometry-mode"), if appearance.roughness > 0.0 { "handdrawn" } else { "standard" })
                     .segment("standard",word("canvas.geometry.standard"),None)
                     .segment("handdrawn",word("canvas.geometry.handdrawn"),None)
                     .on_change(move |value,window,cx| geometry(value.clone(),window,cx)))
+                .children((!defaults && matches!(shape.kind,super::ShapeKind::Rect|super::ShapeKind::RoundedRect)).then(|| Switch::new((id.clone(),"rounded"),matches!(shape.kind,super::ShapeKind::RoundedRect)).label(super::ShapeKind::RoundedRect.words(cx)).on_change(rounded)))
                 .child(ScrubInput::new((id.clone(), "rotation"), word("canvas.rotation"), shape.rotation.to_degrees() as f64).range(-360.0,360.0).on_change(rotate))
                 .child(ScrubInput::new((id.clone(), "width"), word("canvas.stroke_width"), appearance.stroke_width as f64).range(0.1,100.0).on_change(width))
                 .child(ScrubInput::new((id.clone(), "opacity"), word("canvas.opacity"), appearance.opacity as f64).range(0.0,1.0).precision(2).on_change(opacity))
                 .child(ScrubInput::new((id.clone(), "roughness"), word("canvas.roughness"), appearance.roughness as f64).range(0.0,10.0).on_change(roughness))
                 .child(ScrubInput::new((id.clone(), "font"), word("canvas.font_size"), appearance.font_size as f64).range(1.0,512.0).on_change(font))
-                .child(Switch::new((id.clone(), "filled"), appearance.fill.is_some()).label(word("canvas.fill")).on_change(filled))
-                .child(ColorPalette::new((id.clone(), "fill-hue"), HUE_NAMES.iter().enumerate().map(|(ix,_)| (word(&format!("canvas.hue.{ix}")),chart[ix]))).selected(appearance.fill.map(|hue| chart[hue % chart.len()]).unwrap_or(chart[0])).on_change(fill_hue))
+                .child(Switch::new((id.clone(), "filled"), appearance.fill.is_some() || appearance.fill_color.is_some()).label(word("canvas.fill")).on_change(filled))
+                .child(ColorPalette::new((id.clone(), "fill-hue"), HUE_NAMES.iter().enumerate().map(|(ix,_)| (word(&format!("canvas.hue.{ix}")),chart[ix]))).selected(appearance.fill_color.or_else(|| appearance.fill.map(|hue| chart[hue % chart.len()])).unwrap_or(chart[0])).on_change(fill_hue))
+                .child(super::panel::color_well(cx,(id.clone(),"exact-fill").into(),appearance.fill_color.or_else(||appearance.fill.map(|h|chart[h%chart.len()])).unwrap_or(chart[0]),exact_fill))
+                .child(ScrubInput::new((id.clone(), "fill-opacity"), word("canvas.fill_opacity"), appearance.fill_opacity as f64).range(0.0,1.0).precision(2).on_change(fill_opacity))
+                .child(caption(word("canvas.fill_style"),cx))
+                .child(crate::buttons::SegmentedControl::new((id.clone(), "fill-style"), match appearance.fill_style { super::FillStyle::Solid => "solid", super::FillStyle::Hachure => "hachure", super::FillStyle::CrossHatch => "cross_hatch", super::FillStyle::Zigzag => "zigzag" })
+                    .segment("solid",word("canvas.solid"),None).segment("hachure",word("canvas.fill.hachure"),None).segment("cross_hatch",word("canvas.fill.cross_hatch"),None).segment("zigzag",word("canvas.fill.zigzag"),None)
+                    .on_change(move |value,window,cx| fill_style(value.clone(),window,cx)))
+                .child(caption(word("canvas.text_align"),cx))
+                .child(crate::buttons::SegmentedControl::new((id.clone(), "text-align"), match appearance.text_align { super::CanvasTextAlign::Left => "left", super::CanvasTextAlign::Center => "center", super::CanvasTextAlign::Right => "right" })
+                    .segment("left",word("canvas.align.left"),None).segment("center",word("canvas.align.center"),None).segment("right",word("canvas.align.right"),None)
+                    .on_change(move |value,window,cx| text_align(value.clone(),window,cx)))
                 .child(caption(word("canvas.font"),cx))
                 .child(crate::buttons::SegmentedControl::new((id.clone(), "font-family"), match appearance.font { super::CanvasFont::Default => "default", super::CanvasFont::Handwritten => "handwritten", super::CanvasFont::Monospace => "monospace" })
                     .segment("handwritten",word("canvas.font.handwritten"),None).segment("default",word("canvas.font.default"),None).segment("monospace",word("canvas.font.monospace"),None)

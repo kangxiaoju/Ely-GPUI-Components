@@ -74,12 +74,12 @@ pub(crate) fn paint_shape(
     window: &mut Window,
 ) {
     let style = shape.appearance;
-    let opacity = style.map_or(1.0, |s| s.opacity.clamp(0.0, 1.0));
-    let ink = palette.hue(shape.hue, format_args!("shape {}", shape.key)).alpha(opacity);
+    let ink = style.map_or_else(|| palette.hue(shape.hue, format_args!("shape {}", shape.key)), |s| s.stroke_ink(palette));
     let wash = match style {
-        Some(s) => s.fill.map(|hue| palette.hue(hue, "shape fill").alpha(opacity)),
-        None => Some(ink.alpha(0.14)),
+        Some(s) => s.fill_ink(palette),
+        None => Some(ink.opacity(0.14)),
     };
+    let seed = style.map_or_else(|| super::sketch_seed(&shape.key), |s| s.sketch_seed(&shape.key));
     let stroke = style.map_or(stroke, |s| Pixels::from(s.stroke_width * view.zoom));
     let frame = &shape.frame;
     if let ShapeKind::Symbol(kind) = shape.kind {
@@ -88,11 +88,11 @@ pub(crate) fn paint_shape(
             if closed { points.pop(); }
             for p in &mut points {p.0+=frame.x;p.1+=frame.y;}
             let roughness=style.map_or(0.0,|s|s.roughness);
-            let seed=super::sketch_seed(&shape.key).wrapping_add(index as u64);
+            let seed=seed.wrapping_add(index as u64);
             let second=(roughness>0.0).then(||super::sketch_outline(&points,closed,roughness,seed^0x9e3779b97f4a7c15));
             let mut points=super::sketch_outline(&points,closed,roughness,seed);
             for p in &mut points {*p=view.to_view(shape.rotate_point(*p,shape.rotation));}
-            if index==0 && closed {if let Some(wash)=wash {finish(solid(&points,origin),wash,window);}}
+            if index==0 && closed {if let Some(wash)=wash {paint_fill(&points,origin,shape,view,seed,wash,window);}}
             let dash=style.map_or(super::Dash::Solid,|s|s.dash);
             patterned(&points,origin,stroke,closed,dash,0.0,ink,window);
             if let Some(mut second)=second {
@@ -123,11 +123,11 @@ pub(crate) fn paint_shape(
         ShapeKind::Text(_) | ShapeKind::Image(_) | ShapeKind::Symbol(_) => return,
     };
     let roughness = style.map_or(0.0, |style| style.roughness);
-    let second = (roughness > 0.0).then(|| super::sketch_outline(&points,closed,roughness,super::sketch_seed(&shape.key)^0x9e3779b97f4a7c15));
-    points = super::sketch_outline(&points,closed,roughness,super::sketch_seed(&shape.key));
+    let second = (roughness > 0.0).then(|| super::sketch_outline(&points,closed,roughness,seed^0x9e3779b97f4a7c15));
+    points = super::sketch_outline(&points,closed,roughness,seed);
     for point in &mut points { *point = view.to_view(shape.rotate_point(*point,shape.rotation)); }
     if closed {
-        if let Some(wash) = wash { finish(solid(&points, origin), wash, window); }
+        if let Some(wash) = wash { paint_fill(&points,origin,shape,view,seed,wash,window); }
     }
     let width = match (&shape.kind, style) {
         (ShapeKind::Path { width, .. }, None) => Pixels::from(width * view.zoom).max(stroke),
@@ -141,6 +141,16 @@ pub(crate) fn paint_shape(
     }
     if matches!(shape.kind, ShapeKind::Arrow(_) | ShapeKind::Polyline { arrow: true, .. }) && points.len() >= 2 {
         finish(solid(&head(points[points.len()-2], points[points.len()-1], width), origin), ink, window);
+    }
+}
+
+fn paint_fill(points: &[(f32,f32)], origin: Point<Pixels>, shape: &Shape, view: &Viewport, seed: u64, ink: Hsla, window: &mut Window) {
+    let pattern = shape.appearance.map_or(super::FillStyle::Solid, |s| s.fill_style);
+    if pattern == super::FillStyle::Solid { finish(solid(points,origin),ink,window); return; }
+    let local: Vec<_> = points.iter().map(|p| { let p=shape.rotate_point(view.to_canvas(*p),-shape.rotation); (p.0-shape.frame.x,p.1-shape.frame.y) }).collect();
+    for segment in super::fill_pattern_segments(&local,pattern,seed,8.0) {
+        let segment=segment.map(|p| view.to_view(shape.rotate_point((p.0+shape.frame.x,p.1+shape.frame.y),shape.rotation)));
+        finish(outline(&segment,origin,Pixels::from(view.zoom),false),ink,window);
     }
 }
 

@@ -1,6 +1,12 @@
 //! Hebrew messages, machine translated, for a native speaker to review.
 
 pub(super) const TABLE: &[(&str, &str)] = &[
+    ("canvas.fill_style", "סגנון מילוי"),
+    ("canvas.fill_opacity", "אטימות מילוי"),
+    ("canvas.fill.hachure", "קווים אלכסוניים"),
+    ("canvas.fill.cross_hatch", "קווים מצטלבים"),
+    ("canvas.fill.zigzag", "זיגזג"),
+    ("canvas.text_align", "יישור טקסט"),
     ("palette.command.placeholder", "הקלד פקודה"),
     ("palette.command.empty", "אין פקודות תואמות"),
     ("palette.recent", "אחרונים"),

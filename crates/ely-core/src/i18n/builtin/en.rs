@@ -1,6 +1,12 @@
 //! English messages; en-US and en-GB read them.
 
 pub(super) const TABLE: &[(&str, &str)] = &[
+    ("canvas.fill_style", "Fill style"),
+    ("canvas.fill_opacity", "Fill opacity"),
+    ("canvas.fill.hachure", "Hachure"),
+    ("canvas.fill.cross_hatch", "Cross hatch"),
+    ("canvas.fill.zigzag", "Zigzag"),
+    ("canvas.text_align", "Text alignment"),
     ("mindmap.expand", "Expand branch"),
     ("mindmap.collapse", "Collapse branch"),
     ("palette.command.placeholder", "Type a command"),

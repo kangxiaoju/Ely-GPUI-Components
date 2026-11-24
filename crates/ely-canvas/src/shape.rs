@@ -154,6 +154,32 @@ impl CanvasFont {
     }
 }
 
+/// Interior pattern for canvas content.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FillStyle {
+    /// An uninterrupted fill.
+    #[default]
+    Solid,
+    /// Parallel diagonal strokes clipped to the shape.
+    Hachure,
+    /// Two crossing sets of diagonal strokes.
+    CrossHatch,
+    /// Alternating diagonal strokes clipped to the shape.
+    Zigzag,
+}
+
+/// Horizontal alignment within a shape's text frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CanvasTextAlign {
+    /// Align to the left edge.
+    Left,
+    /// Align to the center.
+    #[default]
+    Center,
+    /// Align to the right edge.
+    Right,
+}
+
 /// Theme-relative appearance shared by committed shapes and tool previews.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ShapeAppearance {
@@ -161,6 +187,18 @@ pub struct ShapeAppearance {
     pub stroke: usize,
     /// Optional fill hue slot; `None` leaves the interior transparent.
     pub fill: Option<usize>,
+    /// Exact stroke color, overriding the theme hue slot.
+    pub stroke_color: Option<gpui::Hsla>,
+    /// Exact fill color, overriding the optional theme hue slot.
+    pub fill_color: Option<gpui::Hsla>,
+    /// Additional fill and image alpha from zero to one.
+    pub fill_opacity: f32,
+    /// Interior pattern.
+    pub fill_style: FillStyle,
+    /// Deterministic sketch and fill seed; zero derives it from the shape key.
+    pub seed: u64,
+    /// Horizontal text alignment.
+    pub text_align: CanvasTextAlign,
     /// Stroke width in canvas units.
     pub stroke_width: f32,
     /// Overall alpha from zero to one.
@@ -177,8 +215,38 @@ pub struct ShapeAppearance {
 
 impl Default for ShapeAppearance {
     fn default() -> Self {
-        Self { stroke: 0, fill: None, stroke_width: 2.0, opacity: 1.0,
-            roughness: 0.0, dash: super::style::Dash::Solid, font_size: 16.0, font: CanvasFont::Default }
+        Self { stroke: 0, fill: None, stroke_color: None, fill_color: None,
+            fill_opacity: 1.0, fill_style: FillStyle::Solid, seed: 0, text_align: CanvasTextAlign::Center,
+            stroke_width: 2.0, opacity: 1.0, roughness: 0.0,
+            dash: super::style::Dash::Solid, font_size: 16.0, font: CanvasFont::Default }
+    }
+}
+
+impl ShapeAppearance {
+    /// Chooses a theme stroke slot and discards the exact stroke override.
+    pub fn select_stroke(&mut self, hue: usize) {
+        self.stroke = hue;
+        self.stroke_color = None;
+    }
+
+    /// Chooses a theme fill slot or transparency and discards the exact fill override.
+    pub fn select_fill(&mut self, hue: Option<usize>) {
+        self.fill = hue;
+        self.fill_color = None;
+    }
+
+    pub(crate) fn stroke_ink(self, palette: &crate::theme::Palette) -> gpui::Hsla {
+        self.stroke_color.unwrap_or_else(|| palette.hue(self.stroke, "shape stroke"))
+            .opacity(self.opacity.clamp(0.0, 1.0))
+    }
+
+    pub(crate) fn fill_ink(self, palette: &crate::theme::Palette) -> Option<gpui::Hsla> {
+        self.fill_color.or_else(|| self.fill.map(|hue| palette.hue(hue, "shape fill")))
+            .map(|color| color.opacity(self.opacity.clamp(0.0, 1.0) * self.fill_opacity.clamp(0.0, 1.0)))
+    }
+
+    pub(crate) fn sketch_seed(self, key: &str) -> u64 {
+        if self.seed == 0 { super::sketch_seed(key) } else { self.seed }
     }
 }
 
@@ -410,5 +478,32 @@ mod tests {
             corners.into_iter().map(round).collect::<Vec<_>>(),
             [(50.0, 0.0), (100.0, 50.0), (50.0, 100.0), (0.0, 50.0)]
         );
+    }
+
+    #[test]
+    fn exact_colors_preserve_alpha_and_multiply_opacity() {
+        let color = gpui::hsla(0.3, 0.7, 0.4, 0.5);
+        let appearance = super::ShapeAppearance {
+            stroke_color: Some(color), fill_color: Some(color),
+            opacity: 0.6, fill_opacity: 0.5, ..Default::default()
+        };
+        let palette = crate::theme::Palette::light(false);
+        assert_eq!(appearance.stroke_ink(&palette).a, 0.3);
+        assert_eq!(appearance.fill_ink(&palette).unwrap().a, 0.15);
+    }
+
+    #[test]
+    fn selecting_a_palette_slot_clears_its_exact_color_only() {
+        let color = gpui::hsla(0.3, 0.7, 0.4, 0.5);
+        let mut appearance = super::ShapeAppearance {
+            stroke_color: Some(color), fill_color: Some(color), ..Default::default()
+        };
+        appearance.select_stroke(3);
+        assert_eq!(appearance.stroke, 3);
+        assert_eq!(appearance.stroke_color, None);
+        assert_eq!(appearance.fill_color, Some(color));
+        appearance.select_fill(Some(5));
+        assert_eq!(appearance.fill, Some(5));
+        assert_eq!(appearance.fill_color, None);
     }
 }

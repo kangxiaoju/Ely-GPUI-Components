@@ -1,6 +1,12 @@
 //! Japanese messages, machine translated, for a native speaker to review.
 
 pub(super) const TABLE: &[(&str, &str)] = &[
+    ("canvas.fill_style", "塗りつぶしの種類"),
+    ("canvas.fill_opacity", "塗りつぶしの不透明度"),
+    ("canvas.fill.hachure", "斜線"),
+    ("canvas.fill.cross_hatch", "交差線"),
+    ("canvas.fill.zigzag", "ジグザグ"),
+    ("canvas.text_align", "文字の配置"),
     ("palette.command.placeholder", "コマンドを入力"),
     ("palette.command.empty", "一致するコマンドはありません"),
     ("palette.recent", "最近使用した項目"),

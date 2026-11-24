@@ -3,6 +3,7 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
+- `ely-canvas` 0.4.0: native content colors override theme slots without losing alpha; separate fill/image opacity, seeded solid/hachure/cross-hatch/zigzag fills and left/center/right text alignment render natively. Inspector retains eight-color palettes and clears exact overrides when a slot is chosen; fill styles and text alignment reuse Ely controls.
 - `ely-editor`: `SyntaxSnapshot`, `SyntaxToken` and stamp-checked `CodeEditor::set_syntax` accept asynchronous local parser projections for themed byte-range highlighting, outlines, structural folds, bracket matching and newline indentation. Parser-owned syntax never falls back to a lexical scan while a newer text is pending; publishing results preserves IME, selections and undo history.
 - `ely-editor`: parser folds and bracket tables are prepared once at publication and shared by paint frames and movement; no per-frame full-table cloning or conversion.
 - `ely-editor`: newline preserves the current line's indentation and handles newly typed openers before asynchronous syntax arrives; fresh syntax suppresses openers inside strings and comments.

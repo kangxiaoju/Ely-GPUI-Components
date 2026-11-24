@@ -1,6 +1,12 @@
 //! German messages, machine translated, for a native speaker to review.
 
 pub(super) const TABLE: &[(&str, &str)] = &[
+    ("canvas.fill_style", "Füllstil"),
+    ("canvas.fill_opacity", "Fülldeckkraft"),
+    ("canvas.fill.hachure", "Schraffur"),
+    ("canvas.fill.cross_hatch", "Kreuzschraffur"),
+    ("canvas.fill.zigzag", "Zickzack"),
+    ("canvas.text_align", "Textausrichtung"),
     ("palette.command.placeholder", "Befehl eingeben"),
     ("palette.command.empty", "Keine passenden Befehle"),
     ("palette.recent", "Zuletzt verwendet"),

@@ -1,6 +1,12 @@
 //! Simplified Chinese messages.
 
 pub(super) const TABLE: &[(&str, &str)] = &[
+    ("canvas.fill_style", "填充类型"),
+    ("canvas.fill_opacity", "填充不透明度"),
+    ("canvas.fill.hachure", "斜线"),
+    ("canvas.fill.cross_hatch", "交叉线"),
+    ("canvas.fill.zigzag", "折线"),
+    ("canvas.text_align", "文字对齐"),
     ("mindmap.expand", "展开分支"),
     ("mindmap.collapse", "折叠分支"),
     ("palette.command.placeholder", "输入命令"),
