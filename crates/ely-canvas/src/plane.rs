@@ -331,6 +331,7 @@ impl RenderOnce for InfiniteCanvas {
                     }
                     _ => shape.label.as_ref().map(|label| {
                         placed(label)
+                            .flex().flex_col().justify_center()
                             .text_color(text_ink)
                             .into_any_element()
                     }),
