@@ -91,6 +91,21 @@ impl SyntaxSnapshot {
     }
 }
 
+pub(crate) struct LocalSyntax {
+    stamp: u64,
+    snapshot: SyntaxSnapshot,
+    folds: std::sync::Arc<Vec<(usize, usize)>>,
+    brackets: std::sync::Arc<Vec<Bracket>>,
+}
+
+impl LocalSyntax {
+    fn new(stamp: u64, mut snapshot: SyntaxSnapshot) -> Self {
+        let folds = std::sync::Arc::new(std::mem::take(&mut snapshot.folds));
+        let brackets = std::sync::Arc::new(std::mem::take(&mut snapshot.brackets).into_iter().map(|(offset, depth, partner)| Bracket { offset, depth, partner }).collect());
+        Self { stamp, snapshot, folds, brackets }
+    }
+}
+
 impl crate::CodeEditor {
     /// The exact text identity for accepting asynchronous parser results.
     pub fn syntax_stamp(&self) -> u64 {
@@ -99,7 +114,7 @@ impl crate::CodeEditor {
 
     /// Enables parser-owned syntax; stale results never decorate newer text.
     pub fn enable_syntax(&mut self, cx: &mut gpui::Context<Self>) {
-        self.local_syntax = Some((0, std::sync::Arc::new(SyntaxSnapshot::default())));
+        self.local_syntax = Some(LocalSyntax::new(0, SyntaxSnapshot::default()));
         cx.notify();
     }
 
@@ -108,7 +123,7 @@ impl crate::CodeEditor {
         if stamp != self.buffer.stamp() {
             return false;
         }
-        self.local_syntax = Some((stamp, std::sync::Arc::new(syntax)));
+        self.local_syntax = Some(LocalSyntax::new(stamp, syntax));
         cx.notify();
         true
     }
@@ -119,21 +134,23 @@ impl crate::CodeEditor {
     }
 
     pub(crate) fn current_syntax(&self) -> Option<&SyntaxSnapshot> {
-        self.local_syntax.as_ref().and_then(|(stamp, syntax)| (*stamp == self.buffer.stamp()).then_some(syntax.as_ref()))
+        self.local_syntax.as_ref().and_then(|syntax| (syntax.stamp == self.buffer.stamp()).then_some(&syntax.snapshot))
     }
 
-    pub(crate) fn syntax_folds(&self) -> Vec<(usize, usize)> {
-        if self.local_syntax.is_some() {
-            return self.current_syntax().map_or_else(Vec::new, |syntax| syntax.folds.clone());
+    pub(crate) fn syntax_folds(&self) -> std::sync::Arc<Vec<(usize, usize)>> {
+        match &self.local_syntax {
+            Some(syntax) if syntax.stamp == self.buffer.stamp() => syntax.folds.clone(),
+            Some(_) => std::sync::Arc::default(),
+            None => std::sync::Arc::new(folds(&self.buffer)),
         }
-        folds(&self.buffer)
     }
 
-    pub(crate) fn syntax_brackets(&self) -> Vec<Bracket> {
-        if self.local_syntax.is_some() {
-            return self.current_syntax().map_or_else(Vec::new, |syntax| syntax.brackets.iter().map(|&(offset, depth, partner)| Bracket { offset, depth, partner }).collect());
+    pub(crate) fn syntax_brackets(&self) -> std::sync::Arc<Vec<Bracket>> {
+        match &self.local_syntax {
+            Some(syntax) if syntax.stamp == self.buffer.stamp() => syntax.brackets.clone(),
+            Some(_) => std::sync::Arc::default(),
+            None => std::sync::Arc::new(brackets(&self.buffer)),
         }
-        brackets(&self.buffer)
     }
 
     pub(crate) fn syntax_colors(&self, range: Range<usize>, cx: &App) -> Vec<(Range<usize>, HighlightStyle)> {

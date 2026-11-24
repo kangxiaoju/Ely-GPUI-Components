@@ -36,6 +36,8 @@ fn parser_snapshot_keeps_history_and_rejects_stale_offsets(cx: &mut TestAppConte
             ..Default::default()
         };
         assert!(editor.set_syntax(stamp, snapshot.clone(), cx));
+        assert!(std::sync::Arc::ptr_eq(&editor.syntax_folds(), &editor.syntax_folds()));
+        assert!(std::sync::Arc::ptr_eq(&editor.syntax_brackets(), &editor.syntax_brackets()));
         assert_eq!(editor.primary().head, caret);
         assert!(!editor.can_undo());
         editor.newline(cx);

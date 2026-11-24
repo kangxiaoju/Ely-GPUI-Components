@@ -280,7 +280,7 @@ pub(crate) fn listen<E: InteractiveElement>(root: E, cx: &mut Context<CodeEditor
     let root = on!(root, Fold, |e, _, cx| {
         let line = e.buffer.line_of(e.primary().head);
         let header = e.syntax_folds()
-            .into_iter()
+            .iter().copied()
             .filter(|(header, end)| *header <= line && line <= *end)
             .map(|(header, _)| header)
             .next_back();

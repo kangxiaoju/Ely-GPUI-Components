@@ -105,7 +105,7 @@ impl CodeEditor {
     pub(crate) fn toggle_fold(&mut self, line: usize, cx: &mut Context<Self>) {
         if !self.folded.remove(&line) {
             let Some((_, end)) = self.syntax_folds()
-                .into_iter()
+                .iter().copied()
                 .find(|(header, _)| *header == line)
             else {
                 return;

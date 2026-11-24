@@ -166,7 +166,7 @@ pub struct CodeEditor {
     focused: bool,
     pub(crate) chat_field: gpui::Entity<TextInput>,
     pub(crate) frame: Frame,
-    pub(crate) local_syntax: Option<(u64, std::sync::Arc<super::syntax::SyntaxSnapshot>)>,
+    pub(crate) local_syntax: Option<super::syntax::LocalSyntax>,
     blink_epoch: u64,
     _blink: Option<Task<()>>,
     _subscriptions: Vec<Subscription>,

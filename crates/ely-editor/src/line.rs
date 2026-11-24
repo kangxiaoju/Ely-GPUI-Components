@@ -36,11 +36,11 @@ impl CodeEditor {
         let mut spans = self.syntax_colors(range.clone(), cx);
         // Offsets found in an older text are left out.
         let fresh = self.frame.stamp == self.buffer.stamp();
-        let brackets = self
-            .frame
-            .brackets
+        let first_bracket = self.frame.brackets.partition_point(|bracket| bracket.offset < range.start);
+        let brackets = self.frame.brackets[first_bracket..]
             .iter()
-            .filter(|bracket| fresh && range.contains(&bracket.offset));
+            .take_while(|bracket| bracket.offset < range.end)
+            .filter(|_| fresh);
         for bracket in brackets {
             let at = bracket.offset - range.start;
             let color = if self.options.rainbow {

@@ -24,8 +24,8 @@ use ely_core::layout::{Scrollbar, on_axis};
 #[derive(Default)]
 pub(crate) struct Frame {
     pub rows: Vec<Row>,
-    pub folds: Vec<(usize, usize)>,
-    pub brackets: Vec<Bracket>,
+    pub folds: std::sync::Arc<Vec<(usize, usize)>>,
+    pub brackets: std::sync::Arc<Vec<Bracket>>,
     pub advance: Pixels,
     pub line: Pixels,
     pub matched: Option<(usize, usize)>,
@@ -305,13 +305,13 @@ impl Render for CodeEditor {
         let scrollbar_clearance = theme.scrollbar_thickness().to_pixels(window.rem_size()) * 2.0;
         let lightweight = self.lightweight();
         let found = if lightweight && self.local_syntax.is_none() {
-            Vec::new()
+            std::sync::Arc::default()
         } else {
             self.syntax_folds()
         };
         let hide = hidden(self.buffer.lines(), &found, &self.folded);
         let found_brackets = if lightweight && self.local_syntax.is_none() {
-            Vec::new()
+            std::sync::Arc::default()
         } else {
             self.syntax_brackets()
         };
