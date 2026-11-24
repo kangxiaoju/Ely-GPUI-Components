@@ -545,6 +545,7 @@ impl CodeEditor {
     /// Makes `before` one undo step when the text moved on from it.
     pub(crate) fn commit(&mut self, before: Snapshot, typing: bool, cx: &mut Context<Self>) {
         if before.text != self.buffer.text() {
+            self.rebase_syntax(&before.text);
             if self.composing.is_none() {
                 self.history.record(before, typing);
                 self.cap_history();

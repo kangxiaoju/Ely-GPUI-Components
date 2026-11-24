@@ -128,6 +128,50 @@ impl crate::CodeEditor {
         true
     }
 
+    pub(crate) fn rebase_syntax(&mut self, old: &str) {
+        let Some(syntax) = self.local_syntax.as_mut() else { return; };
+        let new = self.buffer.text();
+        let mut start = old.bytes().zip(new.bytes()).take_while(|(a,b)| a == b).count();
+        while !old.is_char_boundary(start) || !new.is_char_boundary(start) { start -= 1; }
+        let mut suffix = old[start..].bytes().rev().zip(new[start..].bytes().rev()).take_while(|(a,b)| a == b).count();
+        while !old.is_char_boundary(old.len()-suffix) || !new.is_char_boundary(new.len()-suffix) { suffix -= 1; }
+        let old_end = old.len()-suffix;
+        let new_end = new.len()-suffix;
+        let shift = |at: usize| at.saturating_add(new_end).saturating_sub(old_end);
+        syntax.snapshot.highlights.retain_mut(|(range, _)| {
+            if range.end <= start { return true; }
+            if range.start >= old_end { *range = shift(range.start)..shift(range.end); return true; }
+            false
+        });
+        // Only proven unchanged token ranges survive until the parser publishes.
+        syntax.snapshot.indents.clear();
+        syntax.snapshot.symbols.clear();
+        let first_line = old[..start].bytes().filter(|b| *b == b'\n').count();
+        let old_lines = old[start..old_end].bytes().filter(|b| *b == b'\n').count();
+        let new_lines = new[start..new_end].bytes().filter(|b| *b == b'\n').count();
+        let folds = std::sync::Arc::make_mut(&mut syntax.folds);
+        folds.retain_mut(|(header, end)| {
+            if *end < first_line { return true; }
+            if *header > first_line + old_lines {
+                *header = header.saturating_add(new_lines).saturating_sub(old_lines);
+                *end = end.saturating_add(new_lines).saturating_sub(old_lines);
+                return true;
+            }
+            // Keep a containing fold only when no line count changed.
+            old_lines == new_lines && *header <= first_line && *end > first_line
+        });
+        let brackets = std::sync::Arc::make_mut(&mut syntax.brackets);
+        brackets.retain_mut(|bracket| {
+            if bracket.offset >= start && bracket.offset < old_end { return false; }
+            if bracket.offset >= old_end { bracket.offset = shift(bracket.offset); }
+            bracket.partner = bracket.partner.and_then(|at| {
+                if at >= start && at < old_end { None } else if at >= old_end { Some(shift(at)) } else { Some(at) }
+            });
+            true
+        });
+        syntax.stamp = self.buffer.stamp();
+    }
+
     /// The current local outline, empty while its text is being parsed.
     pub fn syntax_symbols(&self) -> &[crate::Symbol] {
         self.current_syntax().map_or(&[], |syntax| syntax.symbols.as_slice())

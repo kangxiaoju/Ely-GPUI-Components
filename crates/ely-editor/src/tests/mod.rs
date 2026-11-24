@@ -117,6 +117,23 @@ fn parser_snapshot_keeps_history_and_rejects_stale_offsets(cx: &mut TestAppConte
 }
 
 #[gpui::test]
+fn parser_typing_preserves_unchanged_token_colors(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("fn a() {}\nlet b = 1;", cx);
+    editor.update(cx, |editor, cx| {
+        editor.enable_syntax(cx);
+        let stamp = editor.syntax_stamp();
+        editor.set_syntax(stamp, crate::SyntaxSnapshot {
+            highlights: vec![(0..2, crate::SyntaxToken::Keyword), (10..13, crate::SyntaxToken::Keyword)],
+            ..Default::default()
+        }, cx);
+        editor.edit([(3..4, "long_name".into())], cx);
+        assert!(!editor.syntax_colors(0..2, cx).is_empty(), "unmodified rows must not flash uncolored while parsing");
+        assert!(!editor.syntax_colors(18..21, cx).is_empty(), "following spans track inserted bytes");
+        assert!(!editor.set_syntax(stamp, crate::SyntaxSnapshot::default(), cx));
+    });
+}
+
+#[gpui::test]
 fn typed_pairs_close_and_one_undo_takes_back_the_burst(cx: &mut TestAppContext) {
     let (editor, cx) = editor("let x = ", cx);
     editor.update(cx, |editor, cx| {
