@@ -47,6 +47,7 @@ type OnMove = Rc<dyn Fn(&Point<Pixels>, &mut Window, &mut App)>;
 pub struct FloatingPanel {
     id: ElementId,
     title: SharedString,
+    leading: Option<AnyElement>,
     start: Point<Pixels>,
     base: gpui::Div,
     on_move: Option<OnMove>,
@@ -63,11 +64,18 @@ impl FloatingPanel {
         Self {
             id: id.into(),
             title: title.into(),
+            leading: None,
             start,
             base: div(),
             on_move: None,
             body: SmallVec::new(),
         }
+    }
+
+    /// Adds an interactive control before the draggable title.
+    pub fn leading(mut self, element: impl IntoElement) -> Self {
+        self.leading = Some(element.into_any_element());
+        self
     }
 
     /// Reports each new top-left corner while dragging.
@@ -155,9 +163,10 @@ impl RenderOnce for FloatingPanel {
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(theme.colors.fg_muted)
                     .on_drag(carry, |_, _, _, cx| cx.new(|_| EmptyView))
+                    .children(self.leading)
                     .child(self.title),
             )
-            .child(div().p_3().children(self.body));
+            .when(!self.body.is_empty(), |panel| panel.child(div().p_3().children(self.body)));
         raise((self.id, "raised"), anchored().position(at).child(panel))
     }
 }
