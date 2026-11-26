@@ -10,6 +10,7 @@ use gpui::{
 mod cite;
 mod compose;
 mod history;
+mod list;
 mod welcome;
 mod selection;
 

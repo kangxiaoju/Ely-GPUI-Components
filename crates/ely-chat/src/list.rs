@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{ops::Range, rc::Rc};
 
 use gpui::{
     AnyElement, App, Context, ElementId, IntoElement, ListAlignment, ListOffset, ListState,
@@ -21,6 +21,7 @@ struct Feed {
     count: usize,
     away: bool,
     fresh: usize,
+    revision: Option<u64>,
 }
 
 /// How many messages arrived while the reader was away, from `before` to `now`; none once they are back.
@@ -44,6 +45,7 @@ pub struct MessageList {
     id: ElementId,
     count: usize,
     render: RenderItem,
+    content_revision: Option<(u64, Range<usize>)>,
 }
 
 impl MessageList {
@@ -57,7 +59,14 @@ impl MessageList {
             id: id.into(),
             count,
             render: Rc::new(render),
+            content_revision: None,
         }
+    }
+
+    /// Remeasure `changed_rows` once when `revision` changes, preserving the reader's anchor.
+    pub fn content_revision(mut self, revision: u64, changed_rows: Range<usize>) -> Self {
+        self.content_revision = Some((revision, changed_rows));
+        self
     }
 }
 
@@ -65,6 +74,7 @@ impl RenderOnce for MessageList {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let count = self.count;
         let overdraw = cx.theme().list_overdraw().to_pixels(window.rem_size());
+        let revision = self.content_revision.as_ref().map(|(revision, _)| *revision);
         let feed = window.use_keyed_state(
             (self.id.clone(), "feed"),
             cx,
@@ -89,6 +99,7 @@ impl RenderOnce for MessageList {
                     count,
                     away: false,
                     fresh: 0,
+                    revision,
                 }
             },
         );
@@ -101,6 +112,18 @@ impl RenderOnce for MessageList {
                 }
                 feed.fresh = arrived(feed.count, count, feed.away, feed.fresh);
                 feed.count = count;
+            });
+        }
+        if let Some((revision, changed_rows)) = self.content_revision
+            && feed.read(cx).revision != Some(revision)
+        {
+            feed.update(cx, |feed, _| {
+                let start = changed_rows.start.min(count);
+                let end = changed_rows.end.min(count);
+                if start < end {
+                    feed.list.remeasure_items(start..end);
+                }
+                feed.revision = Some(revision);
             });
         }
         let (state, away, fresh) = {
