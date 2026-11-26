@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod canvas_tests;
 mod de;
 mod en;
 mod es;
