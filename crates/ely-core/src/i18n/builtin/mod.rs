@@ -61,6 +61,54 @@ mod tests {
     }
 
     #[test]
+    fn every_locale_resolves_calendar_startup_messages() {
+        for locale in LOCALES {
+            for key in [
+                "calendar.title",
+                "calendar.monthday",
+                "calendar.more",
+                "calendar.count",
+                "calendar.interval",
+                "calendar.repeat",
+                "calendar.reminder",
+                "calendar.today",
+                "calendar.month.previous",
+                "calendar.month.next",
+                "calendar.year.previous",
+                "calendar.year.next",
+                "calendar.week.previous",
+                "calendar.week.next",
+                "calendar.day.previous",
+                "calendar.day.next",
+            ] {
+                assert!(
+                    !super::builtin(locale.tag, key).is_empty(),
+                    "{} {key}",
+                    locale.tag
+                );
+            }
+            for weekday in ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] {
+                let key = format!("calendar.weekday.{weekday}");
+                assert!(
+                    !super::builtin(locale.tag, &key).is_empty(),
+                    "{} {key}",
+                    locale.tag
+                );
+            }
+            for month in 1..=12 {
+                for prefix in ["calendar.month", "calendar.short_month"] {
+                    let key = format!("{prefix}.{month}");
+                    assert!(
+                        !super::builtin(locale.tag, &key).is_empty(),
+                        "{} {key}",
+                        locale.tag
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn every_table_holds_every_key_and_asks_only_given_arguments() {
         let english: HashSet<&str> = en::TABLE.iter().map(|(key, _)| *key).collect();
         assert_eq!(english.len(), en::TABLE.len(), "en repeats a key");
