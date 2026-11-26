@@ -126,6 +126,8 @@ pub struct Metrics {
 
 const BLINK: Duration = Duration::from_millis(530);
 
+type OnContext = std::rc::Rc<dyn Fn(gpui::Point<Pixels>, &mut Window, &mut gpui::App)>;
+
 /// Code to read and edit: syntax colors, many cursors, folds, a gutter, a minimap, and what tools lay over it.
 ///
 /// ```
@@ -169,6 +171,7 @@ pub struct CodeEditor {
     pub(crate) chat_field: gpui::Entity<TextInput>,
     pub(crate) frame: Frame,
     pub(crate) local_syntax: Option<super::syntax::LocalSyntax>,
+    pub(crate) on_context: Option<OnContext>,
     blink_epoch: u64,
     _blink: Option<Task<()>>,
     _subscriptions: Vec<Subscription>,
@@ -259,6 +262,7 @@ impl CodeEditor {
             chat_field,
             frame: Frame::default(),
             local_syntax: None,
+            on_context: None,
             blink_epoch: 0,
             _blink: None,
             _subscriptions: subscriptions,
@@ -347,6 +351,11 @@ impl CodeEditor {
     /// Every selection, the primary last.
     pub fn selections(&self) -> &[Selection] {
         &self.selections
+    }
+
+    /// Handles secondary presses without changing the source selection.
+    pub fn on_context(&mut self, handler: impl Fn(gpui::Point<Pixels>, &mut Window, &mut gpui::App) + 'static) {
+        self.on_context = Some(std::rc::Rc::new(handler));
     }
 
     /// The last cursor placed, which scrolling follows.

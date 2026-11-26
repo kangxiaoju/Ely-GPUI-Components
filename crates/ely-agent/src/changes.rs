@@ -11,7 +11,7 @@ use crate::{
     collab::Decision,
     forms::OnFlag,
     git::{DiffStat, DiffViewer, stat},
-    primitives::{Disclosure, FocusRing, Icon, IconName, file_icon},
+    primitives::{Disclosure, FocusRing, Icon, IconName, Tooltip, file_icon},
     theme::{ActiveTheme, ControlSize, IconSize, Radius, TextSize},
     typography::Ellipsis,
 };
@@ -82,6 +82,10 @@ fn verdict(id: &ElementId, state: ChangeState, on_decide: Option<OnFlag>, cx: &A
         (ChangeState::Rejected, _) => said(IconName::X, "Rejected", colors.fg_subtle),
     }
 }
+fn path_parts(path: &str) -> (&str, &str) {
+    path.rfind(['/', '\\']).map_or((path, ""), |at| (&path[at+1..], &path[..at]))
+}
+
 
 /// One file an agent would change: its path and how much moves, Reject or Accept while proposed; opened, the diff.
 ///
@@ -178,10 +182,14 @@ impl RenderOnce for FileChangeCard {
                     )
                     .child(
                         div()
-                            .flex_1()
-                            .min_w(theme.label_width())
+                            .id((self.id.clone(), "file-path"))
+                            .flex_1().min_w_0().flex().items_center().gap_2()
+                            .tooltip(Tooltip::text(self.change.path.clone()))
                             .font_family(theme.mono_family.clone())
-                            .child(Ellipsis::new(self.change.path.clone())),
+                            .child(div().min_w_0().flex_shrink_0().max_w_full()
+                                .child(Ellipsis::new(path_parts(&self.change.path).0.to_owned())))
+                            .child(div().min_w_0().flex_1().text_color(colors.fg_muted)
+                                .child(Ellipsis::new(path_parts(&self.change.path).1.to_owned()))),
                     )
                     .child(
                         div()

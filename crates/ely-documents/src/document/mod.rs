@@ -78,6 +78,8 @@ struct Placement {
     placing: bool,
 }
 
+type OnContext = Rc<dyn Fn(gpui::Point<Pixels>, &mut Window, &mut App)>;
+
 /// The block open as its source, in its own field.
 struct Open {
     range: Range<usize>,
@@ -153,6 +155,7 @@ pub struct MarkdownDocument {
     pressed: u64,
     on_link: Option<OnLink>,
     on_heading: Option<OnHeading>,
+    on_context: Option<OnContext>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -230,6 +233,7 @@ impl MarkdownDocument {
             pressed: 0,
             on_link: None,
             on_heading: Some(on_heading),
+            on_context: None,
             _subscriptions: subscriptions,
         };
         document.reparse(true, cx);
@@ -251,6 +255,13 @@ impl MarkdownDocument {
     /// Takes link presses; without it the system opens them.
     pub fn on_link(&mut self, handler: impl Fn(&str, &mut Window, &mut App) + 'static) {
         self.on_link = Some(Rc::new(handler));
+    }
+
+    /// Handles secondary presses while retaining the visual source selection.
+    pub fn on_context(&mut self, handler: impl Fn(gpui::Point<Pixels>, &mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
+        let handler: OnContext = Rc::new(handler);
+        self.on_context = Some(handler.clone());
+        self.editor.update(cx, |editor, _| editor.on_context(move |position, window, cx| handler(position, window, cx)));
     }
 
     /// The code editor that holds the text and its undo.

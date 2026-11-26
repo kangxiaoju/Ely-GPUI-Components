@@ -291,6 +291,11 @@ impl MarkdownDocument {
         cx.listener(|document, event: &MouseDownEvent, window, cx| {
             window.prevent_default();
             cx.stop_propagation();
+            if let Some(handler) = document.on_context.clone() {
+                let position = event.position;
+                window.defer(cx, move |window, cx| handler(position, window, cx));
+                return;
+            }
             document.point_open(Some(event.position), cx);
         })
     }

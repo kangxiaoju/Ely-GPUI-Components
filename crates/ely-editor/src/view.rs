@@ -442,6 +442,13 @@ impl Render for CodeEditor {
             .font_family(mono_family)
             .text_size(size)
             .text_color(colors.fg)
+            .on_mouse_down(MouseButton::Right, cx.listener(|editor, event: &MouseDownEvent, window, cx| {
+                if let Some(handler) = editor.on_context.clone() {
+                    window.prevent_default();
+                    let position = event.position;
+                    window.defer(cx, move |window, cx| handler(position, window, cx));
+                }
+            }))
             .on_mouse_up(
                 MouseButton::Left,
                 cx.listener(|editor, _, _, _| editor.dragging = false),
