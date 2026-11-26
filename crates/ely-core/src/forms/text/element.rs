@@ -17,6 +17,11 @@ pub(crate) struct TextElement {
     input: Entity<TextInput>,
 }
 
+impl gpui::IntoElement for TextElement {
+    type Element = Self;
+    fn into_element(self) -> Self::Element { self }
+}
+
 impl TextElement {
     pub(crate) fn new(input: Entity<TextInput>) -> Self {
         Self { input }

@@ -36,6 +36,11 @@ pub(crate) struct Named {
     child: AnyElement,
 }
 
+impl gpui::IntoElement for Named {
+    type Element = Self;
+    fn into_element(self) -> Self::Element { self }
+}
+
 impl Named {
     pub(crate) fn new(naming: Naming, child: AnyElement) -> Self {
         Self { naming, child }

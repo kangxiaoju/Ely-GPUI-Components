@@ -45,6 +45,11 @@ pub(super) struct MathText {
     glue: Pixels,
 }
 
+impl gpui::IntoElement for MathText {
+    type Element = Self;
+    fn into_element(self) -> Self::Element { self }
+}
+
 impl MathText {
     /// The element and how a point finds its original byte.
     pub(super) fn new(
