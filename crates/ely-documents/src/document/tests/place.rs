@@ -237,3 +237,23 @@ fn a_visual_opening_starts_at_the_top(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(landed(&document, cx), 0);
 }
+
+#[gpui::test]
+fn selection_source_range_tracks_duplicate_blocks_and_unsaved_typing(cx: &mut TestAppContext) {
+    let (document, cx) = open("same words\n\nsame words\n", MarkdownMode::Visual, cx);
+    super::type_in(&document, Some(1), None, cx);
+    document.update(cx, |document, cx| {
+        let open = document.open.as_ref().expect("second block is open");
+        open.input.update(cx, |input, cx| {
+            input.set_text("same 🦀 words", cx);
+            input.select(5..9, cx);
+        });
+    });
+    document.read_with(cx, |document, cx| {
+        let source = document.text(cx);
+        let range = document.selection_source_range(cx).expect("selection has source coordinates");
+        assert_eq!(range, 17..21);
+        assert_eq!(&source[range], "🦀");
+        assert_eq!(source, "same words\n\nsame 🦀 words\n");
+    });
+}

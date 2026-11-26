@@ -50,6 +50,28 @@ impl MarkdownDocument {
         input.text()[input.selection()].to_string()
     }
 
+    /// Selected source bytes in `text`, including an open block's unsaved typing.
+    pub fn selection_source_range(&self, cx: &App) -> Option<std::ops::Range<usize>> {
+        let Some(open) = &self.open else {
+            return matches!(self.mode, MarkdownMode::Source | MarkdownMode::Split)
+                .then(|| self.editor.read(cx).primary().range())
+                .filter(|range| !range.is_empty());
+        };
+        let input = open.input.read(cx);
+        let selected = input.selection();
+        if selected.is_empty() { return None; }
+        let source = self.editor.read(cx).text();
+        let joined = if open.append && !input.text().is_empty() { joint(source).len() } else { 0 };
+        let offset = |at| {
+            let within = match open.cell {
+                Some(_) => cells::kept_at(input.text(), at, cells::edges(source, open.range.clone())),
+                None => at,
+            };
+            open.range.start + joined + within
+        };
+        Some(offset(selected.start)..offset(selected.end))
+    }
+
     /// The caret to `line` and `column`, clamped to text.
     pub fn set_caret(&mut self, line: usize, column: usize, cx: &mut Context<Self>) {
         self.commit(cx);

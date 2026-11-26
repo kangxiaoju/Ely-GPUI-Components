@@ -43,6 +43,7 @@ struct Nav {
     asked: HashSet<SharedString>,
     drop: Option<(SharedString, DropAt)>,
     renaming: Option<SharedString>,
+    revealed: Option<(SharedString, u64)>,
 }
 
 /// A dragged tree node; drops past the rows carry it.
@@ -94,6 +95,7 @@ pub struct Tree {
     on_toggle: Option<OnToggle>,
     on_open: Option<OnOpen>,
     content: Option<OnContent>,
+    reveal: Option<(SharedString, u64)>,
 }
 
 impl Tree {
@@ -117,7 +119,15 @@ impl Tree {
             on_toggle: None,
             on_open: None,
             content: None,
+            reveal: None,
         }
+    }
+
+    /// Scrolls an existing row into view once per request, without focus or selection callbacks.
+    /// A row not yet loaded is retried on later renders with the same request.
+    pub fn reveal(mut self, key: impl Into<SharedString>, request: u64) -> Self {
+        self.reveal = Some((key.into(), request));
+        self
     }
 
     /// The nodes open at first; a new list from the owner replaces what was opened since.
@@ -249,6 +259,17 @@ impl RenderOnce for Tree {
         let open: HashSet<SharedString> = opened.read(cx).value.iter().cloned().collect();
         let nodes = Rc::new(self.nodes);
         let shown = Rc::new(rows(&nodes, &open));
+        if let Some((key, request)) = &self.reveal {
+            if nav.read(cx).revealed.as_ref() != Some(&(key.clone(), *request)) {
+                if let Some(index) = shown.iter().position(|row| row.key() == Some(key)) {
+                    nav.update(cx, |nav, _| {
+                        nav.scroll.scroll_to_item(index, ScrollStrategy::Center);
+                        nav.cursor = index;
+                        nav.revealed = Some((key.clone(), *request));
+                    });
+                }
+            }
+        }
         for row in shown.iter().filter(|row| row.shown == Shown::Loading) {
             let key = shown[row.parent.expect("a wait has a parent")]
                 .key()
