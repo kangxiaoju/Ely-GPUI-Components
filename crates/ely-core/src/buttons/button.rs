@@ -152,6 +152,7 @@ pub struct Button {
     id: ElementId,
     label: SharedString,
     name: Option<SharedString>,
+    description: Option<SharedString>,
     icon: Option<IconName>,
     trailing_icon: Option<IconName>,
     shortcut: Option<SharedString>,
@@ -166,12 +167,19 @@ pub struct Button {
 }
 
 impl Button {
+    /// Describes the control to assistive technology without changing its label.
+    pub fn accessible_description(mut self, description: impl Into<SharedString>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
     /// A secondary button under `id` that reads `label`.
     pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
             name: None,
+            description: None,
             icon: None,
             trailing_icon: None,
             shortcut: None,
@@ -301,6 +309,7 @@ impl RenderOnce for Button {
             .id(self.id)
             .role(Role::Button)
             .when(!name.is_empty(), |el| el.aria_label(name))
+            .when_some(self.description, |el, description| el.aria_description(description))
             .flex()
             // Never grows; shrinks only when a row cannot wrap.
             .flex_grow_0()
