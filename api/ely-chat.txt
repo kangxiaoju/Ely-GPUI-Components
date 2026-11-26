@@ -407,6 +407,7 @@ pub fn ely_chat::MessageHeader::into_element(self) -> Self::Element
 pub fn ely_chat::MessageHeader::model(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_chat::MessageHeader::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_chat::MessageHeader::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_chat::MessageList::content_revision(self, u64, core::ops::range::Range<usize>) -> Self
 pub fn ely_chat::MessageList::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_chat::MessageList::into_element(self) -> Self::Element
 pub fn ely_chat::MessageList::new(impl core::convert::Into<gpui::window::ElementId>, usize, impl core::ops::function::Fn(usize, &mut gpui::window::Window, &mut gpui::app::App) -> gpui::element::AnyElement + 'static) -> Self
