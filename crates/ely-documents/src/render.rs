@@ -388,7 +388,7 @@ impl Draw<'_> {
                 self.point_code(block, Some(layout), text, *from)
             }
             Node::List { start, items } => self.list(start, items, cx),
-            Node::Table { aligns, head, rows } => self.table(aligns, head, rows, cx),
+            Node::Table { aligns, head, rows, spans } => self.table(aligns, head, rows, spans, cx),
             Node::Rule => div()
                 .debug_selector(|| "markdown-rule".into())
                 .my_2()

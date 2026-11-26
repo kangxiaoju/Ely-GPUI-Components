@@ -112,16 +112,17 @@ impl ZoomControls {
 }
 
 impl RenderOnce for ZoomControls {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let (id, zoom) = (self.id.clone(), self.zoom);
         let button = |inward: bool| {
             let next = stepped(zoom, inward);
             let on_zoom = self.on_zoom.clone();
-            let (icon, words) = match inward {
-                true => (IconName::ZoomIn, "Zoom in"),
-                false => (IconName::ZoomOut, "Zoom out"),
+            let (icon, key) = match inward {
+                true => (IconName::ZoomIn, "canvas.zoom_in"),
+                false => (IconName::ZoomOut, "canvas.zoom_out"),
             };
-            IconButton::new((id.clone(), words), icon)
+            let words = crate::i18n::text(cx,key,&[]);
+            IconButton::new((id.clone(), key), icon)
                 .variant(ButtonVariant::Ghost)
                 .size(ControlSize::Sm)
                 .tooltip(words)
@@ -146,7 +147,7 @@ impl RenderOnce for ZoomControls {
             IconButton::new((id.clone(), "fit"), IconName::Maximize2)
                 .variant(ButtonVariant::Ghost)
                 .size(ControlSize::Sm)
-                .tooltip("Fit to screen")
+                .tooltip(crate::i18n::text(cx,"canvas.zoom_fit",&[]))
                 .on_click(move |_, window, cx| on_fit(window, cx))
         });
         div()

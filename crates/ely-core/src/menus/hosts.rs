@@ -13,7 +13,7 @@ use super::{
 };
 use crate::{
     buttons::{Button, ButtonGroup, ButtonVariant, IconButton},
-    forms::TextInput,
+    forms::{Run, TextInput},
     i18n,
     primitives::IconName,
 };
@@ -273,6 +273,7 @@ pub struct ContextMenu {
     id: ElementId,
     menu: Menu,
     request: Option<Option<(u64, Point<Pixels>)>>,
+    on_close: Option<Run>,
     children: SmallVec<[AnyElement; 2]>,
     base: Div,
 }
@@ -284,6 +285,7 @@ impl ContextMenu {
             id: id.into(),
             menu,
             request: None,
+            on_close: None,
             children: SmallVec::new(),
             base: div(),
         }
@@ -292,6 +294,12 @@ impl ContextMenu {
     /// Opens on the owner's numbered request, not a right click.
     pub fn manual(mut self, request: Option<(u64, Point<Pixels>)>) -> Self {
         self.request = Some(request);
+        self
+    }
+
+    /// Runs after dismissal, so an owner can clear its request.
+    pub fn on_close(mut self, close: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_close = Some(Rc::new(close));
         self
     }
 }
@@ -311,6 +319,7 @@ impl Styled for ContextMenu {
 impl RenderOnce for ContextMenu {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let state = state(&self.id, window, cx);
+        state.update(cx, |open, _| open.on_close = self.on_close);
         if let Some(Some((number, at))) = self.request {
             let asked = window.use_keyed_state((self.id.clone(), "asked"), cx, |_, _| None);
             if *asked.read(cx) != Some(number) {

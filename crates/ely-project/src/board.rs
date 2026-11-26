@@ -17,6 +17,7 @@ use crate::{
 
 type OnMove = Rc<dyn Fn(&SharedString, &SharedString, usize, &mut Window, &mut App)>;
 type OnCard = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
+type OnLoadMore = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// A card on a board: its key and what it shows.
 pub struct KanbanCard {
@@ -47,6 +48,9 @@ pub struct KanbanColumn {
     key: SharedString,
     title: SharedString,
     cards: Vec<KanbanCard>,
+    footer: Option<AnyElement>,
+    total: Option<usize>,
+    on_load_more: Option<OnLoadMore>,
 }
 
 impl KanbanColumn {
@@ -56,6 +60,9 @@ impl KanbanColumn {
             key: key.into(),
             title: title.into(),
             cards: Vec::new(),
+            footer: None,
+            total: None,
+            on_load_more: None,
         }
     }
 
@@ -68,6 +75,29 @@ impl KanbanColumn {
     /// Cards at its end, in order.
     pub fn cards(mut self, cards: impl IntoIterator<Item = KanbanCard>) -> Self {
         self.cards.extend(cards);
+        self
+    }
+
+    /// Content after the cards, outside their drag and keyboard move order.
+    pub fn footer(mut self, footer: impl IntoElement) -> Self {
+        self.footer = Some(footer.into_any_element());
+        self
+    }
+
+    /// The header's count, instead of the number of loaded cards.
+    pub fn total(mut self, total: usize) -> Self {
+        self.total = Some(total);
+        self
+    }
+
+    /// Requests one page when loaded cards leave spare height in a full-height board.
+    /// Attach only while more records exist and no request is pending. Requests are deferred
+    /// and deduplicated until content or viewport height changes, or this handler is reattached.
+    pub fn on_load_more(
+        mut self,
+        handler: impl Fn(&mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_load_more = Some(Rc::new(handler));
         self
     }
 }
@@ -125,6 +155,7 @@ fn measure(
 ///
 /// let board = KanbanBoard::new("board")
 ///     .column(KanbanColumn::new("todo", "Todo").card(KanbanCard::new("t1", "Write the brief")))
+///     .column(KanbanColumn::new("backlog", "Backlog").total(12).footer("More records available"))
 ///     .column(KanbanColumn::new("done", "Done"))
 ///     .on_move(|_card, _column, _index, _, _| {});
 /// ```
@@ -132,6 +163,8 @@ fn measure(
 pub struct KanbanBoard {
     id: ElementId,
     columns: Vec<KanbanColumn>,
+    scroll: Option<ScrollHandle>,
+    fill_height: bool,
     on_move: Option<OnMove>,
     on_open: Option<OnCard>,
 }
@@ -142,6 +175,8 @@ impl KanbanBoard {
         Self {
             id: id.into(),
             columns: Vec::new(),
+            scroll: None,
+            fill_height: false,
             on_move: None,
             on_open: None,
         }
@@ -150,6 +185,19 @@ impl KanbanBoard {
     /// A column at its end.
     pub fn column(mut self, column: KanbanColumn) -> Self {
         self.columns.push(column);
+        self
+    }
+
+    /// Shares horizontal scrolling with the owner; otherwise the board keeps a keyed handle.
+    pub fn track_scroll(mut self, handle: &ScrollHandle) -> Self {
+        self.scroll = Some(handle.clone());
+        self
+    }
+
+    /// Fills a height-constrained parent, scrolling each column's cards independently.
+    /// Defaults to false; give the parent a height or `flex_1().min_h_0()` in a sized column.
+    pub fn fill_height(mut self, fill_height: bool) -> Self {
+        self.fill_height = fill_height;
         self
     }
 
@@ -189,10 +237,12 @@ impl RenderOnce for KanbanBoard {
         let hold = window.use_keyed_state((id.clone(), "hold"), cx, |_, _| None::<Hold>);
         let measures =
             window.use_keyed_state((id.clone(), "measures"), cx, |_, _| Measures::default());
-        let scroll = window
-            .use_keyed_state((id.clone(), "scroll"), cx, |_, _| ScrollHandle::new())
-            .read(cx)
-            .clone();
+        let scroll = self.scroll.unwrap_or_else(|| {
+            window
+                .use_keyed_state((id.clone(), "scroll"), cx, |_, _| ScrollHandle::new())
+                .read(cx)
+                .clone()
+        });
         let owner = hold.entity_id();
         let stale = hold
             .read(cx)
@@ -242,14 +292,39 @@ impl RenderOnce for KanbanBoard {
                 (key.clone(), reveal.into_any_element())
             })
             .collect();
-        let theme = cx.theme();
-        let colors = &theme.colors;
-        let width = theme.project().column;
+        let width = cx.theme().project().column;
+        let card_radius = cx.theme().radius(Radius::Md);
+        let column_radius = cx.theme().radius(Radius::Lg);
+        let text_size = cx.theme().text_size(TextSize::Sm);
+        let sunken = cx.theme().colors.sunken;
+        let fg_muted = cx.theme().colors.fg_muted;
         let mut lifted: Option<AnyElement> = None;
         let mut columns = Vec::new();
         for (column_ix, column) in self.columns.into_iter().enumerate() {
             let mut flip = Flip::new((id.clone(), format!("column-{}", column.key)));
-            let count = column.cards.len();
+            let count = column.total.unwrap_or(column.cards.len());
+            let vertical_scroll = self.fill_height.then(|| {
+                window
+                    .use_keyed_state(
+                        (id.clone(), format!("scroll-{}", column.key)),
+                        cx,
+                        |_, _| ScrollHandle::new(),
+                    )
+                    .read(cx)
+                    .clone()
+            });
+            let fill_request = self.fill_height.then(|| {
+                let request = window.use_keyed_state(
+                    (id.clone(), format!("fill-request-{}", column.key)),
+                    cx,
+                    |_, _| None::<(Pixels, Pixels, usize)>,
+                );
+                if column.on_load_more.is_none() {
+                    request.update(cx, |request, _| *request = None);
+                }
+                request
+            });
+            let loaded = column.cards.len();
             let mut shown = 0;
             let slot = held
                 .as_ref()
@@ -291,7 +366,7 @@ impl RenderOnce for KanbanBoard {
                     .when_some(name, |face, name| face.aria_label(name))
                     .relative()
                     .track_focus(&handle)
-                    .rounded(theme.radius(Radius::Md))
+                    .rounded(card_radius)
                     .border_1()
                     .border_color(gpui::transparent_black())
                     .focus_ring(cx)
@@ -352,6 +427,16 @@ impl RenderOnce for KanbanBoard {
                     .pb_2()
                     .child(face)
                     .child(reveal)
+                    .children(vertical_scroll.as_ref().map(|scroll| {
+                        reveal_when_focused(
+                            (id.clone(), format!("vertical-reveal-{key}-{}", column.key)),
+                            scroll,
+                            &handle,
+                            Axis::Vertical,
+                            window,
+                            cx,
+                        )
+                    }))
                     .child(measure(&row_measures, {
                         let key = key.clone();
                         move |measures, bounds| {
@@ -366,6 +451,57 @@ impl RenderOnce for KanbanBoard {
                 flip = flip.row("+slot", placeholder(&measures, held_key, cx));
             }
             let body_key = column.key.clone();
+            let body = div()
+                .relative()
+                .min_h_16()
+                .when(self.fill_height, |body| body.min_h_0())
+                .child(flip)
+                .child(measure(&measures, move |measures, bounds| {
+                    measures.bodies.insert(body_key.clone(), bounds) != Some(bounds)
+                }));
+            let body = match vertical_scroll {
+                Some(scroll) => on_axis(
+                    div()
+                        .id((id.clone(), format!("body-{}", column.key)))
+                        .relative()
+                        .flex_1()
+                        .min_h_0()
+                        .track_scroll(&scroll)
+                        .overflow_y_scroll(),
+                )
+                .child(body)
+                .children(column.on_load_more.zip(fill_request).map(|(on_load_more, request)| {
+                    let measures = measures.clone();
+                    let key = column.key.clone();
+                    let dragging = held.is_some();
+                    canvas(
+                        move |bounds, window, cx| {
+                            if dragging || loaded == 0 {
+                                return;
+                            }
+                            let Some(content) = measures.read(cx).bodies.get(&key).copied() else {
+                                return;
+                            };
+                            let geometry = (bounds.size.height, content.size.height, loaded);
+                            if content.size.height >= bounds.size.height
+                                || request.read(cx).as_ref() == Some(&geometry)
+                            {
+                                return;
+                            }
+                            request.update(cx, |request, _| *request = Some(geometry));
+                            let on_load_more = on_load_more.clone();
+                            window.defer(cx, move |window, cx| on_load_more(window, cx));
+                        },
+                        |_, _, _, _| {},
+                    )
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                }))
+                .into_any_element(),
+                None => body.into_any_element(),
+            };
             columns.push(
                 div()
                     .debug_selector({
@@ -376,36 +512,40 @@ impl RenderOnce for KanbanBoard {
                     .flex_none()
                     .flex()
                     .flex_col()
+                    .when(self.fill_height, |column| column.h_full().min_h_0())
                     .gap_2()
                     .p_2()
-                    .rounded(theme.radius(Radius::Lg))
-                    .bg(colors.sunken)
+                    .rounded(column_radius)
+                    .bg(sunken)
                     .child(
                         div()
                             .flex()
+                            .when(self.fill_height, |header| header.flex_none())
                             .items_center()
                             .justify_between()
                             .gap_2()
                             .px_1()
                             .child(
                                 div()
-                                    .text_size(theme.text_size(TextSize::Sm))
+                                    .text_size(text_size)
                                     .font_weight(gpui::FontWeight::MEDIUM)
                                     .child(column.title),
                             )
                             .child(
                                 tabular(div())
-                                    .text_size(theme.text_size(TextSize::Sm))
-                                    .text_color(colors.fg_muted)
+                                    .text_size(text_size)
+                                    .text_color(fg_muted)
                                     .child(count.to_string()),
                             ),
                     )
-                    .child(div().relative().min_h_16().child(flip).child(measure(
-                        &measures,
-                        move |measures, bounds| {
-                            measures.bodies.insert(body_key.clone(), bounds) != Some(bounds)
-                        },
-                    ))),
+                    .child(body)
+                    .children(column.footer.map(|footer| {
+                        if self.fill_height {
+                            div().flex_none().child(footer).into_any_element()
+                        } else {
+                            footer
+                        }
+                    })),
             );
         }
         let raised = held.as_ref().zip(lifted).map(|(held, content)| {
@@ -414,8 +554,8 @@ impl RenderOnce for KanbanBoard {
                 anchored().position(held.pointer - held.grab).child(
                     div()
                         .w(width)
-                        .rounded(theme.radius(Radius::Md))
-                        .shadow(theme.elevation(Elevation::Floating))
+                        .rounded(card_radius)
+                        .shadow(cx.theme().elevation(Elevation::Floating))
                         .child(content),
                 ),
             )
@@ -427,11 +567,16 @@ impl RenderOnce for KanbanBoard {
             div()
                 .id(id.clone())
                 .debug_selector(|| "kanban-board".into())
+                .w_full()
+                .min_w_0()
                 .track_scroll(&scroll)
                 .overflow_x_scroll(),
         )
         .flex()
         .items_start()
+        .when(self.fill_height, |board| {
+            board.h_full().min_h_0().items_stretch()
+        })
         .gap_3()
         .on_drag_move::<CardDrag>(move |event, _, cx| {
             if event.drag(cx).owner != owner {

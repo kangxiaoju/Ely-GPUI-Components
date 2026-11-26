@@ -31,6 +31,8 @@ pub struct Choice {
     pub note: Option<SharedString>,
     /// Shown but not pickable.
     pub disabled: bool,
+    /// A section label: drawn quieter than a selectable row, never picked.
+    pub heading: bool,
     /// How far it sits under a parent.
     pub depth: usize,
 }
@@ -45,6 +47,7 @@ impl Choice {
             avatar: None,
             note: None,
             disabled: false,
+            heading: false,
             depth: 0,
         }
     }
@@ -78,6 +81,18 @@ impl Choice {
         self.disabled = true;
         self
     }
+
+    /// A section label above its rows, such as a group name: quiet but legible,
+    /// skipped by the keyboard and never picked.
+    pub fn heading(mut self) -> Self {
+        self.heading = true;
+        self
+    }
+
+    /// Whether a press or the keyboard can pick this row.
+    pub(crate) fn pickable(&self) -> bool {
+        !self.disabled && !self.heading
+    }
 }
 
 #[doc(hidden)]
@@ -99,7 +114,7 @@ pub(crate) fn step(rows: &[Choice], from: usize, by: isize) -> usize {
     let mut at = from as isize;
     for _ in 0..count {
         at = (at + by).rem_euclid(count);
-        if !rows[at as usize].disabled {
+        if rows[at as usize].pickable() {
             return at as usize;
         }
     }
@@ -130,7 +145,9 @@ pub fn marked_row(
     let id = id.into();
     let theme = cx.theme();
     let colors = &theme.colors;
-    let fg = if choice.disabled {
+    let fg = if choice.heading {
+        colors.fg_muted
+    } else if choice.disabled {
         colors.fg_disabled
     } else {
         colors.fg
@@ -149,8 +166,8 @@ pub fn marked_row(
         .py_1()
         .rounded(theme.radius(Radius::Md))
         .text_color(fg)
-        .when(highlighted && !choice.disabled, |row| row.bg(colors.hover))
-        .when(!choice.disabled, |row| {
+        .when(highlighted && choice.pickable(), |row| row.bg(colors.hover))
+        .when(choice.pickable(), |row| {
             row.cursor_pointer().hover(|style| style.bg(colors.hover))
         })
         .when_some(checked, |row, on| {
@@ -334,7 +351,7 @@ impl Popup<'_> {
                 checked,
                 cx,
             )
-            .when(!choice.disabled, |row| {
+            .when(choice.pickable(), |row| {
                 row.on_mouse_down(MouseButton::Left, move |_, window, cx| {
                     window.prevent_default();
                     cx.stop_propagation();

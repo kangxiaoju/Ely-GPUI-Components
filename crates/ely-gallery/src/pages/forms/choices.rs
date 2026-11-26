@@ -3,6 +3,7 @@ use ely_gpui_component::{
         CheckState, Checkbox, CheckboxCard, CheckboxGroup, Choice, RadioCard, RadioGroup, Switch,
     },
     primitives::IconName,
+    theme::{ActiveTheme, Radius},
 };
 use gpui::{App, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
 
@@ -125,6 +126,7 @@ pub fn cards(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
     let space = keep("card-space", || SharedString::from("personal"), window, cx);
     let backup = keep("card-backup", || true, window, cx);
     let (space_now, backup_now) = (space.read(cx).clone(), *backup.read(cx));
+    let sample = cx.theme().colors.clone();
     let (personal, team) = (space.clone(), space);
     section(
         "CheckboxCard / RadioCard",
@@ -162,6 +164,14 @@ pub fn cards(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
                 .on_change(move |on, _, cx| set(&backup, on, cx)),
         ),
     )
+    .child(div().mt_4().w(px(200.)).child(
+        RadioCard::new("card-thumbnail", true, "Thumbnail choice")
+            .thumbnail(div().h(px(80.)).w_full().p_3().bg(sample.sunken)
+                .child(div().h_1().w(px(64.)).rounded(cx.theme().radius(Radius::Sm)).bg(sample.fg))
+                .child(div().mt_2().flex().gap_1().children(sample.chart.iter().take(5).map(|color| {
+                    div().size_3().rounded_full().bg(*color)
+                })))),
+    ))
 }
 
 pub fn switches(window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {

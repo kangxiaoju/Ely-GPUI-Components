@@ -244,6 +244,7 @@ impl RenderOnce for Scrollbar {
             });
         let track = div()
             .id(self.id)
+            .debug_selector(move || format!("scrollbar-track-{axis:?}"))
             .hover_listener_mode(HoverListenerMode::InputModalityIndependent)
             .absolute()
             .opacity(presence)

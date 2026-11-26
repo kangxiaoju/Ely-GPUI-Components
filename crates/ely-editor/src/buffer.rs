@@ -2,12 +2,17 @@ use std::{
     ops::Range,
     sync::atomic::{AtomicU64, Ordering},
 };
+use unicode_width::UnicodeWidthChar;
 
 /// Source text and where each line starts, in bytes.
 #[derive(Clone, Debug)]
 pub struct Buffer {
     text: String,
     starts: Vec<usize>,
+    widest: usize,
+    longest: usize,
+    last_line_bytes: usize,
+    last_line_columns: usize,
     stamp: u64,
 }
 
@@ -25,20 +30,40 @@ fn stamp() -> u64 {
     NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
-fn starts(text: &str) -> Vec<usize> {
-    std::iter::once(0)
+fn width(ch: char) -> usize {
+    if ch == '\t' { 4 } else { ch.width().unwrap_or(0) }
+}
+
+fn shape(text: &str) -> (Vec<usize>, usize, usize, usize, usize) {
+    let starts: Vec<usize> = std::iter::once(0)
         .chain(text.match_indices('\n').map(|(at, _)| at + 1))
-        .collect()
+        .collect();
+    let mut widest = 0;
+    let mut longest = 0;
+    let mut last_line_bytes = 0;
+    let mut last_line_columns = 0;
+    for line in text.split('\n') {
+        let columns = line.chars().map(width).sum();
+        longest = longest.max(line.len());
+        widest = widest.max(columns);
+        last_line_bytes = line.len();
+        last_line_columns = columns;
+    }
+    (starts, widest, longest, last_line_bytes, last_line_columns)
 }
 
 impl Buffer {
     /// A buffer holding `text`.
     pub fn new(text: impl Into<String>) -> Self {
         let text = text.into();
-        let starts = starts(&text);
+        let (starts, widest, longest, last_line_bytes, last_line_columns) = shape(&text);
         Self {
             text,
             starts,
+            widest,
+            longest,
+            last_line_bytes,
+            last_line_columns,
             stamp: stamp(),
         }
     }
@@ -66,6 +91,14 @@ impl Buffer {
     /// How many lines it holds; an empty buffer holds one.
     pub fn lines(&self) -> usize {
         self.starts.len()
+    }
+
+    pub(crate) fn widest(&self) -> usize {
+        self.widest
+    }
+
+    pub(crate) fn longest(&self) -> usize {
+        self.longest
     }
 
     /// A line's bytes, without its line break.
@@ -138,7 +171,42 @@ impl Buffer {
             self.text.len()
         );
         self.text.replace_range(range, text);
-        self.starts = starts(&self.text);
+        (
+            self.starts,
+            self.widest,
+            self.longest,
+            self.last_line_bytes,
+            self.last_line_columns,
+        ) = shape(&self.text);
+        self.stamp = stamp();
+    }
+
+    pub(crate) fn append(&mut self, text: &str) {
+        self.append_counted(text, &mut 0);
+    }
+
+    fn append_counted(&mut self, text: &str, scanned: &mut usize) {
+        if text.is_empty() {
+            return;
+        }
+        let old_len = self.text.len();
+        self.text.push_str(text);
+        *scanned += text.len();
+        let mut consumed = 0;
+        for part in text.split_inclusive('\n') {
+            consumed += part.len();
+            let has_newline = part.ends_with('\n');
+            let content = part.strip_suffix('\n').unwrap_or(part);
+            self.last_line_bytes += content.len();
+            self.last_line_columns += content.chars().map(width).sum::<usize>();
+            self.longest = self.longest.max(self.last_line_bytes);
+            self.widest = self.widest.max(self.last_line_columns);
+            if has_newline {
+                self.starts.push(old_len + consumed);
+                self.last_line_bytes = 0;
+                self.last_line_columns = 0;
+            }
+        }
         self.stamp = stamp();
     }
 }
@@ -274,6 +342,36 @@ mod tests {
     }
 
     #[test]
+    fn append_matches_full_shape_for_unicode_tabs_and_lines() {
+        let mut buffer = Buffer::new("前\t缀");
+        let before = buffer.stamp();
+        buffer.append("🙂e\u{301}\n第二\t行\n");
+        let expected = shape(buffer.text());
+        assert_eq!(buffer.starts, expected.0);
+        assert_eq!(buffer.lines(), expected.0.len());
+        assert_eq!(buffer.widest, expected.1);
+        assert_eq!(buffer.longest, expected.2);
+        assert_eq!(buffer.last_line_bytes, expected.3);
+        assert_eq!(buffer.last_line_columns, expected.4);
+        assert_eq!(buffer.line(buffer.lines() - 1), "");
+        assert_ne!(buffer.stamp(), before);
+    }
+
+    #[test]
+    fn append_after_trailing_newline_matches_full_shape() {
+        let mut buffer = Buffer::new("wide界\n");
+        buffer.append("\tcombining e\u{301}\nlast");
+        let expected = shape(buffer.text());
+        assert_eq!(buffer.starts, expected.0);
+        assert_eq!(buffer.lines(), expected.0.len());
+        assert_eq!(buffer.widest, expected.1);
+        assert_eq!(buffer.longest, expected.2);
+        assert_eq!(buffer.last_line_bytes, expected.3);
+        assert_eq!(buffer.last_line_columns, expected.4);
+        assert_eq!(buffer.line(buffer.lines() - 1), "last");
+    }
+
+    #[test]
     fn words_stop_at_their_class_and_at_line_edges() {
         let buffer = Buffer::new("let total = price * 2;\nnext");
         assert_eq!(buffer.word_start(9), 4, "back to the start of total");
@@ -283,5 +381,17 @@ mod tests {
         assert_eq!(buffer.word_end(22), 23, "a line end steps to the next line");
         assert_eq!(buffer.word_at(6), 4..9);
         assert_eq!(buffer.word_at(10), 10..11, "a mark is its own run");
+    }
+
+    #[test]
+    fn many_small_appends_scan_exactly_new_bytes() {
+        let mut buffer = Buffer::new("");
+        let mut scanned = 0;
+        for _ in 0..1_000 {
+            buffer.append_counted("你", &mut scanned);
+        }
+        assert_eq!(scanned, "你".len() * 1_000);
+        assert_eq!(buffer.last_line_bytes, scanned);
+        assert_eq!(shape(buffer.text()).3, scanned);
     }
 }

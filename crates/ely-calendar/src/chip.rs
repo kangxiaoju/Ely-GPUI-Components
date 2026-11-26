@@ -2,7 +2,8 @@ use std::rc::Rc;
 
 use gpui::{
     App, ElementId, FontWeight, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div, prelude::*, relative,
+    RenderOnce, Role, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::*,
+    relative,
 };
 use jiff::tz::TimeZone;
 
@@ -38,6 +39,8 @@ pub struct EventChip {
     zone: Option<TimeZone>,
     before: bool,
     after: bool,
+    tooltip: Option<SharedString>,
+    centered: bool,
     on_click: Option<Run>,
 }
 
@@ -50,6 +53,8 @@ impl EventChip {
             zone: None,
             before: false,
             after: false,
+            tooltip: None,
+            centered: false,
             on_click: None,
         }
     }
@@ -64,6 +69,17 @@ impl EventChip {
     pub(crate) fn open(mut self, before: bool, after: bool) -> Self {
         self.before = before;
         self.after = after;
+        self
+    }
+
+    pub(crate) fn centered(mut self) -> Self {
+        self.centered = true;
+        self
+    }
+
+    /// A tip shown on hover, for a title the chip cuts off.
+    pub fn tooltip(mut self, text: impl Into<SharedString>) -> Self {
+        self.tooltip = Some(text.into());
         self
     }
 
@@ -121,6 +137,9 @@ impl RenderOnce for EventChip {
                 Some(_) => chip.hover(|style| style.bg(colors.hover)),
                 None => chip.bg(tint.alpha(0.18)).font_weight(FontWeight::MEDIUM),
             })
+            .when_some(self.tooltip, |chip, text| {
+                chip.tooltip(crate::primitives::Tooltip::text(text))
+            })
             .when_some(self.on_click, |chip, on_click| {
                 let key = self.event.key.clone();
                 chip.cursor_pointer()
@@ -152,6 +171,7 @@ impl RenderOnce for EventChip {
                 div()
                     .flex_1()
                     .min_w_0()
+                    .when(self.centered, |title| title.text_center())
                     .child(Ellipsis::new(self.event.title.clone())),
             )
     }

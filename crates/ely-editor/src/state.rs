@@ -1,8 +1,8 @@
 use std::{collections::BTreeSet, ops::Range, time::Duration};
 
 use gpui::{
-    App, AppContext as _, Context, EventEmitter, FocusHandle, Focusable, Pixels, SharedString,
-    Subscription, Task, UniformListScrollHandle, Window,
+    App, AppContext as _, Context, EventEmitter, FocusHandle, Focusable, Pixels, ScrollHandle,
+    SharedString, Subscription, Task, UniformListScrollHandle, Window,
 };
 
 use super::{
@@ -69,6 +69,7 @@ pub(crate) struct Options {
     pub minimap: bool,
     pub sticky: bool,
     pub read_only: bool,
+    pub read_only_banner: bool,
     pub tab: usize,
     pub highlighter: Option<super::prose::LineHighlighter>,
     /// Text size against the theme's.
@@ -149,6 +150,7 @@ pub struct CodeEditor {
     pub(crate) history_bytes: usize,
     pub(crate) focus: FocusHandle,
     pub(crate) scroll: UniformListScrollHandle,
+    pub(crate) horizontal: ScrollHandle,
     pub(crate) folded: BTreeSet<usize>,
     pub(crate) options: Options,
     pub(crate) marks: Marks,
@@ -166,6 +168,7 @@ pub struct CodeEditor {
     focused: bool,
     pub(crate) chat_field: gpui::Entity<TextInput>,
     pub(crate) frame: Frame,
+    pub(crate) local_syntax: Option<super::syntax::LocalSyntax>,
     blink_epoch: u64,
     _blink: Option<Task<()>>,
     _subscriptions: Vec<Subscription>,
@@ -224,6 +227,7 @@ impl CodeEditor {
             history_bytes: super::prose::HISTORY_BYTES,
             focus,
             scroll: UniformListScrollHandle::new(),
+            horizontal: ScrollHandle::new(),
             folded: BTreeSet::new(),
             options: Options {
                 language: "Plain text".into(),
@@ -236,6 +240,7 @@ impl CodeEditor {
                 minimap: false,
                 sticky: false,
                 read_only: false,
+                read_only_banner: true,
                 tab: 4,
                 highlighter: None,
                 scale: 1.0,
@@ -253,6 +258,7 @@ impl CodeEditor {
             focused: false,
             chat_field,
             frame: Frame::default(),
+            local_syntax: None,
             blink_epoch: 0,
             _blink: None,
             _subscriptions: subscriptions,
@@ -319,6 +325,13 @@ impl CodeEditor {
         self
     }
 
+    /// Read-only output without the unlock strip; intended for generated/result panes.
+    pub fn read_only_without_banner(mut self) -> Self {
+        self.options.read_only = true;
+        self.options.read_only_banner = false;
+        self
+    }
+
     /// Spaces a Tab inserts and an indent guide spans.
     pub fn tab_size(mut self, size: usize) -> Self {
         assert!(size > 0, "a tab spans at least one column");
@@ -352,6 +365,11 @@ impl CodeEditor {
         &self.options.language
     }
 
+    /// Large or minified sources skip expensive whole-buffer decoration scans.
+    pub fn lightweight(&self) -> bool {
+        self.buffer.len() >= 128 * 1024 || self.buffer.longest() >= 16 * 1024
+    }
+
     /// The line the inline chat sits under, while it is open.
     pub fn chat_line(&self) -> Option<usize> {
         self.marks.chat
@@ -360,6 +378,16 @@ impl CodeEditor {
     /// Whether it takes no typing.
     pub fn is_read_only(&self) -> bool {
         self.options.read_only
+    }
+
+    /// Diagnostics currently attached by the editor owner.
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        &self.marks.diagnostics
+    }
+
+    /// Inlay hints currently attached by the editor owner.
+    pub fn inlay_hints(&self) -> &[InlayHint] {
+        &self.marks.hints
     }
 
     /// Replaces the text, as one undo step, one caret at the start.
@@ -371,6 +399,18 @@ impl CodeEditor {
         (self.marked, self.composing) = (None, None);
         anchors::clear(&mut self.marks);
         self.commit(before, false, cx);
+    }
+
+    /// Appends generated text without creating a user undo step.
+    /// Intended for bounded streaming output in read-only editors.
+    pub fn append_programmatic(&mut self, text: &str, cx: &mut Context<Self>) {
+        if text.is_empty() {
+            return;
+        }
+        self.buffer.append(text);
+        self.folded.retain(|line| *line < self.buffer.lines());
+        cx.emit(EditorEvent::Changed);
+        self.restart_blink(cx);
     }
 
     /// How the cursor draws.
@@ -522,6 +562,7 @@ impl CodeEditor {
     /// Makes `before` one undo step when the text moved on from it.
     pub(crate) fn commit(&mut self, before: Snapshot, typing: bool, cx: &mut Context<Self>) {
         if before.text != self.buffer.text() {
+            self.rebase_syntax(&before.text);
             if self.composing.is_none() {
                 self.history.record(before, typing);
                 self.cap_history();

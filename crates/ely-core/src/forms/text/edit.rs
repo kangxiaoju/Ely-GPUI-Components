@@ -91,6 +91,30 @@ pub(crate) fn unmasked_offset(text: &str, display: usize, bullet: char) -> usize
 pub(crate) struct Snapshot {
     pub text: String,
     pub selection: Range<usize>,
+    pub sensitive: bool,
+}
+
+impl Drop for Snapshot {
+    fn drop(&mut self) {
+        if self.sensitive {
+            crate::platform::clear_sensitive(&mut self.text);
+        }
+    }
+}
+
+impl History<Snapshot> {
+    pub(super) fn mark_sensitive(&mut self) {
+        for snapshot in self.undo.iter_mut().chain(&mut self.redo) {
+            snapshot.sensitive = true;
+        }
+    }
+
+    pub(super) fn clear_sensitive(&mut self) {
+        self.mark_sensitive();
+        self.undo.clear();
+        self.redo.clear();
+        self.typing_since = None;
+    }
 }
 
 /// Typing within this pause joins one undo step.
@@ -259,6 +283,7 @@ mod tests {
         let snap = |text: &str| Snapshot {
             text: text.into(),
             selection: text.len()..text.len(),
+            sensitive: false,
         };
         let mut history = History::<Snapshot>::default();
         history.record(snap(""), true);

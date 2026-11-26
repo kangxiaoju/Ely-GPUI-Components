@@ -23,6 +23,68 @@ struct Desk {
     asked: Option<(u64, gpui::Point<gpui::Pixels>)>,
 }
 
+/// A manual request must be consumed even after its host is unmounted.
+struct ManualDesk {
+    request: Option<(u64, gpui::Point<gpui::Pixels>)>,
+    mounted: bool,
+    closed: usize,
+    chosen: usize,
+}
+
+impl Render for ManualDesk {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let (closed, chosen) = (cx.entity(), cx.entity());
+        div().size_full().when(self.mounted, |root| {
+            root.child(ContextMenu::new("manual-lifecycle", Menu::new().item(
+                MenuItem::new("Choose").on_click(move |_, cx| {
+                    chosen.update(cx, |desk, _| desk.chosen += 1);
+                }),
+            )).manual(self.request).on_close(move |_, cx| {
+                closed.update(cx, |desk, cx| {
+                    desk.request = None;
+                    desk.closed += 1;
+                    cx.notify();
+                });
+            }).child(div().size_full()))
+        })
+    }
+}
+
+#[gpui::test]
+fn manual_dismissal_does_not_replay_after_remount(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        Theme::init(cx);
+        crate::forms::bind_keys(cx);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| ManualDesk {
+        request: Some((1, point(px(60.0), px(80.0)))),
+        mounted: true,
+        closed: 0,
+        chosen: 0,
+    });
+    settle(cx);
+    press("escape", cx);
+    assert_eq!(view.read_with(cx, |desk, _| desk.closed), 1);
+    for mounted in [false, true] {
+        view.update(cx, |desk, cx| { desk.mounted = mounted; cx.notify(); });
+        settle(cx);
+    }
+    press("down", cx);
+    press("enter", cx);
+    assert_eq!(view.read_with(cx, |desk, _| desk.chosen), 0);
+    view.update(cx, |desk, cx| {
+        desk.request = Some((2, point(px(60.0), px(80.0))));
+        cx.notify();
+    });
+    settle(cx);
+    press("down", cx);
+    press("enter", cx);
+    assert_eq!(view.read_with(cx, |desk, _| desk.chosen), 1);
+    assert_eq!(view.read_with(cx, |desk, _| desk.closed), 2);
+    press("escape", cx);
+    assert_eq!(view.read_with(cx, |desk, _| desk.closed), 2);
+}
+
 impl Desk {
     fn menu(&self, cx: &mut Context<Self>) -> Menu {
         let run = |name: &'static str| {

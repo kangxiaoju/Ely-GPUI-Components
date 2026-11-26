@@ -149,6 +149,7 @@ pub fn ely_mail::MailItem::zone(self, jiff::tz::timezone::TimeZone) -> Self
 pub fn ely_mail::MailList::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_mail::MailList::into_element(self) -> Self::Element
 pub fn ely_mail::MailList::new(impl core::convert::Into<gpui::window::ElementId>, alloc::rcs::rc::Rc<alloc::vec::Vec<ely_mail::Mail>>) -> Self
+pub fn ely_mail::MailList::on_load_more(self, bool, bool, impl core::ops::function::Fn(&mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_mail::MailList::on_select(self, impl core::ops::function::Fn(&[gpui_shared_string::SharedString], &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_mail::MailList::on_star(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, bool, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_mail::MailList::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
@@ -194,6 +195,7 @@ pub fn ely_mail::MailboxList::on_open(self, impl core::ops::function::Fn(&gpui_s
 pub fn ely_mail::MailboxList::open(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_mail::MailboxList::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_mail::MailboxList::section(self, impl core::convert::Into<gpui_shared_string::SharedString>, impl core::iter::traits::collect::IntoIterator<Item = ely_mail::Mailbox>) -> Self
+pub fn ely_mail::MailboxList::section_action(self, impl gpui::element::IntoElement) -> Self
 pub fn ely_mail::Message::cc(self, impl core::iter::traits::collect::IntoIterator<Item = ely_mail::Contact>) -> Self
 pub fn ely_mail::Message::clone(&self) -> Self
 pub fn ely_mail::Message::eq(&self, &Self) -> bool

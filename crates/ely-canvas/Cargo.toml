@@ -15,6 +15,7 @@ categories.workspace = true
 test-support = ["ely-core/test-support", "gpui/test-support", "gpui/leak-detection"]
 
 [dependencies]
+base64 = "0.22"
 ely-core.workspace = true
 gpui.workspace = true
 log.workspace = true

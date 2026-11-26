@@ -30,7 +30,7 @@ impl Studio {
             Shape::new(
                 "card",
                 "Card",
-                ShapeKind::Rect,
+                ShapeKind::RoundedRect,
                 Frame::new(40.0, 40.0, 220.0, 140.0),
             )
             .hue(0),

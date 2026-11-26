@@ -1,6 +1,9 @@
 //! A wide character takes its laid-out width, not one column.
 
-use gpui::{Bounds, EntityInputHandler, TestAppContext, VisualTestContext};
+use gpui::{
+    Bounds, EntityInputHandler, Modifiers, ScrollDelta, ScrollWheelEvent, TestAppContext,
+    TouchPhase, VisualTestContext, point, px,
+};
 
 use super::editor;
 
@@ -62,5 +65,133 @@ fn an_input_method_edit_measures_before_the_next_draw(cx: &mut TestAppContext) {
         }
         let bounds = editor.bounds_for_range(1..1, Bounds::default(), window, cx);
         assert!(bounds.is_some(), "the caret after it is measured");
+    });
+}
+
+#[gpui::test]
+fn a_long_line_scrolls_horizontally(cx: &mut TestAppContext) {
+    let text = "const value = ".to_string() + &"x".repeat(400);
+    let (editor, cx) = editor(&text, cx);
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("scrollbar-thumb").is_some(),
+        "a long line shows a horizontal scrollbar thumb"
+    );
+    let end = text.encode_utf16().count();
+    let before = editor.update_in(cx, |editor, window, cx| {
+        editor
+            .bounds_for_range(end..end, Bounds::default(), window, cx)
+            .expect("the line end is laid out")
+            .origin
+            .x
+    });
+
+    cx.simulate_event(ScrollWheelEvent {
+        position: point(px(200.0), px(100.0)),
+        delta: ScrollDelta::Pixels(point(px(-240.0), px(0.0))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+        source: gpui::ScrollSource::Pointer,
+    });
+    cx.run_until_parked();
+
+    let after = editor.update_in(cx, |editor, window, cx| {
+        editor
+            .bounds_for_range(end..end, Bounds::default(), window, cx)
+            .expect("the line end stays laid out")
+            .origin
+            .x
+    });
+    assert!(
+        after < before,
+        "horizontal wheel must shift the long line: {before:?} -> {after:?}"
+    );
+}
+
+#[gpui::test]
+fn a_vertical_wheel_does_not_shift_a_long_line_sideways(cx: &mut TestAppContext) {
+    let text = "const value = ".to_string() + &"x".repeat(400);
+    let (editor, cx) = editor(&text, cx);
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    let end = text.encode_utf16().count();
+    let before = editor.update_in(cx, |editor, window, cx| {
+        editor
+            .bounds_for_range(end..end, Bounds::default(), window, cx)
+            .expect("the line end is laid out")
+            .origin
+            .x
+    });
+
+    cx.simulate_event(ScrollWheelEvent {
+        position: point(px(200.0), px(100.0)),
+        delta: ScrollDelta::Pixels(point(px(0.0), px(-240.0))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+        source: gpui::ScrollSource::Pointer,
+    });
+    cx.run_until_parked();
+
+    let after = editor.update_in(cx, |editor, window, cx| {
+        editor
+            .bounds_for_range(end..end, Bounds::default(), window, cx)
+            .expect("the line end stays laid out")
+            .origin
+            .x
+    });
+    assert_eq!(after, before, "vertical wheel must not shift a long line sideways");
+}
+
+#[gpui::test]
+fn the_last_line_stays_above_the_horizontal_scrollbar(cx: &mut TestAppContext) {
+    let text = (0..40)
+        .map(|ix| format!("line {ix} {}", "x".repeat(400)))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let last = text.len();
+    let (editor, cx) = editor(&text, cx);
+    cx.simulate_resize(gpui::size(px(800.0), px(92.0)));
+    editor.update(cx, |editor, cx| {
+        editor.select([last..last], cx);
+        editor.reveal(true, cx);
+    });
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+
+    let line = cx.debug_bounds("editor-line-39").expect("last line is drawn");
+    let track = cx
+        .debug_bounds("scrollbar-track-Horizontal")
+        .expect("horizontal scrollbar track is drawn");
+    assert!(
+        line.bottom() <= track.top(),
+        "last line must clear the horizontal scrollbar track: line={line:?}, track={track:?}"
+    );
+}
+
+#[gpui::test]
+fn a_large_minified_file_uses_lightweight_rendering(cx: &mut TestAppContext) {
+    let text = "x".repeat(128 * 1024);
+    let (editor, _) = editor(&text, cx);
+    assert!(editor.read_with(cx, |editor, _| editor.lightweight()));
+}
+
+#[gpui::test]
+fn a_large_source_file_keeps_syntax_colors(cx: &mut TestAppContext) {
+    // A source file over the lightweight threshold must still color each line;
+    // only whole-buffer decoration scans (folds, brackets) are skipped.
+    let mut text = String::with_capacity(200 * 1024);
+    for _ in 0..4000 {
+        text.push_str("let x = 1;\n");
+    }
+    text.push_str("fn main() {}\n");
+    let (editor, cx) = editor(&text, cx);
+    editor.update(cx, |editor, cx| {
+        assert!(editor.lightweight(), "test text must exceed the 128 KiB threshold");
+        let styles = editor.styles(4000, cx);
+        assert!(!styles.is_empty(), "large files must keep per-line syntax colors");
     });
 }

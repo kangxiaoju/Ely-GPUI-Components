@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc, time::Instant};
 
 use gpui::{
     AnyElement, App, AppContext as _, Bounds, ElementId, EmptyView, Entity, EntityId,
@@ -7,8 +7,8 @@ use gpui::{
 };
 
 use super::{
-    links::{Link, halfway, route},
-    paint::{at, finish, head, in_view, outline, paint_shape, quad, solid},
+    links::{Link, CanvasScene, LinkAnimation, FlowMode, FlowDirection, halfway},
+    paint::{at, finish, in_view, outline, paint_shape, quad},
     shape::{Artboard, Guide, Shape, ShapeKind},
     view::{Viewport, marks, step},
 };
@@ -18,9 +18,10 @@ use crate::{
 };
 
 pub(crate) type OnViewport = Rc<dyn Fn(Viewport, &mut Window, &mut App)>;
+type OnLinkSelect = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
 
 /// A link's run in view pixels, with its words.
-type Drawn = (Vec<(f32, f32)>, Option<SharedString>);
+type Drawn = (Vec<(f32, f32)>, Option<SharedString>, Option<LinkAnimation>, Option<super::LinkPresentation>, Option<SharedString>);
 
 /// A drag that pans a canvas, and whose canvas it is.
 struct Pan {
@@ -33,6 +34,7 @@ struct Plane {
     bounds: Bounds<Pixels>,
     grip: Option<(Point<Pixels>, Viewport)>,
 }
+
 
 /// An endless plane: a dot grid that thins as it zooms out, rulers along the top and left, guides, artboards with their names, and shapes. A drag on empty space pans it from where it was pressed, a wheel scrolls it, and Command or Control with the wheel zooms about the pointer. The owner keeps the viewport; a new one from the owner shows at once.
 ///
@@ -56,6 +58,12 @@ pub struct InfiniteCanvas {
     rulers: bool,
     layers: Vec<AnyElement>,
     on_viewport: Option<OnViewport>,
+    scene: Option<Arc<CanvasScene>>,
+    link_animations: Vec<LinkAnimation>,
+    animations_active: bool,
+    reduced_motion: bool,
+    link_hues: std::collections::HashMap<SharedString,usize>,
+    on_link_select: Option<OnLinkSelect>,
 }
 
 impl InfiniteCanvas {
@@ -71,6 +79,12 @@ impl InfiniteCanvas {
             rulers: false,
             layers: Vec::new(),
             on_viewport: None,
+            scene: None,
+            link_animations: Vec::new(),
+            animations_active: true,
+            reduced_motion: false,
+            link_hues: Default::default(),
+            on_link_select: None,
         }
     }
 
@@ -84,6 +98,30 @@ impl InfiniteCanvas {
     pub fn links(mut self, links: impl IntoIterator<Item = Link>) -> Self {
         self.links = links.into_iter().collect();
         self
+    }
+
+    /// Uses an immutable content-revision scene without cloning shapes or recalculating routes.
+    pub fn scene(mut self, scene: Arc<CanvasScene>) -> Self { self.scene = Some(scene); self }
+
+    /// Independent flow styles, keyed by connector.
+    pub fn link_animations(mut self, animations: impl IntoIterator<Item = LinkAnimation>) -> Self {
+        self.link_animations = animations.into_iter().collect(); self
+    }
+
+    /// Stops animation scheduling while the owning tab or view is hidden.
+    pub fn animations_active(mut self, active: bool) -> Self { self.animations_active = active; self }
+
+    /// Shows static connector patterns without requesting animation frames.
+    pub fn reduced_motion(mut self, reduced: bool) -> Self { self.reduced_motion = reduced; self }
+
+    /// Theme hue slots for static connectors, keyed by link.
+    pub fn link_hues(mut self, hues: impl IntoIterator<Item=(SharedString,usize)>) -> Self {
+        self.link_hues = hues.into_iter().collect(); self
+    }
+
+    /// Receives the key of a prepared connector pressed with the primary pointer.
+    pub fn on_link_select(mut self, handler:impl Fn(&SharedString,&mut Window,&mut App)+'static)->Self {
+        self.on_link_select=Some(Rc::new(handler));self
     }
 
     /// Boards drawn under the shapes.
@@ -122,6 +160,7 @@ impl InfiniteCanvas {
 
 impl RenderOnce for InfiniteCanvas {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let scene = self.scene.clone().unwrap_or_else(|| Arc::new(CanvasScene::new(self.shapes, self.links)));
         let id = self.id.clone();
         let local = use_seeded((id.clone(), "view"), self.viewport, window, cx);
         let plane: Entity<Plane> =
@@ -144,6 +183,8 @@ impl RenderOnce for InfiniteCanvas {
         let theme = cx.theme();
         let (colors, sizes) = (theme.colors.clone(), theme.canvas());
         let rem = window.rem_size();
+        let base_text_size = theme.text_size(TextSize::Base).to_pixels(rem);
+        let xs_text_size = theme.text_size(TextSize::Xs);
         let (dot, hairline, stroke) = (sizes.dot, sizes.hairline, sizes.stroke.to_pixels(rem));
         let (ruler, side) = (sizes.ruler.to_pixels(rem), sizes.side.to_pixels(rem));
         let grid = step(view.zoom, f32::from(sizes.grid.to_pixels(rem)));
@@ -161,7 +202,7 @@ impl RenderOnce for InfiniteCanvas {
             div()
                 .absolute()
                 .whitespace_nowrap()
-                .text_size(theme.text_size(TextSize::Xs))
+                .text_size(xs_text_size)
                 .text_color(color)
                 .child(text)
         };
@@ -177,32 +218,27 @@ impl RenderOnce for InfiniteCanvas {
                     .into_any_element()
             })
             .collect();
-        let routes: Vec<Drawn> = self
-            .links
-            .iter()
-            .filter_map(|link| {
-                let named = |key: &SharedString| self.shapes.iter().find(|shape| shape.key == *key);
-                let (Some(from), Some(to)) = (named(&link.from), named(&link.to)) else {
-                    log::error!(
-                        "canvas: link {} names a shape gone from the canvas",
-                        link.key
-                    );
-                    return None;
-                };
-                (!from.hidden && !to.hidden).then(|| {
-                    let points = route(&from.frame, &to.frame, link.elbow)
-                        .into_iter()
-                        .map(|point| view.to_view(point))
-                        .collect();
-                    (points, link.label.clone())
-                })
-            })
-            .collect();
+        let routes: Vec<Drawn> = scene.links.iter().zip(&scene.routes).filter_map(|(link, route)| {
+            let points: Vec<_> = route.as_ref()?.iter().map(|point| view.to_view(*point)).collect();
+            let bounds = points.iter().map(|p| super::view::Frame::new(p.0,p.1,0.0,0.0))
+                .reduce(|a,b| a.union(&b))?;
+            if bounds.right() < 0.0 || bounds.bottom() < 0.0 || bounds.x > w || bounds.y > h { return None; }
+            let animation = self.link_animations.iter().find(|a| a.key == link.key).cloned()
+                .or_else(|| self.link_hues.get(&link.key).map(|hue| LinkAnimation { key:link.key.clone(), mode:FlowMode::Dashes, direction:FlowDirection::Forward, speed:0.0, paused:true, hue:*hue, glow:false }));
+            let presentation=scene.presentations.get(&link.key).map(|p|super::LinkPresentation {key:p.key.clone(),points:Vec::new(),stroke:p.stroke,stroke_width:p.stroke_width,dash:p.dash,start_arrow:p.start_arrow,end_arrow:p.end_arrow});
+            let font=scene.link_fonts.get(&link.key).map(|font|font.family(cx));
+            Some((points, link.label.clone(), animation, presentation, font))
+        }).collect();
+        let flowing = self.animations_active && !self.reduced_motion && !theme.reduced_motion && routes.iter().any(|(_,_,a,_,_)| a.as_ref().is_some_and(|a| !a.paused && a.speed > 0.0));
         let chip = theme.text_size(TextSize::Sm).to_pixels(rem) * view.zoom;
         let chips: Vec<AnyElement> = routes
             .iter()
-            .filter_map(|(points, label)| {
+            .filter_map(|(points, label, _, _, font)| {
                 let (x, y) = halfway(points);
+                let chip_label=div().flex_none().whitespace_nowrap().px(chip*0.5)
+                    .rounded(theme.radius(Radius::Sm)).bg(colors.bg).border_1().border_color(colors.border)
+                    .text_size(chip).line_height(chip*1.4).text_color(colors.fg_muted).child(label.clone()?);
+                let chip_label=if let Some(font)=font {chip_label.font_family(font.clone())} else {chip_label};
                 Some(
                     div()
                         .absolute()
@@ -212,66 +248,91 @@ impl RenderOnce for InfiniteCanvas {
                         .flex()
                         .items_center()
                         .justify_center()
-                        .child(
-                            div()
-                                .flex_none()
-                                .whitespace_nowrap()
-                                .px(chip * 0.5)
-                                .rounded(theme.radius(Radius::Sm))
-                                .bg(colors.bg)
-                                .border_1()
-                                .border_color(colors.border)
-                                .text_size(chip)
-                                .line_height(chip * 1.4)
-                                .text_color(colors.fg_muted)
-                                .child(label.clone()?),
-                        )
+                        .child(chip_label)
                         .into_any_element(),
                 )
             })
             .collect();
-        let lines: Vec<Vec<(f32, f32)>> = routes.into_iter().map(|(points, _)| points).collect();
-        let texts: Vec<AnyElement> = self
-            .shapes
+        let lines = routes;
+        let surface = window.use_keyed_state((self.id.clone(), "flow-surface"), cx, |_,_| super::link_surface::LinkSurface {
+            lines: Vec::new(), palette: colors.clone(), stroke, zoom: view.zoom, active:false, started:Instant::now()
+        });
+        surface.update(cx, |surface, _| {
+            let elapsed = surface.started.elapsed().as_secs_f32();
+            let previous = std::mem::take(&mut surface.lines);
+            surface.lines = lines.into_iter().map(|(points,_,animation,presentation,_)| {
+                let phase = animation.as_ref().and_then(|next| previous.iter().find(|old| old.animation.as_ref().is_some_and(|old| old.key == next.key)))
+                    .map_or(0.0, |old| super::link_surface::advanced_phase(old.phase,elapsed,old.animation.as_ref(),surface.active,surface.zoom));
+                super::link_surface::SurfaceLine {points,animation,phase,presentation}
+            }).collect();
+            surface.started=Instant::now();
+            surface.palette=colors.clone(); surface.stroke=stroke; surface.zoom=view.zoom; surface.active=flowing;
+        });
+        let texts: Vec<AnyElement> = scene.shapes
             .iter()
             .filter(|shape| !shape.hidden)
+            .filter(|shape| { let frame=in_view(&view,&shape.bounds()); frame.right()>=0.0 && frame.bottom()>=0.0 && frame.x<=w && frame.y<=h })
             .filter_map(|shape| {
                 let frame = in_view(&view, &shape.frame);
-                let size = theme.text_size(TextSize::Base).to_pixels(rem) * view.zoom;
+                let label_frame=if let ShapeKind::Symbol(kind)=shape.kind {
+                    let local=super::symbol_label_frame(kind,shape.frame.w,shape.frame.h);
+                    in_view(&view,&super::Frame::new(shape.frame.x+local.x,shape.frame.y+local.y,local.w,local.h))
+                } else {frame};
+                let size = shape.appearance.map_or(base_text_size, |s| Pixels::from(s.font_size)) * view.zoom;
+                let font_family = shape.appearance.map_or(super::CanvasFont::Default,|style|style.font).family(cx);
+                let alignment = shape.appearance.map_or(super::CanvasTextAlign::Center, |s| s.text_align);
+                let text_ink = shape.appearance.map_or(colors.fg, |s| s.stroke_color.unwrap_or_else(|| colors.hue(s.stroke,"shape text")));
+                if shape.rotation != 0.0 && !matches!(shape.kind, ShapeKind::Image(_)) {
+                    if let Some(text) = shape.words() {
+                        let font_size = shape.appearance.map_or(16.0, |s| s.font_size);
+                        let escaped = |s:&str| s.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;").replace('"',"&quot;").replace('\'',"&apos;");
+                        let (x,anchor) = match alignment { super::CanvasTextAlign::Left => (0.0,"start"), super::CanvasTextAlign::Center => (shape.frame.w*0.5,"middle"), super::CanvasTextAlign::Right => (shape.frame.w,"end") };
+                        let spans = text.lines().enumerate().map(|(ix,line)| format!("<tspan x='{x}' y='{}'>{}</tspan>", font_size*(1.0+ix as f32*1.3),escaped(line))).collect::<String>();
+                        let data = format!("<svg xmlns='http://www.w3.org/2000/svg' width='{}' height='{}'><text text-anchor='{anchor}' font-family='{}' font-size='{}'>{}</text></svg>",shape.frame.w,shape.frame.h,escaped(&font_family),font_size,spans);
+                        return Some(gpui::svg().data(&super::text_outline::outlined(&data,cx)).with_transformation(gpui::Transformation::rotate(gpui::radians(shape.rotation)))
+                            .absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y)).w(Pixels::from(frame.w)).h(Pixels::from(frame.h))
+                            .text_color(text_ink).opacity(shape.appearance.map_or(1.0,|s|s.opacity.clamp(0.0,1.0))).into_any_element());
+                    }
+                }
                 let placed = |text: &str| {
-                    div()
+                    let placed = div()
                         .absolute()
-                        .left(Pixels::from(frame.x))
-                        .top(Pixels::from(frame.y))
-                        .w(Pixels::from(frame.w))
-                        .h(Pixels::from(frame.h))
+                        .left(Pixels::from(label_frame.x))
+                        .top(Pixels::from(label_frame.y))
+                        .w(Pixels::from(label_frame.w))
+                        .h(Pixels::from(label_frame.h))
                         .overflow_hidden()
                         .text_size(size)
+                        .font_family(font_family.clone())
                         .line_height(size * 1.3)
-                        .child(text.to_string())
+                        .opacity(shape.appearance.map_or(1.0, |s| s.opacity.clamp(0.0,1.0)))
+                        .child(text.to_string());
+                    match alignment { super::CanvasTextAlign::Left => placed.text_left(), super::CanvasTextAlign::Center => placed.text_center(), super::CanvasTextAlign::Right => placed.text_right() }
                 };
                 match &shape.kind {
+                    ShapeKind::Image(_) => {
+                        let frame = in_view(&view, &shape.bounds());
+                        scene.images.get(&shape.key).map(|image| gpui::img(image.clone())
+                            .absolute().left(Pixels::from(frame.x)).top(Pixels::from(frame.y))
+                            .w(Pixels::from(frame.w)).h(Pixels::from(frame.h))
+                            .opacity(shape.appearance.map_or(1.0, |s| s.opacity.clamp(0.0,1.0)*s.fill_opacity.clamp(0.0,1.0))).into_any_element())
+                    }
                     ShapeKind::Text(text) => {
-                        Some(placed(text).text_color(colors.fg).into_any_element())
+                        Some(placed(text).text_color(text_ink).into_any_element())
                     }
                     ShapeKind::Note(text) => {
-                        let paper = colors.hue(shape.hue, format_args!("note {}", shape.key));
                         Some(
                             placed(text)
                                 .p(sizes.note_inset.to_pixels(rem) * view.zoom)
                                 .rounded(sizes.note_corner.to_pixels(rem) * view.zoom)
-                                .bg(paper.alpha(0.22))
-                                .text_color(colors.fg)
+                                .text_color(text_ink)
                                 .into_any_element(),
                         )
                     }
                     _ => shape.label.as_ref().map(|label| {
                         placed(label)
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .text_center()
-                            .text_color(colors.fg)
+                            .flex().flex_col().justify_center()
+                            .text_color(text_ink)
                             .into_any_element()
                     }),
                 }
@@ -309,7 +370,7 @@ impl RenderOnce for InfiniteCanvas {
             ]
         });
         let (shapes, artboards, guides, palette) =
-            (self.shapes, self.artboards, self.guides, colors.clone());
+            (scene.shapes.clone(), self.artboards, self.guides, colors.clone());
         let painted = canvas(
             |_, _, _| {},
             move |bounds, _, window, _| {
@@ -329,20 +390,9 @@ impl RenderOnce for InfiniteCanvas {
                     );
                 }
                 for shape in shapes.iter().filter(|shape| !shape.hidden) {
+                    let frame=in_view(&view,&shape.bounds());
+                    if frame.right()<0.0 || frame.bottom()<0.0 || frame.x>w || frame.y>h { continue; }
                     paint_shape(shape, &view, origin, &palette, stroke, window);
-                }
-                for points in &lines {
-                    let end = &points[points.len() - 2..];
-                    finish(
-                        outline(points, origin, stroke, false),
-                        palette.fg_muted,
-                        window,
-                    );
-                    finish(
-                        solid(&head(end[0], end[1], stroke), origin),
-                        palette.fg_muted,
-                        window,
-                    );
                 }
                 let line = palette.hue(3, "guide");
                 for guide in &guides {
@@ -391,6 +441,7 @@ impl RenderOnce for InfiniteCanvas {
         let (wheel, pan, drop) = (set.clone(), set, plane.clone());
         let (scrolled, dragged, pressed) = (plane.clone(), plane.clone(), plane);
         let (live, held) = (local.clone(), local.clone());
+        let on_link_select=self.on_link_select;
         div()
             .id(id)
             .relative()
@@ -420,8 +471,14 @@ impl RenderOnce for InfiniteCanvas {
                 cx.stop_propagation();
                 wheel(next, window, cx);
             })
-            .on_mouse_down(gpui::MouseButton::Left, move |event, _, cx| {
+            .on_mouse_down(gpui::MouseButton::Left, move |event, window, cx| {
                 let now = held.read(cx).value;
+                if let Some(handler)=&on_link_select {
+                    let position=event.position-pressed.read(cx).bounds.origin;
+                    if let Some(key)=scene.hit_link(now.to_canvas((f32::from(position.x),f32::from(position.y))),6.0/now.zoom) {
+                        handler(key,window,cx);cx.stop_propagation();return;
+                    }
+                }
                 pressed.update(cx, |plane, _| plane.grip = Some((event.position, now)))
             })
             .on_drag(Pan { owner }, |_, _, _, cx| cx.new(|_| EmptyView))
@@ -443,6 +500,7 @@ impl RenderOnce for InfiniteCanvas {
             .child(painted)
             .children(names)
             .children(texts)
+            .child(surface)
             .children(chips)
             .children(self.layers)
             .children(rulers.into_iter().flatten())

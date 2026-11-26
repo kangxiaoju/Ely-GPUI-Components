@@ -85,6 +85,7 @@ pub struct TextInput {
     composing: Option<Snapshot>,
     rows: Option<(usize, usize)>,
     masked: bool,
+    sensitive: bool,
     filter: Option<Filter>,
     fit: Option<Fit>,
     max_len: Option<usize>,
@@ -146,6 +147,7 @@ impl TextInput {
             composing: None,
             rows: None,
             masked: false,
+            sensitive: false,
             filter: None,
             fit: None,
             max_len: None,
@@ -198,9 +200,10 @@ impl TextInput {
         self
     }
 
-    /// Shows bullets instead of the text, and keeps it off the clipboard.
+    /// Shows bullets, keeps text off the clipboard, and zeroizes owned storage on drop.
     pub fn masked(mut self) -> Self {
         self.masked = true;
+        self.mark_sensitive();
         self
     }
 
@@ -324,6 +327,9 @@ impl TextInput {
     /// Hides or shows its text.
     pub fn set_masked(&mut self, masked: bool, cx: &mut Context<Self>) {
         self.masked = masked;
+        if masked {
+            self.mark_sensitive();
+        }
         cx.notify();
     }
 
@@ -345,11 +351,56 @@ impl TextInput {
             None => text,
         };
         self.selection = text.len()..text.len();
-        self.text = text;
+        self.replace_owned_text(text);
         self.marked = None;
         self.composing = None;
         cx.emit(InputEvent::Changed);
         cx.notify();
+    }
+
+    /// Zeroizes owned text and composition/history snapshots, then clears the field.
+    /// Preserves masking; copies held by the OS, renderer or caller are outside this API.
+    pub fn clear_sensitive(&mut self, cx: &mut Context<Self>) {
+        self.mark_sensitive();
+        crate::platform::clear_sensitive(&mut self.text);
+        self.composing = None;
+        self.history.clear_sensitive();
+        self.selection = 0..0;
+        self.edited_from = 0..0;
+        self.reversed = false;
+        self.marked = None;
+        self.layout = None;
+        self.scroll = Point::default();
+        self.selecting = false;
+        cx.emit(InputEvent::Changed);
+        self.restart_blink(cx);
+    }
+
+    fn mark_sensitive(&mut self) {
+        self.sensitive = true;
+        if let Some(snapshot) = &mut self.composing {
+            snapshot.sensitive = true;
+        }
+        self.history.mark_sensitive();
+    }
+
+    fn replace_owned_text(&mut self, text: String) {
+        if self.sensitive {
+            crate::platform::clear_sensitive(&mut self.text);
+        }
+        self.text = text;
+    }
+
+    fn replace_owned_range(&mut self, range: Range<usize>, incoming: &str) {
+        if self.sensitive {
+            let mut text = String::with_capacity(self.text.len() - range.len() + incoming.len());
+            text.push_str(&self.text[..range.start]);
+            text.push_str(incoming);
+            text.push_str(&self.text[range.end..]);
+            self.replace_owned_text(text);
+        } else {
+            self.text.replace_range(range, incoming);
+        }
     }
 
     /// Reshapes every edit, as a mask does: text, replaced range and typed text in; text and caret out. Undo starts afresh, since earlier text need not fit.
@@ -453,11 +504,11 @@ impl TextInput {
                     None => (self.text.as_str(), range),
                 };
                 let (text, caret) = fit(base, range, &incoming);
-                self.text = text;
+                self.replace_owned_text(text);
                 caret
             }
             None => {
-                self.text.replace_range(range.clone(), &incoming);
+                self.replace_owned_range(range.clone(), &incoming);
                 range.start + incoming.len()
             }
         };
@@ -481,12 +532,13 @@ impl TextInput {
         self.composing.clone().unwrap_or_else(|| Snapshot {
             text: self.text.clone(),
             selection: self.selection.clone(),
+            sensitive: self.sensitive,
         })
     }
 
-    pub(crate) fn restore(&mut self, snapshot: Snapshot, cx: &mut Context<Self>) {
-        self.text = snapshot.text;
-        self.selection = snapshot.selection;
+    pub(crate) fn restore(&mut self, mut snapshot: Snapshot, cx: &mut Context<Self>) {
+        self.replace_owned_text(std::mem::take(&mut snapshot.text));
+        self.selection = snapshot.selection.clone();
         self.reversed = false;
         self.marked = None;
         self.composing = None;
@@ -590,5 +642,13 @@ impl TextInput {
     #[doc(hidden)]
     pub fn focus(&self) -> &FocusHandle {
         &self.focus
+    }
+}
+
+impl Drop for TextInput {
+    fn drop(&mut self) {
+        if self.sensitive {
+            crate::platform::clear_sensitive(&mut self.text);
+        }
     }
 }

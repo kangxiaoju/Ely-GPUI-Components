@@ -12,19 +12,20 @@ use super::{
     keys::{CONTEXT, listen},
     layout::{Row, around, hidden, rows},
     state::{CodeEditor, EditorEvent},
-    syntax::{self, Bracket, brackets, folds},
+    syntax::{self, Bracket},
 };
 use crate::{
     i18n,
     theme::{ActiveTheme, TextSize},
 };
+use ely_core::layout::{Scrollbar, on_axis};
 
 /// What one render worked out, for the rows the list builds after it.
 #[derive(Default)]
 pub(crate) struct Frame {
     pub rows: Vec<Row>,
-    pub folds: Vec<(usize, usize)>,
-    pub brackets: Vec<Bracket>,
+    pub folds: std::sync::Arc<Vec<(usize, usize)>>,
+    pub brackets: std::sync::Arc<Vec<Bracket>>,
     pub advance: Pixels,
     pub line: Pixels,
     pub matched: Option<(usize, usize)>,
@@ -41,6 +42,10 @@ const LEADING: f32 = 1.6;
 const STICKY: usize = 3;
 /// Columns the minimap spans, in code characters.
 const MINIMAP: f32 = 12.0;
+// A minimap never needs more detail than its pixels can show. Keep both
+// highlighter work and painted spans bounded even for very large files.
+const MINIMAP_ROWS: usize = 512;
+const MINIMAP_COLUMNS: usize = 120;
 
 impl CodeEditor {
     /// The text the primary selection or its word gives, for highlighting where else it appears.
@@ -91,7 +96,7 @@ impl CodeEditor {
         }
         let rows = headers.into_iter().map(|line| {
             let text = self.buffer.line(line).to_string();
-            let styles = self.line_colors(&text, cx);
+            let styles = self.syntax_colors(self.buffer.line_range(line), cx);
             let jump = cx.entity();
             div()
                 .id(("sticky", line))
@@ -142,23 +147,31 @@ impl CodeEditor {
     fn minimap_view(&self, cx: &mut Context<Self>) -> AnyElement {
         let colors = cx.theme().colors.clone();
         let (advance, line) = (self.frame.advance, self.frame.line);
-        let tokens: Vec<Vec<(usize, usize, gpui::Hsla)>> = self
-            .frame
-            .rows
-            .iter()
-            .map(|row| match row {
-                Row::Line(at) => {
-                    let text = self.buffer.line(*at);
-                    self.line_colors(text, cx)
-                        .into_iter()
-                        .filter_map(|(range, style)| {
-                            let start = text[..range.start].chars().count();
-                            let len = text[range].chars().count();
-                            style.color.map(|color| (start, len, color))
-                        })
-                        .collect()
-                }
-                _ => Vec::new(),
+        let total_rows = self.frame.rows.len().max(1);
+        let samples = total_rows.min(MINIMAP_ROWS);
+        let tokens: Vec<(usize, Vec<(usize, usize, gpui::Hsla)>)> = (0..samples)
+            .map(|sample| {
+                let index = sample * (total_rows - 1) / (samples - 1).max(1);
+                let spans = match self.frame.rows.get(index) {
+                    Some(Row::Line(at)) => {
+                        let text = self.buffer.line(*at);
+                        let end = text
+                            .char_indices()
+                            .nth(MINIMAP_COLUMNS)
+                            .map_or(text.len(), |(offset, _)| offset);
+                        let text = &text[..end];
+                        self.syntax_colors(self.buffer.line_range(*at).start..self.buffer.line_range(*at).start + end, cx)
+                            .into_iter()
+                            .filter_map(|(range, style)| {
+                                let start = text[..range.start].chars().count();
+                                let len = text[range].chars().count();
+                                style.color.map(|color| (start, len, color))
+                            })
+                            .collect()
+                    }
+                    _ => Vec::new(),
+                };
+                (index, spans)
             })
             .collect();
         let scroll = self.scroll.clone();
@@ -171,6 +184,7 @@ impl CodeEditor {
             .flex_none()
             .w(advance * MINIMAP)
             .h_full()
+            .overflow_hidden()
             .border_l_1()
             .border_color(colors.border)
             .cursor_pointer()
@@ -180,7 +194,7 @@ impl CodeEditor {
                         entity.update(cx, |editor, _| editor.frame.minimap = bounds);
                     },
                     move |bounds, _, window, _| {
-                        let rows = tokens.len().max(1) as f32;
+                        let rows = total_rows as f32;
                         let tall = (line * 0.15).min(bounds.size.height / rows);
                         let wide = advance * 0.12;
                         let state = scroll.0.borrow();
@@ -192,13 +206,17 @@ impl CodeEditor {
                             Bounds::new(point(bounds.origin.x, top), extent),
                             shade,
                         ));
-                        for (ix, spans) in tokens.iter().enumerate() {
+                        for (ix, spans) in &tokens {
                             for (start, len, color) in spans {
                                 let origin = point(
                                     bounds.origin.x + wide * (*start + 2) as f32,
-                                    bounds.origin.y + tall * ix as f32,
+                                    bounds.origin.y + tall * *ix as f32,
                                 );
-                                let extent = size(wide * *len as f32, tall * 0.7);
+                                let extent = size(
+                                    wide * *len as f32,
+                                    (tall * total_rows as f32 / samples as f32 * 0.7)
+                                        .max(gpui::px(1.0)),
+                                );
                                 window.paint_quad(fill(
                                     Bounds::new(origin, extent),
                                     color.opacity(0.7),
@@ -282,9 +300,21 @@ impl Render for CodeEditor {
             }
         };
         let line = (pixels * LEADING).round();
-        let found = folds(&self.buffer);
+        // The horizontal scrollbar is an overlay with a 2×-thickness hit track.
+        // Reserve that much vertical room so the last row stays selectable above it.
+        let scrollbar_clearance = theme.scrollbar_thickness().to_pixels(window.rem_size()) * 2.0;
+        let lightweight = self.lightweight();
+        let found = if lightweight && self.local_syntax.is_none() {
+            std::sync::Arc::default()
+        } else {
+            self.syntax_folds()
+        };
         let hide = hidden(self.buffer.lines(), &found, &self.folded);
-        let found_brackets = brackets(&self.buffer);
+        let found_brackets = if lightweight && self.local_syntax.is_none() {
+            std::sync::Arc::default()
+        } else {
+            self.syntax_brackets()
+        };
         let matched = syntax::matched(&found_brackets, self.primary().head);
         let occurrences = match self.needle() {
             Some(needle) if self.focus.is_focused(window) => {
@@ -318,8 +348,12 @@ impl Render for CodeEditor {
         // Typewriter: the caret's row centers as it moves.
         let centered = (self.primary_row(), self.metrics.height, line);
         if self.options.typewriter && self.centered != Some(centered) {
-            self.scroll
-                .scroll_to_item_strict(centered.0, ScrollStrategy::Center);
+            // List padding reserves scrollbar room, not part of the centering viewport.
+            let mut scroll = self.scroll.0.borrow_mut();
+            scroll.deferred_scroll_to_item = None;
+            let mut offset = scroll.base_handle.offset();
+            offset.y = self.metrics.height / 2.0 - line * (centered.0 as f32 + 0.5);
+            scroll.base_handle.set_offset(offset);
             self.centered = Some(centered);
         }
         let sticky = if self.options.sticky {
@@ -328,6 +362,7 @@ impl Render for CodeEditor {
             None
         };
         let count = self.frame.rows.len();
+        let content_width = advance * (self.gutter_columns() + self.buffer.widest() + 2) as f32;
         let list = uniform_list(
             "editor-rows",
             count,
@@ -336,10 +371,12 @@ impl Render for CodeEditor {
             }),
         )
         .track_scroll(&self.scroll)
-        .size_full();
+        .h_full()
+        .pb(scrollbar_clearance)
+        .min_w(content_width);
         let (top, focus, input) = (cx.entity(), self.focus.clone(), cx.entity());
         let unlock = cx.entity();
-        let banner = self.options.read_only.then(|| {
+        let banner = (self.options.read_only && self.options.read_only_banner).then(|| {
             ReadOnlyBanner::new(
                 ("read-only", cx.entity_id().as_u64()),
                 "This file is read-only.",
@@ -351,11 +388,14 @@ impl Render for CodeEditor {
                 })
             })
         });
-        let body = div()
+        let body = on_axis(div())
+            .id(("editor-horizontal", cx.entity_id().as_u64()))
             .relative()
             .flex_1()
             .h_full()
             .min_h_0()
+            .overflow_x_scroll()
+            .track_scroll(&self.horizontal)
             .child(list)
             .children(sticky)
             .child(
@@ -382,8 +422,14 @@ impl Render for CodeEditor {
                 .left_0()
                 .size_full(),
             );
+        let horizontal = Scrollbar::new(
+            ("editor-scrollbar-x", cx.entity_id().as_u64()),
+            &self.horizontal,
+            gpui::Axis::Horizontal,
+        );
         let root = div()
             .id(("code-editor", cx.entity_id().as_u64()))
+            .relative()
             .role(Role::MultilineTextInput)
             .aria_label(i18n::text(cx, "editor.code", &[]))
             .key_context(CONTEXT)
@@ -414,6 +460,7 @@ impl Render for CodeEditor {
                     .child(body)
                     .children(self.options.minimap.then(|| self.minimap_view(cx))),
             )
+            .child(horizontal)
             .child(
                 canvas(
                     |_, _, _| {},

@@ -8,6 +8,7 @@ mod path;
 mod popup;
 mod shown;
 mod stale;
+mod sensitive;
 mod structure;
 mod tags;
 mod upload;

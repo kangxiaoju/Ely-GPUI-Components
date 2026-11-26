@@ -1,6 +1,12 @@
 //! Spanish component messages.
 
 pub(super) const TABLE: &[(&str, &str)] = &[
+    ("canvas.fill_style", "Estilo de relleno"),
+    ("canvas.fill_opacity", "Opacidad del relleno"),
+    ("canvas.fill.hachure", "Rayado"),
+    ("canvas.fill.cross_hatch", "Rayado cruzado"),
+    ("canvas.fill.zigzag", "Zigzag"),
+    ("canvas.text_align", "Alineación del texto"),
     ("palette.command.placeholder", "Escriba un comando"),
     ("palette.command.empty", "No hay comandos que coincidan"),
     ("palette.recent", "Recientes"),

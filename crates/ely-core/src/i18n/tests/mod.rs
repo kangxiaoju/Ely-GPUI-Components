@@ -27,6 +27,26 @@ fn a_message_fills_its_arguments() {
     assert_eq!(fill("{b}", &[("a", "x")]), Err("no argument \"b\"".into()));
 }
 
+#[test]
+fn conversation_empty_states_follow_the_locale() {
+    assert_eq!(
+        super::builtin::builtin("en-US", "chat.conversations.empty"),
+        "No conversations yet"
+    );
+    assert_eq!(
+        super::builtin::builtin("zh-CN", "chat.conversations.empty"),
+        "暂无历史会话"
+    );
+    assert_eq!(
+        super::builtin::builtin("en-US", "chat.conversations.no_match"),
+        "No conversations match"
+    );
+    assert_eq!(
+        super::builtin::builtin("zh-CN", "chat.conversations.no_match"),
+        "没有匹配的历史记录"
+    );
+}
+
 /// A right-to-left message leads with its mark, so one that starts with Latin letters or a signed number still reads right to left.
 #[test]
 fn a_right_to_left_message_leads_with_its_mark() {
@@ -139,6 +159,14 @@ fn locales_write_their_own_numbers_and_dates() {
         "3.5",
         "a gain takes no mark"
     );
+}
+
+#[cfg(feature = "test-support")]
+#[gpui::test]
+fn builtin_only_i18n_switches_between_shipped_locales(cx: &mut gpui::TestAppContext) {
+    cx.update(|cx| cx.set_global(I18n::new("zh-CN")));
+    cx.update(|cx| I18n::set_locale("en-US", cx));
+    cx.update(|cx| assert_eq!(cx.global::<I18n>().locale().tag, "en-US"));
 }
 
 #[cfg(feature = "test-support")]

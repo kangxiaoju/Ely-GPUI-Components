@@ -4,13 +4,23 @@ use super::{
     cursor::{Motion, Selection, merged, moved},
     layout::{Row, hidden, rows},
     state::CodeEditor,
-    syntax::folds,
 };
 
 impl CodeEditor {
+    /// Centers the row at `offset` without changing the selection.
+    pub fn center_on(&mut self, offset: usize, cx: &mut Context<Self>) {
+        let offset = offset.min(self.buffer.len());
+        let line = self.buffer.line_of(offset);
+        let hide = hidden(self.buffer.lines(), &self.syntax_folds(), &self.folded);
+        let row = rows(&self.buffer, &hide, &self.marks).iter()
+            .rposition(|row| matches!(row, Row::Line(shown) if *shown <= line)).unwrap_or(0) + self.pad;
+        self.scroll.scroll_to_item_strict(row, ScrollStrategy::Center);
+        cx.notify();
+    }
+
     /// Moves every cursor. Up and down step over folded lines.
     pub(crate) fn motion(&mut self, motion: Motion, extend: bool, cx: &mut Context<Self>) {
-        let hide = hidden(self.buffer.lines(), &folds(&self.buffer), &self.folded);
+        let hide = hidden(self.buffer.lines(), &self.syntax_folds(), &self.folded);
         let vertical = matches!(motion, Motion::Up | Motion::Down | Motion::Page(_));
         let moved: Vec<Selection> = self
             .selections
@@ -105,8 +115,8 @@ impl CodeEditor {
     /// Folds the block that opens on a line, or opens it again; cursors inside move to its header.
     pub(crate) fn toggle_fold(&mut self, line: usize, cx: &mut Context<Self>) {
         if !self.folded.remove(&line) {
-            let Some((_, end)) = folds(&self.buffer)
-                .into_iter()
+            let Some((_, end)) = self.syntax_folds()
+                .iter().copied()
                 .find(|(header, _)| *header == line)
             else {
                 return;
@@ -135,7 +145,7 @@ impl CodeEditor {
         if self.folded.is_empty() {
             return;
         }
-        let folds = folds(&self.buffer);
+        let folds = self.syntax_folds();
         let lines: Vec<usize> = self
             .selections
             .iter()
@@ -152,13 +162,8 @@ impl CodeEditor {
 
     /// The row the primary cursor draws on, or the fold header above it when a fold hides it.
     pub(crate) fn primary_row(&self) -> usize {
-        self.row_of(self.primary().head)
-    }
-
-    /// The row `offset` draws on, or the fold header above it when a fold hides it.
-    fn row_of(&self, offset: usize) -> usize {
-        let line = self.buffer.line_of(offset);
-        let hide = hidden(self.buffer.lines(), &folds(&self.buffer), &self.folded);
+        let line = self.buffer.line_of(self.primary().head);
+        let hide = hidden(self.buffer.lines(), &self.syntax_folds(), &self.folded);
         rows(&self.buffer, &hide, &self.marks)
             .iter()
             .rposition(|row| matches!(row, Row::Line(shown) if *shown <= line))
@@ -174,14 +179,6 @@ impl CodeEditor {
             ScrollStrategy::Top
         };
         self.scroll.scroll_to_item(self.primary_row(), strategy);
-        cx.notify();
-    }
-
-    /// Scrolls the row of `offset` to the middle of the view, even when it shows already; the selection stays.
-    pub fn center_on(&mut self, offset: usize, cx: &mut Context<Self>) {
-        let offset = offset.min(self.buffer.len());
-        self.scroll
-            .scroll_to_item_strict(self.row_of(offset), ScrollStrategy::Center);
         cx.notify();
     }
 }

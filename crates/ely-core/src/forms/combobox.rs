@@ -205,7 +205,7 @@ impl RenderOnce for Combobox {
         if open != picker.read(cx).open {
             let chosen = self.selected.as_ref().and_then(|value| {
                 rows.iter()
-                    .position(|row| !row.disabled && row.value == *value)
+                    .position(|row| row.pickable() && row.value == *value)
             });
             picker.update(cx, |picker, _| {
                 picker.open = open;
@@ -215,7 +215,7 @@ impl RenderOnce for Combobox {
             });
         }
         let kept = picker.read(cx).highlighted;
-        let highlighted = if rows.get(kept).is_some_and(|row| !row.disabled) {
+        let highlighted = if rows.get(kept).is_some_and(|row| row.pickable()) {
             kept
         } else {
             step(&rows, rows.len().saturating_sub(1), 1)
@@ -256,7 +256,7 @@ impl RenderOnce for Combobox {
             );
             Rc::new(move |ix, window, cx| {
                 let choice = rows[ix].clone();
-                if choice.disabled {
+                if !choice.pickable() {
                     return;
                 }
                 log::info!("combobox {id:?}: {}", choice.value);
@@ -291,8 +291,17 @@ impl RenderOnce for Combobox {
                 .color(subtle)
                 .into_any_element(),
         };
+        let reopen = typing.clone();
         div()
             .id(self.id.clone())
+            .on_mouse_down(MouseButton::Left, move |_, _, cx| {
+                if reopen.read(cx).dismissed {
+                    reopen.update(cx, |typing, cx| {
+                        typing.dismissed = false;
+                        cx.notify();
+                    });
+                }
+            })
             .relative()
             .capture_action(move |_: &Up, window, cx| {
                 if open {

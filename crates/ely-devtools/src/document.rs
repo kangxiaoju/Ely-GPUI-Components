@@ -1,6 +1,6 @@
 use gpui::{
-    App, ClipboardItem, ElementId, Entity, IntoElement, ParentElement, RenderOnce, SharedString,
-    Styled, Window, div,
+    AnyElement, App, ClipboardItem, ElementId, Entity, IntoElement, ParentElement, RenderOnce,
+    SharedString, Styled, Window, div, prelude::FluentBuilder,
 };
 
 use super::datum::{Datum, Unread, read_json, read_yaml};
@@ -97,6 +97,7 @@ fn document(
     search: &Entity<TextInput>,
     window: &mut Window,
     cx: &mut App,
+    fill: bool,
 ) -> gpui::AnyElement {
     let copied = window.use_keyed_state((id.clone(), "copied"), cx, |_, _| Copied::default());
     let query = search.read(cx).text().trim().to_lowercase();
@@ -108,22 +109,21 @@ fn document(
             let rows = nodes(&datum, "$", &query, &mut open);
             let root = TreeNode::new("$", "$").note(preview(&datum)).children(rows);
             let copy = copied.clone();
-            div()
-                .h(theme.list_max_height())
-                .child(
-                    Tree::new((id, "tree"), [root])
-                        .open(open)
-                        .on_activate(move |path, _, cx| {
-                            log::info!("document: copied {path}");
-                            cx.write_to_clipboard(ClipboardItem::new_string(path.to_string()));
-                            copy.update(cx, |copied, cx| {
-                                copied.0 = Some(path.clone());
-                                cx.notify();
-                            });
-                        })
-                        .size_full(),
-                )
-                .into_any_element()
+            tree_panel(
+                Tree::new((id, "tree"), [root])
+                    .open(open)
+                    .on_activate(move |path, _, cx| {
+                        log::info!("document: copied {path}");
+                        cx.write_to_clipboard(ClipboardItem::new_string(path.to_string()));
+                        copy.update(cx, |copied, cx| {
+                            copied.0 = Some(path.clone());
+                            cx.notify();
+                        });
+                    }),
+                fill,
+                cx,
+            )
+            .into_any_element()
         }
     };
     let note = copied.read(cx).0.clone().map(|path| {
@@ -131,14 +131,36 @@ fn document(
             .text_size(theme.text_size(TextSize::Xs))
             .text_color(theme.colors.fg_subtle)
             .child(format!("Copied {path}"))
+            .into_any_element()
     });
+    document_frame(search, body, note, fill)
+}
+
+fn tree_panel(tree: Tree, fill: bool, cx: &App) -> gpui::Div {
+    div()
+        .when(fill, |panel| panel.flex_1().min_h_0().min_w_0())
+        .when(!fill, |panel| panel.h(cx.theme().list_max_height()))
+        .child(tree.size_full())
+}
+
+fn document_frame(
+    search: &Entity<TextInput>,
+    body: AnyElement,
+    note: Option<AnyElement>,
+    fill: bool,
+) -> AnyElement {
     div()
         .flex()
         .flex_col()
         .gap_2()
-        .child(Input::new(search).prefix(Icon::new(IconName::Search).size(IconSize::Sm)))
+        .when(fill, |frame| frame.size_full().min_h_0().min_w_0())
+        .child(
+            div()
+                .flex_none()
+                .child(Input::new(search).prefix(Icon::new(IconName::Search).size(IconSize::Sm))),
+        )
         .child(body)
-        .children(note)
+        .children(note.map(|note| div().flex_none().child(note)))
         .into_any_element()
 }
 
@@ -157,7 +179,9 @@ fn document(
 pub struct JsonViewer {
     id: ElementId,
     text: SharedString,
+    tree: Option<Tree>,
     search: Entity<TextInput>,
+    fill: bool,
 }
 
 impl JsonViewer {
@@ -170,14 +194,55 @@ impl JsonViewer {
         Self {
             id: id.into(),
             text: text.into(),
+            tree: None,
             search: search.clone(),
+            fill: false,
         }
+    }
+
+    /// Shows a caller-prepared tree with the native search field.
+    ///
+    /// The owner handles search changes, filtering, expansion, selection, and
+    /// activation through `search` and `tree`. Rendering never parses JSON or
+    /// walks a document to generate nodes.
+    pub fn from_tree(id: impl Into<ElementId>, tree: Tree, search: &Entity<TextInput>) -> Self {
+        Self {
+            id: id.into(),
+            text: SharedString::default(),
+            tree: Some(tree),
+            search: search.clone(),
+            fill: false,
+        }
+    }
+
+    /// Fills the parent panel, letting the tree use the height below search.
+    ///
+    /// The parent must provide a bounded height. Without this option the tree
+    /// uses the theme's list height.
+    pub fn fill(mut self) -> Self {
+        self.fill = true;
+        self
     }
 }
 
 impl RenderOnce for JsonViewer {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        document(self.id, read_json(&self.text), &self.search, window, cx)
+        match self.tree {
+            Some(tree) => document_frame(
+                &self.search,
+                tree_panel(tree, self.fill, cx).into_any_element(),
+                None,
+                self.fill,
+            ),
+            None => document(
+                self.id,
+                read_json(&self.text),
+                &self.search,
+                window,
+                cx,
+                self.fill,
+            ),
+        }
     }
 }
 
@@ -216,7 +281,14 @@ impl YamlViewer {
 
 impl RenderOnce for YamlViewer {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        document(self.id, read_yaml(&self.text), &self.search, window, cx)
+        document(
+            self.id,
+            read_yaml(&self.text),
+            &self.search,
+            window,
+            cx,
+            false,
+        )
     }
 }
 

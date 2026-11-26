@@ -279,8 +279,8 @@ pub(crate) fn listen<E: InteractiveElement>(root: E, cx: &mut Context<CodeEditor
     let root = on!(root, ToggleComment, |e, _, cx| e.toggle_comment(cx));
     let root = on!(root, Fold, |e, _, cx| {
         let line = e.buffer.line_of(e.primary().head);
-        let header = super::syntax::folds(&e.buffer)
-            .into_iter()
+        let header = e.syntax_folds()
+            .iter().copied()
             .filter(|(header, end)| *header <= line && line <= *end)
             .map(|(header, _)| header)
             .next_back();

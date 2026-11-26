@@ -132,6 +132,103 @@ fn a_raise_keeps_its_state_while_another_comes_before_it(cx: &mut TestAppContext
     );
 }
 
+/// Captures the same global identity GPUI uses for its accessibility node.
+struct AccessibleRaisedLabel {
+    child: gpui::AnyElement,
+    seen: Rc<RefCell<Vec<gpui::GlobalElementId>>>,
+}
+
+impl IntoElement for AccessibleRaisedLabel {
+    type Element = Self;
+
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl gpui::Element for AccessibleRaisedLabel {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<gpui::ElementId> {
+        Some("label".into())
+    }
+
+    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
+        None
+    }
+
+    fn a11y_role(&self) -> Option<gpui::Role> {
+        Some(gpui::Role::Label)
+    }
+
+    fn write_a11y_info(&self, node: &mut gpui::accesskit::Node) {
+        node.set_value("Raised label");
+    }
+
+    fn request_layout(
+        &mut self,
+        _: Option<&gpui::GlobalElementId>,
+        _: Option<&gpui::InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (gpui::LayoutId, ()) {
+        (self.child.request_layout(window, cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        id: Option<&gpui::GlobalElementId>,
+        _: Option<&gpui::InspectorElementId>,
+        _: gpui::Bounds<gpui::Pixels>,
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        self.seen.borrow_mut().push(id.expect("a label has an id").clone());
+        self.child.prepaint(window, cx);
+    }
+
+    fn paint(
+        &mut self,
+        _: Option<&gpui::GlobalElementId>,
+        _: Option<&gpui::InspectorElementId>,
+        _: gpui::Bounds<gpui::Pixels>,
+        _: &mut (),
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        self.child.paint(window, cx);
+    }
+}
+
+struct SiblingRaises(Rc<RefCell<Vec<gpui::GlobalElementId>>>);
+
+impl Render for SiblingRaises {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().size_full().children(["first", "second"].map(|owner| {
+            raise(
+                owner,
+                AccessibleRaisedLabel {
+                    child: div().size(px(40.0)).child("Raised label").into_any_element(),
+                    seen: self.0.clone(),
+                },
+            )
+        }))
+    }
+}
+
+#[gpui::test]
+fn sibling_raises_namespace_accessibility_nodes_by_owner(cx: &mut TestAppContext) {
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let (_, cx) = cx.add_window_view(|_, _| SiblingRaises(seen.clone()));
+    cx.run_until_parked();
+    let ids = seen.borrow();
+    assert!(ids.len() >= 2, "both accessible labels were prepainted");
+    assert_ne!(ids[0], ids[1], "sibling raises must not share an a11y identity");
+}
+
 actions!(host, [Indent]);
 
 /// A root scope around a field whose own context binds Tab.

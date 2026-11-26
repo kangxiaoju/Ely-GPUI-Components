@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, ElementId, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    RenderOnce, SharedString, Styled, Window, div,
+    RenderOnce, SharedString, Styled, Window, div, prelude::*,
 };
 use jiff::civil::Date;
 
@@ -40,6 +40,7 @@ pub struct TaskItem {
     id: ElementId,
     task: Task,
     today: Option<Date>,
+    tooltip_title: bool,
     on_toggle: Option<OnFlag>,
 }
 
@@ -50,6 +51,7 @@ impl TaskItem {
             id: id.into(),
             task,
             today: None,
+            tooltip_title: false,
             on_toggle: None,
         }
     }
@@ -57,6 +59,12 @@ impl TaskItem {
     /// The day due dates count from; the clock's otherwise.
     pub fn today(mut self, day: Date) -> Self {
         self.today = Some(day);
+        self
+    }
+
+    /// Shows the whole title on hover, for rows too narrow to fit it.
+    pub fn tooltip_title(mut self) -> Self {
+        self.tooltip_title = true;
         self
     }
 
@@ -140,7 +148,9 @@ impl TaskItem {
             .children(due)
             .child(assignee);
         let closed = task.status.closed();
+        let title = task.title.clone();
         ListItem::new(self.id, task.title)
+            .when(self.tooltip_title, |item| item.tooltip(title))
             .leading(lead)
             .struck(closed)
             .quiet(closed)
@@ -174,6 +184,7 @@ pub struct TaskList {
     id: ElementId,
     tasks: Vec<Task>,
     today: Option<Date>,
+    tooltip_titles: bool,
     on_open: Option<OnValue>,
     on_toggle: Option<OnTaskToggle>,
 }
@@ -190,6 +201,7 @@ impl TaskList {
             id: id.into(),
             tasks,
             today: None,
+            tooltip_titles: false,
             on_open: None,
             on_toggle: None,
         }
@@ -198,6 +210,12 @@ impl TaskList {
     /// The day due dates count from; the clock's otherwise.
     pub fn today(mut self, day: Date) -> Self {
         self.today = Some(day);
+        self
+    }
+
+    /// Shows each task's whole title on hover, for rows too narrow to fit it.
+    pub fn tooltip_titles(mut self) -> Self {
+        self.tooltip_titles = true;
         self
     }
 
@@ -244,7 +262,8 @@ impl RenderOnce for TaskList {
             SelectableList::new((self.id.clone(), "tasks")),
             |list, task| {
                 let key = task.key.clone();
-                let item = TaskItem::new((self.id.clone(), format!("task-{key}")), task);
+                let item = TaskItem::new((self.id.clone(), format!("task-{key}")), task)
+                    .when(self.tooltip_titles, |item| item.tooltip_title());
                 let item = match self.on_toggle.clone() {
                     Some(toggle) => {
                         let ticked = key.clone();

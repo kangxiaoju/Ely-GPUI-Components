@@ -38,7 +38,7 @@ pub use days::{CalendarDayView, CalendarDays, CalendarWeekView};
 pub use editor::{EventDraft, EventEditor};
 pub use event::{Event, When};
 pub use grid::{TimeGrid, TimezoneOverlay};
-pub use month::CalendarMonthView;
+pub use month::{CalendarMonthView, DayBadge, DayNote};
 pub use now::CurrentTimeIndicator;
 pub use people::{Answer, Attendee, AttendeeList};
 pub use popover::EventPopover;

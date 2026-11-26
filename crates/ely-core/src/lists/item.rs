@@ -9,6 +9,7 @@ use gpui::{
 use smallvec::SmallVec;
 
 use crate::{
+    primitives::Tooltip,
     theme::{ActiveTheme, ControlSize, Radius, TextSize},
     typography::{Ellipsis, LEADING, SelectableText},
 };
@@ -30,9 +31,11 @@ pub(crate) type OnSecondary = Rc<dyn Fn(Point<Pixels>, &mut Window, &mut App)>;
 pub struct ListItem {
     id: ElementId,
     title: SharedString,
+    accessible_label: Option<SharedString>,
     /// A field drawn in the title's place.
     editor: Option<AnyElement>,
     description: Option<SharedString>,
+    accessible_description: Option<SharedString>,
     detail: Option<SharedString>,
     leading: Option<AnyElement>,
     trailing: Option<AnyElement>,
@@ -43,8 +46,10 @@ pub struct ListItem {
     strong: bool,
     quiet: bool,
     struck: bool,
+    compact: bool,
     /// Its place among its list's rows, from one, and their count.
     place: Option<(usize, usize)>,
+    tooltip: Option<SharedString>,
     on_click: Option<OnClick>,
     on_secondary: Option<OnSecondary>,
 }
@@ -55,8 +60,10 @@ impl ListItem {
         Self {
             id: id.into(),
             title: title.into(),
+            accessible_label: None,
             editor: None,
             description: None,
+            accessible_description: None,
             detail: None,
             leading: None,
             trailing: None,
@@ -67,10 +74,18 @@ impl ListItem {
             strong: false,
             quiet: false,
             struck: false,
+            compact: false,
             place: None,
+            tooltip: None,
             on_click: None,
             on_secondary: None,
         }
+    }
+
+    /// Smaller theme typography and spacing for dense navigation lists.
+    pub fn compact(mut self) -> Self {
+        self.compact = true;
+        self
     }
 
     /// Sets the title in the strong weight, as a channel with unread messages has it.
@@ -103,9 +118,27 @@ impl ListItem {
         self
     }
 
+    /// A tip shown on hover, as a row whose title is cut off has its whole name.
+    pub fn tooltip(mut self, text: impl Into<SharedString>) -> Self {
+        self.tooltip = Some(text.into());
+        self
+    }
+
+    /// Extra context assistive technology reads instead of the visual title; nothing is drawn.
+    pub fn accessible_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.accessible_label = Some(label.into());
+        self
+    }
+
     /// A second line, quieter than the title.
     pub fn description(mut self, text: impl Into<SharedString>) -> Self {
         self.description = Some(text.into());
+        self
+    }
+
+    /// Extra context assistive technology reads instead of the visual description; nothing is drawn.
+    pub fn accessible_description(mut self, description: impl Into<SharedString>) -> Self {
+        self.accessible_description = Some(description.into());
         self
     }
 
@@ -204,23 +237,25 @@ impl RenderOnce for ListItem {
         let pressable = self.on_click.is_some() && !self.disabled;
         div()
             .id(self.id)
+            .when_some(self.tooltip, |row, text| row.tooltip(Tooltip::text(text)))
             .role(Role::ListItem)
-            .aria_label(self.title.clone())
+            .aria_label(self.accessible_label.unwrap_or_else(|| self.title.clone()))
             .aria_selected(self.selected)
             .when(self.current, |row| row.aria_active_descendant())
             .when(self.disabled, |row| row.unavailable(cx))
-            .when_some(self.description.clone(), |row, text| {
-                row.aria_description(text)
-            })
+            .when_some(
+                self.accessible_description.or_else(|| self.description.clone()),
+                |row, text| row.aria_description(text),
+            )
             .when_some(self.place, |row, (at, of)| {
                 row.aria_position_in_set(at).aria_size_of_set(of)
             })
             .flex()
             .items_center()
-            .gap_3()
-            .px_3()
-            .py_1p5()
-            .min_h(theme.control_height(ControlSize::Lg))
+            .gap(if self.compact { gpui::rems(0.5) } else { gpui::rems(0.75) })
+            .px(if self.compact { gpui::rems(0.5) } else { gpui::rems(0.75) })
+            .py(if self.compact { gpui::rems(0.25) } else { gpui::rems(0.375) })
+            .min_h(theme.control_height(if self.compact { ControlSize::Md } else { ControlSize::Lg }))
             // Rows in a uniform list fill it.
             .w_full()
             .rounded(theme.radius(Radius::Md))
@@ -259,7 +294,7 @@ impl RenderOnce for ListItem {
                     .child(match self.editor {
                         Some(editor) => div().min_w_0().child(editor).into_any_element(),
                         None => line("title", self.title)
-                            .text_size(theme.text_size(TextSize::Base))
+                            .text_size(theme.text_size(if self.compact { TextSize::Sm } else { TextSize::Base }))
                             .when(self.strong, |title| title.font_weight(FontWeight::SEMIBOLD))
                             .when(self.struck, |title| title.line_through())
                             .text_color(if self.quiet {
@@ -272,19 +307,19 @@ impl RenderOnce for ListItem {
                     .children(self.description.map(|text| {
                         line("description", text.clone())
                             .debug_selector(|| format!("item-description-{text}"))
-                            .text_size(theme.text_size(TextSize::Sm))
+                            .text_size(theme.text_size(if self.compact { TextSize::Xs } else { TextSize::Sm }))
                             .text_color(colors.fg_muted)
                     }))
                     .children(self.detail.map(|text| {
                         line("detail", text)
-                            .text_size(theme.text_size(TextSize::Sm))
+                            .text_size(theme.text_size(if self.compact { TextSize::Xs } else { TextSize::Sm }))
                             .text_color(colors.fg_subtle)
                     })),
             )
             .children(self.trailing.map(|trailing| {
                 div()
                     .flex_none()
-                    .text_size(theme.text_size(TextSize::Sm))
+                    .text_size(theme.text_size(if self.compact { TextSize::Xs } else { TextSize::Sm }))
                     .text_color(colors.fg_subtle)
                     .child(trailing)
             }))

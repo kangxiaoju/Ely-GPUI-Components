@@ -1,4 +1,5 @@
 use std::time::Duration;
+use gpui::prelude::FluentBuilder;
 
 use gpui::{
     App, ElementId, HighlightStyle, IntoElement, ParentElement, RenderOnce, SharedString, Styled,
@@ -197,14 +198,16 @@ impl RenderOnce for StreamingMarkdown {
         } else {
             self.source[..end].to_string()
         };
-        MarkdownRenderer::new((self.id.clone(), "text"), shown).code(|id, language, code| {
-            let block = CodeBlock::new(id, code);
-            match language {
-                Some(language) => block.language(language),
-                None => block,
-            }
-            .into_any_element()
-        })
+        MarkdownRenderer::new((self.id.clone(), "text"), shown)
+            .when(!self.live, |renderer| renderer.selectable(|_, _, _| {}))
+            .code(|id, language, code| {
+                let block = CodeBlock::new(id, code);
+                match language {
+                    Some(language) => block.language(language),
+                    None => block,
+                }
+                .into_any_element()
+            })
     }
 }
 

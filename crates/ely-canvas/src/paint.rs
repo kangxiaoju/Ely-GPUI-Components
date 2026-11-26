@@ -73,45 +73,114 @@ pub(crate) fn paint_shape(
     stroke: Pixels,
     window: &mut Window,
 ) {
-    let ink = palette.hue(shape.hue, format_args!("shape {}", shape.key));
-    let wash = ink.alpha(0.14);
-    let frame = in_view(view, &shape.frame);
-    match &shape.kind {
-        ShapeKind::Rect => {
-            window.paint_quad(fill(quad(origin, &frame), wash));
-            let corners = [
-                (frame.x, frame.y),
-                (frame.right(), frame.y),
-                (frame.right(), frame.bottom()),
-                (frame.x, frame.bottom()),
-            ];
-            finish(outline(&corners, origin, stroke, true), ink, window);
-        }
-        ShapeKind::Ellipse | ShapeKind::Polygon(_) => {
-            let sides = match shape.kind {
-                ShapeKind::Polygon(sides) => sides,
-                _ => 64,
-            };
-            let corners = polygon(&frame, sides);
-            finish(solid(&corners, origin), wash, window);
-            finish(outline(&corners, origin, stroke, true), ink, window);
-        }
-        ShapeKind::Line(end) | ShapeKind::Arrow(end) => {
-            let (from, to) = (end.opposite().of(&frame), end.of(&frame));
-            finish(outline(&[from, to], origin, stroke, false), ink, window);
-            if matches!(shape.kind, ShapeKind::Arrow(_)) {
-                finish(solid(&head(from, to, stroke), origin), ink, window);
+    let style = shape.appearance;
+    let ink = style.map_or_else(|| palette.hue(shape.hue, format_args!("shape {}", shape.key)), |s| s.stroke_ink(palette));
+    let wash = match style {
+        Some(s) => s.fill_ink(palette),
+        None => Some(ink.opacity(0.14)),
+    };
+    let seed = style.map_or_else(|| super::sketch_seed(&shape.key), |s| s.sketch_seed(&shape.key));
+    let stroke = style.map_or(stroke, |s| Pixels::from(s.stroke_width * view.zoom));
+    let frame = &shape.frame;
+    if let ShapeKind::Symbol(kind) = shape.kind {
+        for (index,mut points) in super::symbol_paths(kind,frame.w,frame.h).into_iter().enumerate() {
+            let closed=points.len()>2 && points.first()==points.last();
+            if closed { points.pop(); }
+            for p in &mut points {p.0+=frame.x;p.1+=frame.y;}
+            let roughness=style.map_or(0.0,|s|s.roughness);
+            let seed=seed.wrapping_add(index as u64);
+            let second=(roughness>0.0).then(||super::sketch_outline(&points,closed,roughness,seed^0x9e3779b97f4a7c15));
+            let mut points=super::sketch_outline(&points,closed,roughness,seed);
+            for p in &mut points {*p=view.to_view(shape.rotate_point(*p,shape.rotation));}
+            if index==0 && closed {if let Some(wash)=wash {paint_fill(&points,origin,shape,view,seed,wash,window);}}
+            let dash=style.map_or(super::Dash::Solid,|s|s.dash);
+            patterned(&points,origin,stroke,closed,dash,0.0,ink,window);
+            if let Some(mut second)=second {
+                for p in &mut second {*p=view.to_view(shape.rotate_point(*p,shape.rotation));}
+                patterned(&second,origin,stroke*0.65,closed,dash,0.0,ink.opacity(0.45),window);
             }
         }
-        ShapeKind::Path { points, width } => {
-            let points: Vec<(f32, f32)> = points
-                .iter()
-                .map(|(x, y)| view.to_view((shape.frame.x + x, shape.frame.y + y)))
-                .collect();
-            let wide = Pixels::from(width * view.zoom).max(stroke);
-            finish(outline(&points, origin, wide, false), ink, window);
+        return;
+    }
+    let mut closed = false;
+    let mut points = match &shape.kind {
+        ShapeKind::Rect | ShapeKind::Note(_) => {
+            closed = true;
+            vec![(frame.x, frame.y), (frame.right(), frame.y),
+                (frame.right(), frame.bottom()), (frame.x, frame.bottom())]
         }
-        ShapeKind::Text(_) | ShapeKind::Note(_) => {}
+        ShapeKind::RoundedRect => {
+            closed = true;
+            super::rounded_rectangle_outline(frame)
+        }
+        ShapeKind::Ellipse | ShapeKind::Polygon(_) | ShapeKind::Diamond => {
+            closed = true;
+            let sides = match shape.kind { ShapeKind::Polygon(n) => n, ShapeKind::Diamond => 4, _ => 64 };
+            polygon(frame, sides)
+        }
+        ShapeKind::Line(end) | ShapeKind::Arrow(end) => vec![end.opposite().of(frame), end.of(frame)],
+        ShapeKind::Path { points, .. } | ShapeKind::Polyline { points, .. } => points.iter().map(|(x,y)| (frame.x + x, frame.y + y)).collect(),
+        ShapeKind::Text(_) | ShapeKind::Image(_) | ShapeKind::Symbol(_) => return,
+    };
+    let roughness = style.map_or(0.0, |style| style.roughness);
+    let second = (roughness > 0.0).then(|| super::sketch_outline(&points,closed,roughness,seed^0x9e3779b97f4a7c15));
+    points = super::sketch_outline(&points,closed,roughness,seed);
+    for point in &mut points { *point = view.to_view(shape.rotate_point(*point,shape.rotation)); }
+    if closed {
+        if let Some(wash) = wash { paint_fill(&points,origin,shape,view,seed,wash,window); }
+    }
+    let width = match (&shape.kind, style) {
+        (ShapeKind::Path { width, .. }, None) => Pixels::from(width * view.zoom).max(stroke),
+        _ => stroke,
+    };
+    let dash = style.map_or(super::style::Dash::Solid, |s| s.dash);
+    patterned(&points, origin, width, closed, dash, 0.0, ink, window);
+    if let Some(mut second) = second {
+        for point in &mut second { *point = view.to_view(shape.rotate_point(*point,shape.rotation)); }
+        patterned(&second,origin,width*0.65,closed,dash,0.0,ink.opacity(0.45),window);
+    }
+    if matches!(shape.kind, ShapeKind::Arrow(_) | ShapeKind::Polyline { arrow: true, .. }) && points.len() >= 2 {
+        finish(solid(&head(points[points.len()-2], points[points.len()-1], width), origin), ink, window);
+    }
+}
+
+fn paint_fill(points: &[(f32,f32)], origin: Point<Pixels>, shape: &Shape, view: &Viewport, seed: u64, ink: Hsla, window: &mut Window) {
+    let pattern = shape.appearance.map_or(super::FillStyle::Solid, |s| s.fill_style);
+    if pattern == super::FillStyle::Solid { finish(solid(points,origin),ink,window); return; }
+    let local: Vec<_> = points.iter().map(|p| { let p=shape.rotate_point(view.to_canvas(*p),-shape.rotation); (p.0-shape.frame.x,p.1-shape.frame.y) }).collect();
+    for segment in super::fill_pattern_segments(&local,pattern,seed,8.0) {
+        let segment=segment.map(|p| view.to_view(shape.rotate_point((p.0+shape.frame.x,p.1+shape.frame.y),shape.rotation)));
+        finish(outline(&segment,origin,Pixels::from(view.zoom),false),ink,window);
+    }
+}
+
+/// A solid, dashed or dotted polyline; phase is measured in view pixels.
+pub(crate) fn patterned(points: &[(f32, f32)], origin: Point<Pixels>, width: Pixels,
+    closed: bool, dash: super::style::Dash, phase: f32, ink: Hsla, window: &mut Window) {
+    use super::style::Dash;
+    if dash == Dash::Solid { finish(outline(points, origin, width, closed), ink, window); return; }
+    let width_value = f32::from(width).max(0.5);
+    let (on, off) = if dash == Dash::Dotted { (width_value, width_value * 3.0) }
+        else { (width_value * 5.0, width_value * 3.0) };
+    let period = on + off;
+    let mut distance = -phase;
+    let count = points.len().saturating_sub(1) + usize::from(closed);
+    for ix in 0..count {
+        let (a,b) = (points[ix], points[(ix+1) % points.len()]);
+        let length = (b.0-a.0).hypot(b.1-a.1);
+        if length <= f32::EPSILON { continue; }
+        let mut cursor = 0.0;
+        while cursor < length {
+            let offset = (distance + cursor).rem_euclid(period);
+            let drawing = offset < on;
+            let span = (if drawing { on - offset } else { period - offset }).min(length-cursor).max(0.001);
+            if drawing {
+                let at = |d:f32| (a.0+(b.0-a.0)*d/length, a.1+(b.1-a.1)*d/length);
+                finish(outline(&[at(cursor), at(cursor+span)], origin, width, false), ink, window);
+            }
+            cursor += span;
+        }
+        distance += length;
     }
 }
 

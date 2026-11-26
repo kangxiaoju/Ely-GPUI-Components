@@ -143,9 +143,17 @@ impl CodeEditor {
                     .chars()
                     .take(self.buffer.indent(line))
                     .collect();
-                let before = self.buffer.text()[..at].trim_end().chars().next_back();
+                let prefix = &self.buffer.text()[self.buffer.line_range(line).start..at];
+                let before = prefix.trim_end().char_indices().next_back();
                 let after = self.buffer.text()[selection.range().end..].chars().next();
-                let opens = before.is_some_and(|ch| "{[(:".contains(ch));
+                let opens = before.is_some_and(|(offset, ch)| {
+                    if !"{[(:".contains(ch) { return false; }
+                    let Some(syntax) = self.current_syntax() else { return true; };
+                    let byte = self.buffer.line_range(line).start + offset;
+                    let token = syntax.highlights.partition_point(|(range, _)| range.end <= byte);
+                    let literal = syntax.highlights.get(token).is_some_and(|(range, token)| range.contains(&byte) && matches!(token, super::syntax::SyntaxToken::String | super::syntax::SyntaxToken::Comment));
+                    !literal && syntax.indent_at(at).is_some()
+                });
                 let text = match (opens, after) {
                     (true, Some(close)) if "}])".contains(close) => {
                         format!("\n{indent}{}\n{indent}", " ".repeat(tab))

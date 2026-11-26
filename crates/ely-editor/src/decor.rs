@@ -1,8 +1,8 @@
 use std::{ops::Range, rc::Rc};
 
 use gpui::{
-    App, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce, SharedString, Styled,
-    Window, div,
+    App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    SharedString, Styled, Window, div,
 };
 
 use crate::{
@@ -113,6 +113,7 @@ impl RenderOnce for ReadOnlyBanner {
         let theme = cx.theme();
         let colors = &theme.colors;
         div()
+            .debug_selector(|| "read-only-banner".into())
             .flex()
             .items_center()
             .gap_2()

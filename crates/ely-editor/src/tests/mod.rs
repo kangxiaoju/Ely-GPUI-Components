@@ -10,7 +10,7 @@ use gpui::{
     VisualTestContext,
 };
 
-use super::{CodeEditor, GhostText, InlayHint, LineNumbers, layout::Row};
+use super::{CodeEditor, EditorEvent, GhostText, InlayHint, LineNumbers, layout::Row};
 use crate::theme::Theme;
 
 pub(super) fn editor<'a>(
@@ -20,6 +20,118 @@ pub(super) fn editor<'a>(
     cx.update(Theme::init);
     let text = text.to_string();
     cx.add_window_view(move |window, cx| CodeEditor::new(text, window, cx))
+}
+
+#[gpui::test]
+fn parser_newline_does_not_indent_literal_openers(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("    // {", cx);
+    editor.update(cx, |editor, cx| {
+        editor.enable_syntax(cx);
+        let stamp = editor.syntax_stamp();
+        let end = editor.text().len();
+        let selection = end..end;
+        editor.select([selection], cx);
+        editor.set_syntax(stamp, crate::SyntaxSnapshot {
+            highlights: vec![(4..end, crate::SyntaxToken::Comment)],
+            indents: vec![(0..end + 1, 0)],
+            ..Default::default()
+        }, cx);
+        editor.newline(cx);
+        assert_eq!(editor.text(), "    // {\n    ");
+        editor.reset("    \"{", cx);
+        let stamp = editor.syntax_stamp();
+        let end = editor.text().len();
+        let selection = end..end;
+        editor.select([selection], cx);
+        editor.set_syntax(stamp, crate::SyntaxSnapshot {
+            highlights: vec![(4..end, crate::SyntaxToken::String)],
+            indents: vec![(0..end + 1, 0)],
+            ..Default::default()
+        }, cx);
+        editor.newline(cx);
+        assert_eq!(editor.text(), "    \"{\n    ");
+    });
+}
+
+#[gpui::test]
+fn parser_newline_indents_before_async_results_arrive(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("", cx);
+    editor.update(cx, |editor, cx| {
+        editor.enable_syntax(cx);
+        editor.type_text("{", cx);
+        editor.newline(cx);
+        assert_eq!(editor.text(), "{\n    \n}");
+        editor.reset("if ready", cx);
+        let end = editor.text().len();
+        let selection = end..end;
+        editor.select([selection], cx);
+        editor.type_text(":", cx);
+        editor.newline(cx);
+        assert_eq!(editor.text(), "if ready:\n    ");
+    });
+}
+
+#[gpui::test]
+fn parser_newline_preserves_body_continuation_indent(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("fn a() {\n        call();\n}", cx);
+    editor.update(cx, |editor, cx| {
+        editor.enable_syntax(cx);
+        let stamp = editor.syntax_stamp();
+        let end = editor.buffer().line_range(1).end;
+        let selection = end..end;
+        editor.select([selection], cx);
+        editor.set_syntax(stamp, crate::SyntaxSnapshot {
+            indents: vec![(7..editor.text().len(), 0)],
+            ..Default::default()
+        }, cx);
+        editor.newline(cx);
+        assert_eq!(editor.text(), "fn a() {\n        call();\n        \n}");
+    });
+}
+
+#[gpui::test]
+fn parser_snapshot_keeps_history_and_rejects_stale_offsets(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("fn 示例() {}", cx);
+    editor.update(cx, |editor, cx| {
+        editor.enable_syntax(cx);
+        let stamp = editor.syntax_stamp();
+        let caret = editor.text().len() - 1;
+        let selection = caret..caret;
+        editor.select([selection], cx);
+        let snapshot = crate::SyntaxSnapshot {
+            indents: vec![(caret - 1..caret + 1, 0)],
+            symbols: vec![crate::Symbol::new("示例", crate::SymbolKind::Function, 0)],
+            ..Default::default()
+        };
+        assert!(editor.set_syntax(stamp, snapshot.clone(), cx));
+        assert!(std::sync::Arc::ptr_eq(&editor.syntax_folds(), &editor.syntax_folds()));
+        assert!(std::sync::Arc::ptr_eq(&editor.syntax_brackets(), &editor.syntax_brackets()));
+        assert_eq!(editor.primary().head, caret);
+        assert!(!editor.can_undo());
+        editor.newline(cx);
+        assert_eq!(editor.text(), "fn 示例() {\n    \n}");
+        assert!(editor.syntax_symbols().is_empty());
+        assert!(!editor.set_syntax(stamp, snapshot, cx));
+        editor.undo(cx);
+        assert_eq!(editor.text(), "fn 示例() {}");
+    });
+}
+
+#[gpui::test]
+fn parser_typing_preserves_unchanged_token_colors(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("fn a() {}\nlet b = 1;", cx);
+    editor.update(cx, |editor, cx| {
+        editor.enable_syntax(cx);
+        let stamp = editor.syntax_stamp();
+        editor.set_syntax(stamp, crate::SyntaxSnapshot {
+            highlights: vec![(0..2, crate::SyntaxToken::Keyword), (10..13, crate::SyntaxToken::Keyword)],
+            ..Default::default()
+        }, cx);
+        editor.edit([(3..4, "long_name".into())], cx);
+        assert!(!editor.syntax_colors(0..2, cx).is_empty(), "unmodified rows must not flash uncolored while parsing");
+        assert!(!editor.syntax_colors(18..21, cx).is_empty(), "following spans track inserted bytes");
+        assert!(!editor.set_syntax(stamp, crate::SyntaxSnapshot::default(), cx));
+    });
 }
 
 #[gpui::test]
@@ -146,6 +258,51 @@ fn a_read_only_editor_ignores_typing_and_undo(cx: &mut TestAppContext) {
         editor.undo(cx);
         assert_eq!(editor.text(), "xy");
     });
+}
+
+#[gpui::test]
+fn read_only_without_banner_stays_locked_and_draws_no_banner(cx: &mut TestAppContext) {
+    cx.update(Theme::init);
+    let (editor, cx) = cx.add_window_view(|window, cx| {
+        CodeEditor::new("result", window, cx).read_only_without_banner()
+    });
+    cx.run_until_parked();
+    assert!(editor.read_with(cx, |editor, _| editor.is_read_only()));
+    assert!(
+        cx.debug_bounds("read-only-banner").is_none(),
+        "silent read-only output must not render an unlock banner"
+    );
+}
+
+#[gpui::test]
+fn programmatic_append_is_incremental_and_not_undoable(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("", cx);
+    editor.update(cx, |editor, cx| {
+        editor.append_programmatic("hello", cx);
+        editor.append_programmatic(" world", cx);
+        assert_eq!(editor.text(), "hello world");
+        editor.undo(cx);
+        assert_eq!(editor.text(), "hello world");
+    });
+}
+
+#[gpui::test]
+fn programmatic_append_emits_once_for_text_and_never_for_empty(cx: &mut TestAppContext) {
+    let (editor, cx) = editor("", cx);
+    let changed = Rc::new(Cell::new(0));
+    cx.update(|_, cx| {
+        let changed = Rc::clone(&changed);
+        cx.subscribe(&editor, move |_, event: &EditorEvent, _| {
+            if *event == EditorEvent::Changed {
+                changed.set(changed.get() + 1);
+            }
+        })
+        .detach();
+    });
+    editor.update(cx, |editor, cx| editor.append_programmatic("hello", cx));
+    assert_eq!(changed.get(), 1);
+    editor.update(cx, |editor, cx| editor.append_programmatic("", cx));
+    assert_eq!(changed.get(), 1);
 }
 
 #[gpui::test]

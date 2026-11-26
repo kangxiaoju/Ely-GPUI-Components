@@ -516,6 +516,7 @@ impl core::marker::StructuralPartialEq for ely_core::theme::TextSize
 impl core::marker::StructuralPartialEq for ely_core::theme::ToolingSizes
 impl core::marker::StructuralPartialEq for ely_core::typography::format::DurationStyle
 impl core::marker::StructuralPartialEq for ely_core::typography::format::Separators
+impl core::ops::drop::Drop for ely_core::forms::TextInput
 impl ely_core::Assets
 impl ely_core::buttons::ActionBar
 impl ely_core::buttons::ActionSheet
@@ -885,6 +886,7 @@ impl ely_core::primitives::Measure
 impl ely_core::primitives::Pressable
 impl ely_core::primitives::Raised
 impl ely_core::primitives::Retired
+impl ely_core::primitives::Selectable for ely_core::data_display::Tag
 impl ely_core::primitives::Selectable for ely_core::forms::ColorSwatch
 impl ely_core::primitives::Selectable for ely_core::lists::ListItem
 impl ely_core::primitives::Severity
@@ -2575,6 +2577,7 @@ pub fn ely_core::buttons::BulkActionBar::into_element(self) -> Self::Element
 pub fn ely_core::buttons::BulkActionBar::new(impl core::convert::Into<gpui::window::ElementId>, usize) -> Self
 pub fn ely_core::buttons::BulkActionBar::on_clear(self, impl core::ops::function::Fn(&mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::buttons::BulkActionBar::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_core::buttons::Button::accessible_description(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::buttons::Button::disabled(self, bool) -> Self
 pub fn ely_core::buttons::Button::focus_handle(self, &gpui::window::FocusHandle) -> Self
 pub fn ely_core::buttons::Button::full_width(self) -> Self
@@ -2692,12 +2695,14 @@ pub fn ely_core::data_display::Avatar::icon(self, ely_core::primitives::IconName
 pub fn ely_core::data_display::Avatar::image(self, impl core::convert::Into<gpui::elements::img::ImageSource>) -> Self
 pub fn ely_core::data_display::Avatar::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_core::data_display::Avatar::into_element(self) -> Self::Element
+pub fn ely_core::data_display::Avatar::muted(self) -> Self
 pub fn ely_core::data_display::Avatar::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::data_display::Avatar::presence(self, ely_core::data_display::Presence) -> Self
 pub fn ely_core::data_display::Avatar::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_core::data_display::Avatar::ring(self) -> Self
 pub fn ely_core::data_display::Avatar::ring_color(self, gpui::color::Hsla) -> Self
 pub fn ely_core::data_display::Avatar::size(self, ely_core::theme::AvatarSize) -> Self
+pub fn ely_core::data_display::Avatar::solid(self) -> Self
 pub fn ely_core::data_display::Avatar::square(self) -> Self
 pub fn ely_core::data_display::AvatarGroup::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_core::data_display::AvatarGroup::into_element(self) -> Self::Element
@@ -2839,12 +2844,16 @@ pub fn ely_core::data_display::Statistic::render(self, &mut gpui::window::Window
 pub fn ely_core::data_display::Statistic::size(self, ely_core::theme::TextSize) -> Self
 pub fn ely_core::data_display::Statistic::suffix(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::data_display::Statistic::trend(self, ely_core::data_display::TrendIndicator) -> Self
+pub fn ely_core::data_display::Tag::hue(self, usize) -> Self
 pub fn ely_core::data_display::Tag::icon(self, ely_core::primitives::IconName) -> Self
 pub fn ely_core::data_display::Tag::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_core::data_display::Tag::into_element(self) -> Self::Element
 pub fn ely_core::data_display::Tag::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
+pub fn ely_core::data_display::Tag::on_click(self, impl core::ops::function::Fn(&mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::data_display::Tag::on_remove(self, impl core::ops::function::Fn(&mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
+pub fn ely_core::data_display::Tag::outlined(self) -> Self
 pub fn ely_core::data_display::Tag::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_core::data_display::Tag::selected(self, bool) -> Self
 pub fn ely_core::data_display::Tag::tone(self, impl core::convert::Into<ely_core::data_display::Tone>) -> Self
 pub fn ely_core::data_display::Timeline::default() -> Self
 pub fn ely_core::data_display::Timeline::into_any_element(self) -> gpui::element::AnyElement
@@ -3179,6 +3188,7 @@ pub fn ely_core::forms::Cut::partial_eq(&self, &dyn gpui::action::Action) -> boo
 pub fn ely_core::forms::DatePicker::disabled(self, bool) -> Self
 pub fn ely_core::forms::DatePicker::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_core::forms::DatePicker::into_element(self) -> Self::Element
+pub fn ely_core::forms::DatePicker::iso(self) -> Self
 pub fn ely_core::forms::DatePicker::new(impl core::convert::Into<gpui::window::ElementId>, core::option::Option<jiff::civil::date::Date>) -> Self
 pub fn ely_core::forms::DatePicker::on_change(self, impl core::ops::function::Fn(jiff::civil::date::Date, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::forms::DatePicker::placeholder(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
@@ -3501,6 +3511,7 @@ pub fn ely_core::forms::RadioCard::new(impl core::convert::Into<gpui::window::El
 pub fn ely_core::forms::RadioCard::on_select(self, impl core::ops::function::Fn(&mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::forms::RadioCard::preview(self, impl gpui::element::IntoElement) -> Self
 pub fn ely_core::forms::RadioCard::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_core::forms::RadioCard::thumbnail(self, impl gpui::element::IntoElement) -> Self
 pub fn ely_core::forms::RadioGroup::horizontal(self) -> Self
 pub fn ely_core::forms::RadioGroup::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_core::forms::RadioGroup::into_element(self) -> Self::Element
@@ -3629,7 +3640,9 @@ pub fn ely_core::forms::TextInput::bounds_for_range(&mut self, core::ops::range:
 pub fn ely_core::forms::TextInput::bounds_for_range(&self, core::ops::range::Range<usize>) -> alloc::vec::Vec<gpui::geometry::Bounds<gpui::geometry::Pixels>>
 pub fn ely_core::forms::TextInput::caret_bounds(&self) -> core::option::Option<gpui::geometry::Bounds<gpui::geometry::Pixels>>
 pub fn ely_core::forms::TextInput::character_index_for_point(&mut self, gpui::geometry::Point<gpui::geometry::Pixels>, &mut gpui::window::Window, &mut gpui::app::context::Context<'_, Self>) -> core::option::Option<usize>
+pub fn ely_core::forms::TextInput::clear_sensitive(&mut self, &mut gpui::app::context::Context<'_, Self>)
 pub fn ely_core::forms::TextInput::cursor(&self) -> usize
+pub fn ely_core::forms::TextInput::drop(&mut self)
 pub fn ely_core::forms::TextInput::filter(self, impl core::ops::function::Fn(char) -> bool + 'static) -> Self
 pub fn ely_core::forms::TextInput::focus_handle(&self, &gpui::app::App) -> gpui::window::FocusHandle
 pub fn ely_core::forms::TextInput::highlighter(self, impl core::ops::function::Fn(&str, &gpui::app::App) -> alloc::vec::Vec<(core::ops::range::Range<usize>, ely_core::forms::Highlight)> + 'static) -> Self
@@ -4052,6 +4065,9 @@ pub fn ely_core::lists::List::into_any_element(self) -> gpui::element::AnyElemen
 pub fn ely_core::lists::List::into_element(self) -> Self::Element
 pub fn ely_core::lists::List::new() -> Self
 pub fn ely_core::lists::List::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_core::lists::ListItem::accessible_label(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
+pub fn ely_core::lists::ListItem::accessible_description(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
+pub fn ely_core::lists::ListItem::compact(self) -> Self
 pub fn ely_core::lists::ListItem::current(self, bool) -> Self
 pub fn ely_core::lists::ListItem::description(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::lists::ListItem::detail(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
@@ -4086,6 +4102,7 @@ pub fn ely_core::lists::SelectableList::multiple(self) -> Self
 pub fn ely_core::lists::SelectableList::new(impl core::convert::Into<gpui::window::ElementId>) -> Self
 pub fn ely_core::lists::SelectableList::on_activate(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::SelectableList::on_change(self, impl core::ops::function::Fn(&[gpui_shared_string::SharedString], &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
+pub fn ely_core::lists::SelectableList::on_press(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::SelectableList::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_core::lists::SelectableList::row(self, impl core::convert::Into<gpui_shared_string::SharedString>, ely_core::lists::ListItem) -> Self
 pub fn ely_core::lists::SelectableList::selected(self, impl core::iter::traits::collect::IntoIterator<Item = impl core::convert::Into<gpui_shared_string::SharedString>>) -> Self
@@ -4113,11 +4130,13 @@ pub fn ely_core::lists::Tree::on_check(self, impl core::ops::function::Fn(&[gpui
 pub fn ely_core::lists::Tree::on_context(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, gpui::geometry::Point<gpui::geometry::Pixels>, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::Tree::on_load(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::Tree::on_move(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &gpui_shared_string::SharedString, ely_core::lists::DropAt, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
+pub fn ely_core::lists::Tree::on_open(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, bool, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::Tree::on_rename(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, &gpui_shared_string::SharedString, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::Tree::on_select(self, impl core::ops::function::Fn(&[gpui_shared_string::SharedString], &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::Tree::on_toggle(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, bool, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::lists::Tree::open(self, impl core::iter::traits::collect::IntoIterator<Item = impl core::convert::Into<gpui_shared_string::SharedString>>) -> Self
 pub fn ely_core::lists::Tree::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_core::lists::Tree::row_content(self, impl core::ops::function::Fn(&gpui_shared_string::SharedString, bool, &mut gpui::window::Window, &mut gpui::app::App) -> gpui::element::AnyElement + 'static) -> Self
 pub fn ely_core::lists::Tree::selected(self, impl core::iter::traits::collect::IntoIterator<Item = impl core::convert::Into<gpui_shared_string::SharedString>>) -> Self
 pub fn ely_core::lists::Tree::style(&mut self) -> &mut gpui::style::StyleRefinement
 pub fn ely_core::lists::TreeDrag::key(&self) -> &gpui_shared_string::SharedString
@@ -4150,6 +4169,7 @@ pub fn ely_core::menus::ContextMenu::into_any_element(self) -> gpui::element::An
 pub fn ely_core::menus::ContextMenu::into_element(self) -> Self::Element
 pub fn ely_core::menus::ContextMenu::manual(self, core::option::Option<(u64, gpui::geometry::Point<gpui::geometry::Pixels>)>) -> Self
 pub fn ely_core::menus::ContextMenu::new(impl core::convert::Into<gpui::window::ElementId>, ely_core::menus::Menu) -> Self
+pub fn ely_core::menus::ContextMenu::on_close(self, impl core::ops::function::Fn(&mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_core::menus::ContextMenu::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_core::menus::ContextMenu::style(&mut self) -> &mut gpui::style::StyleRefinement
 pub fn ely_core::menus::DropdownMenu::icon(self, ely_core::primitives::IconName) -> Self
@@ -4545,6 +4565,7 @@ pub fn ely_core::overlays::Dialog::action<E: gpui::element::IntoElement>(self, i
 pub fn ely_core::overlays::Dialog::detail(self, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
 pub fn ely_core::overlays::Dialog::extend(&mut self, impl core::iter::traits::collect::IntoIterator<Item = gpui::element::AnyElement>)
 pub fn ely_core::overlays::Dialog::fullscreen(self) -> Self
+pub fn ely_core::overlays::Dialog::height(self, gpui::geometry::Pixels) -> Self
 pub fn ely_core::overlays::Dialog::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_core::overlays::Dialog::into_element(self) -> Self::Element
 pub fn ely_core::overlays::Dialog::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>, impl core::ops::function::Fn(&mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self

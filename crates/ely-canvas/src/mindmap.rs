@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use gpui::SharedString;
 
 use super::view::Frame;
@@ -97,16 +99,25 @@ pub(crate) struct Placed {
     pub frame: Frame,
     pub parent: Option<SharedString>,
     pub left: bool,
+    pub has_children: bool,
 }
 
-fn tall(topic: &Topic) -> f32 {
-    let children: f32 = topic.children.iter().map(tall).sum::<f32>()
+fn tall(topic: &Topic, collapsed: &HashSet<SharedString>) -> f32 {
+    if collapsed.contains(&topic.key) {
+        return TOPIC.1;
+    }
+    let children: f32 = topic.children.iter().map(|topic| tall(topic, collapsed)).sum::<f32>()
         + GAP.1 * topic.children.len().saturating_sub(1) as f32;
     children.max(TOPIC.1)
 }
 
 /// Every topic laid out: the root centered on the origin, the first half of its children to its right and the rest to its left, each topic's children a column beside it centered on it.
+#[cfg(test)]
 pub(crate) fn laid(root: &Topic) -> Vec<Placed> {
+    laid_collapsed(root, &HashSet::new())
+}
+
+pub(crate) fn laid_collapsed(root: &Topic, collapsed: &HashSet<SharedString>) -> Vec<Placed> {
     let frame = Frame::new(-TOPIC.0 / 2.0, -TOPIC.1 / 2.0, TOPIC.0, TOPIC.1);
     let mut out = vec![Placed {
         key: root.key.clone(),
@@ -114,11 +125,14 @@ pub(crate) fn laid(root: &Topic) -> Vec<Placed> {
         frame,
         parent: None,
         left: false,
+        has_children: !root.children.is_empty(),
     }];
-    let right = root.children.len().div_ceil(2);
-    let (east, west) = root.children.split_at(right);
-    column(east, &root.key, &frame, false, &mut out);
-    column(west, &root.key, &frame, true, &mut out);
+    if !collapsed.contains(&root.key) {
+        let right = root.children.len().div_ceil(2);
+        let (east, west) = root.children.split_at(right);
+        column(east, &root.key, &frame, false, collapsed, &mut out);
+        column(west, &root.key, &frame, true, collapsed, &mut out);
+    }
     out
 }
 
@@ -127,10 +141,12 @@ fn column(
     parent: &SharedString,
     beside: &Frame,
     left: bool,
+    collapsed: &HashSet<SharedString>,
     out: &mut Vec<Placed>,
 ) {
     let total: f32 =
-        topics.iter().map(tall).sum::<f32>() + GAP.1 * topics.len().saturating_sub(1) as f32;
+        topics.iter().map(|topic| tall(topic, collapsed)).sum::<f32>()
+            + GAP.1 * topics.len().saturating_sub(1) as f32;
     let x = if left {
         beside.x - GAP.0 - TOPIC.0
     } else {
@@ -138,7 +154,7 @@ fn column(
     };
     let mut top = beside.center().1 - total / 2.0;
     for topic in topics {
-        let room = tall(topic);
+        let room = tall(topic, collapsed);
         let frame = Frame::new(x, top + (room - TOPIC.1) / 2.0, TOPIC.0, TOPIC.1);
         out.push(Placed {
             key: topic.key.clone(),
@@ -146,8 +162,11 @@ fn column(
             frame,
             parent: Some(parent.clone()),
             left,
+            has_children: !topic.children.is_empty(),
         });
-        column(&topic.children, &topic.key, &frame, left, out);
+        if !collapsed.contains(&topic.key) {
+            column(&topic.children, &topic.key, &frame, left, collapsed, out);
+        }
         top += room + GAP.1;
     }
 }

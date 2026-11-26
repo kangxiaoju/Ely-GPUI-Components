@@ -5,29 +5,236 @@ use gpui::{App, HighlightStyle};
 use super::buffer::Buffer;
 use crate::forms::{Kind, Syntax, code_highlights_with, lex};
 
+/// A theme-independent syntax class supplied by a local parser.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SyntaxToken {
+    /// A language keyword.
+    Keyword,
+    /// A string literal.
+    String,
+    /// A numeric literal.
+    Number,
+    /// A comment.
+    Comment,
+    /// A function name.
+    Function,
+    /// A type name.
+    Type,
+    /// A constant name.
+    Constant,
+    /// A property name.
+    Property,
+    /// A markup tag.
+    Tag,
+    /// An attribute.
+    Attribute,
+    /// An operator.
+    Operator,
+    /// Punctuation.
+    Punctuation,
+    /// A variable name.
+    Variable,
+}
+
+impl SyntaxToken {
+    fn color(self, cx: &App) -> gpui::Hsla {
+        use crate::theme::ActiveTheme;
+        let syntax = &cx.theme().colors.syntax;
+        match self {
+            Self::Keyword => syntax.keyword,
+            Self::String => syntax.string,
+            Self::Number => syntax.number,
+            Self::Comment => syntax.comment,
+            Self::Function => syntax.function,
+            Self::Type => syntax.type_name,
+            Self::Constant => syntax.constant,
+            Self::Property => syntax.property,
+            Self::Tag => syntax.tag,
+            Self::Attribute => syntax.attribute,
+            Self::Operator => syntax.operator,
+            Self::Punctuation => syntax.punctuation,
+            Self::Variable => syntax.variable,
+        }
+    }
+}
+
+/// A parser's immutable projection for one exact buffer stamp.
+#[derive(Clone, Debug, Default)]
+pub struct SyntaxSnapshot {
+    /// Disjoint UTF-8 byte spans, sorted by start.
+    pub highlights: Vec<(Range<usize>, SyntaxToken)>,
+    /// Inclusive first and last lines of structural folds, sorted by header.
+    pub folds: Vec<(usize, usize)>,
+    /// Bracket byte offset, depth and partner byte offset, sorted by offset.
+    pub brackets: Vec<(usize, usize, Option<usize>)>,
+    /// Disjoint byte regions and base indentation in columns, sorted by start.
+    pub indents: Vec<(Range<usize>, usize)>,
+    /// Locally parsed symbols, independent of language servers.
+    pub symbols: Vec<crate::Symbol>,
+}
+
+impl SyntaxSnapshot {
+    fn spans(&self, range: Range<usize>) -> Vec<(Range<usize>, SyntaxToken)> {
+        let first = self.highlights.partition_point(|(span, _)| span.end <= range.start);
+        self.highlights[first..]
+            .iter()
+            .take_while(|(span, _)| span.start < range.end)
+            .map(|(span, token)| {
+                (span.start.max(range.start) - range.start..span.end.min(range.end) - range.start, *token)
+            })
+            .collect()
+    }
+
+    pub(crate) fn indent_at(&self, offset: usize) -> Option<usize> {
+        let index = self.indents.partition_point(|(range, _)| range.end <= offset);
+        self.indents.get(index).and_then(|(range, indent)| range.contains(&offset).then_some(*indent))
+    }
+}
+
+pub(crate) struct LocalSyntax {
+    stamp: u64,
+    snapshot: SyntaxSnapshot,
+    folds: std::sync::Arc<Vec<(usize, usize)>>,
+    brackets: std::sync::Arc<Vec<Bracket>>,
+}
+
+impl LocalSyntax {
+    fn new(stamp: u64, mut snapshot: SyntaxSnapshot) -> Self {
+        let folds = std::sync::Arc::new(std::mem::take(&mut snapshot.folds));
+        let brackets = std::sync::Arc::new(std::mem::take(&mut snapshot.brackets).into_iter().map(|(offset, depth, partner)| Bracket { offset, depth, partner }).collect());
+        Self { stamp, snapshot, folds, brackets }
+    }
+}
+
+impl crate::CodeEditor {
+    /// The exact text identity for accepting asynchronous parser results.
+    pub fn syntax_stamp(&self) -> u64 {
+        self.buffer.stamp()
+    }
+
+    /// Enables parser-owned syntax; stale results never decorate newer text.
+    pub fn enable_syntax(&mut self, cx: &mut gpui::Context<Self>) {
+        self.local_syntax = Some(LocalSyntax::new(0, SyntaxSnapshot::default()));
+        cx.notify();
+    }
+
+    /// Publishes a parser result without changing text, selections or undo history.
+    pub fn set_syntax(&mut self, stamp: u64, syntax: SyntaxSnapshot, cx: &mut gpui::Context<Self>) -> bool {
+        if stamp != self.buffer.stamp() {
+            return false;
+        }
+        self.local_syntax = Some(LocalSyntax::new(stamp, syntax));
+        cx.notify();
+        true
+    }
+
+    pub(crate) fn rebase_syntax(&mut self, old: &str) {
+        let Some(syntax) = self.local_syntax.as_mut() else { return; };
+        let new = self.buffer.text();
+        let mut start = old.bytes().zip(new.bytes()).take_while(|(a,b)| a == b).count();
+        while !old.is_char_boundary(start) || !new.is_char_boundary(start) { start -= 1; }
+        let mut suffix = old[start..].bytes().rev().zip(new[start..].bytes().rev()).take_while(|(a,b)| a == b).count();
+        while !old.is_char_boundary(old.len()-suffix) || !new.is_char_boundary(new.len()-suffix) { suffix -= 1; }
+        let old_end = old.len()-suffix;
+        let new_end = new.len()-suffix;
+        let shift = |at: usize| at.saturating_add(new_end).saturating_sub(old_end);
+        syntax.snapshot.highlights.retain_mut(|(range, _)| {
+            if range.end <= start { return true; }
+            if range.start >= old_end { *range = shift(range.start)..shift(range.end); return true; }
+            false
+        });
+        // Only proven unchanged token ranges survive until the parser publishes.
+        syntax.snapshot.indents.clear();
+        syntax.snapshot.symbols.clear();
+        let first_line = old[..start].bytes().filter(|b| *b == b'\n').count();
+        let old_lines = old[start..old_end].bytes().filter(|b| *b == b'\n').count();
+        let new_lines = new[start..new_end].bytes().filter(|b| *b == b'\n').count();
+        let folds = std::sync::Arc::make_mut(&mut syntax.folds);
+        folds.retain_mut(|(header, end)| {
+            if *end < first_line { return true; }
+            if *header > first_line + old_lines {
+                *header = header.saturating_add(new_lines).saturating_sub(old_lines);
+                *end = end.saturating_add(new_lines).saturating_sub(old_lines);
+                return true;
+            }
+            // Keep a containing fold only when no line count changed.
+            old_lines == new_lines && *header <= first_line && *end > first_line
+        });
+        let brackets = std::sync::Arc::make_mut(&mut syntax.brackets);
+        brackets.retain_mut(|bracket| {
+            if bracket.offset >= start && bracket.offset < old_end { return false; }
+            if bracket.offset >= old_end { bracket.offset = shift(bracket.offset); }
+            bracket.partner = bracket.partner.and_then(|at| {
+                if at >= start && at < old_end { None } else if at >= old_end { Some(shift(at)) } else { Some(at) }
+            });
+            true
+        });
+        syntax.stamp = self.buffer.stamp();
+    }
+
+    /// The current local outline, empty while its text is being parsed.
+    pub fn syntax_symbols(&self) -> &[crate::Symbol] {
+        self.current_syntax().map_or(&[], |syntax| syntax.symbols.as_slice())
+    }
+
+    pub(crate) fn current_syntax(&self) -> Option<&SyntaxSnapshot> {
+        self.local_syntax.as_ref().and_then(|syntax| (syntax.stamp == self.buffer.stamp()).then_some(&syntax.snapshot))
+    }
+
+    pub(crate) fn syntax_folds(&self) -> std::sync::Arc<Vec<(usize, usize)>> {
+        match &self.local_syntax {
+            Some(syntax) if syntax.stamp == self.buffer.stamp() => syntax.folds.clone(),
+            Some(_) => std::sync::Arc::default(),
+            None => std::sync::Arc::new(folds(&self.buffer)),
+        }
+    }
+
+    pub(crate) fn syntax_brackets(&self) -> std::sync::Arc<Vec<Bracket>> {
+        match &self.local_syntax {
+            Some(syntax) if syntax.stamp == self.buffer.stamp() => syntax.brackets.clone(),
+            Some(_) => std::sync::Arc::default(),
+            None => std::sync::Arc::new(brackets(&self.buffer)),
+        }
+    }
+
+    pub(crate) fn syntax_colors(&self, range: Range<usize>, cx: &App) -> Vec<(Range<usize>, HighlightStyle)> {
+        if self.local_syntax.is_some() {
+            return self.current_syntax().map_or_else(Vec::new, |syntax| syntax.spans(range).into_iter().map(|(range, token)| (range, token.color(cx).into())).collect());
+        }
+        self.line_colors(&self.buffer.text()[range], cx)
+    }
+}
+
 /// Each line that opens a block, and the last line the block holds, read from indentation.
 pub(crate) fn folds(buffer: &Buffer) -> Vec<(usize, usize)> {
-    let blank = |line: usize| buffer.line(line).trim().is_empty();
     let mut out = Vec::new();
+    let mut stack: Vec<(usize, usize, Option<usize>)> = Vec::new();
     for line in 0..buffer.lines() {
-        if blank(line) {
+        let text = buffer.line(line);
+        if text.trim().is_empty() {
             continue;
         }
         let indent = buffer.indent(line);
-        let mut end = None;
-        for next in line + 1..buffer.lines() {
-            if blank(next) {
-                continue;
-            }
-            if buffer.indent(next) <= indent {
+        while let Some(&(_, level, _)) = stack.last() {
+            if level < indent {
                 break;
             }
-            end = Some(next);
+            let (header, _, descendant) = stack.pop().expect("the stack has a last entry");
+            if let Some(end) = descendant {
+                out.push((header, end));
+            }
         }
-        if let Some(end) = end {
-            out.push((line, end));
+        for (_, _, descendant) in &mut stack {
+            *descendant = Some(line);
+        }
+        stack.push((line, indent, None));
+    }
+    for (header, _, descendant) in stack {
+        if let Some(end) = descendant {
+            out.push((header, end));
         }
     }
+    out.sort_unstable();
     out
 }
 
@@ -165,6 +372,25 @@ pub(crate) fn occurrences(buffer: &Buffer, needle: &str, lines: Range<usize>) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn syntax_snapshot_clips_multiline_tokens() {
+        let snapshot = super::SyntaxSnapshot {
+            highlights: vec![(0..20, super::SyntaxToken::Comment)],
+            ..Default::default()
+        };
+        assert_eq!(snapshot.spans(5..10), vec![(0..5, super::SyntaxToken::Comment)]);
+    }
+
+    #[test]
+    fn syntax_snapshot_uses_innermost_indent_region() {
+        let snapshot = super::SyntaxSnapshot {
+            indents: vec![(0..10, 0), (10..20, 2), (20..30, 0)],
+            ..Default::default()
+        };
+        assert_eq!(snapshot.indent_at(15), Some(2));
+        assert_eq!(snapshot.indent_at(25), Some(0));
+        assert_eq!(snapshot.indent_at(30), None);
+    }
 
     #[test]
     fn blocks_fold_by_indentation_and_skip_blank_lines() {
@@ -193,5 +419,16 @@ mod tests {
         let buffer = Buffer::new("let total = total_cost + total;");
         let found = occurrences(&buffer, "total", 0..1);
         assert_eq!(found, [4..9, 25..30]);
+    }
+    #[test]
+    fn deeply_indented_lines_fold_in_one_forward_pass() {
+        let text = (0..10_000)
+            .map(|line| format!("{}line{line}", " ".repeat(line % 20)))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let buffer = Buffer::new(text);
+        let found = folds(&buffer);
+        assert!(!found.is_empty());
+        assert!(found.iter().all(|(start, end)| start < end));
     }
 }

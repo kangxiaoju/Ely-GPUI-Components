@@ -61,6 +61,7 @@ pub struct Spinner {
     style: SpinnerStyle,
     size: IconSize,
     color: Option<Hsla>,
+    max_fps: Option<f32>,
 }
 
 impl Spinner {
@@ -71,6 +72,7 @@ impl Spinner {
             style: SpinnerStyle::default(),
             size: IconSize::Md,
             color: None,
+            max_fps: None,
         }
     }
 
@@ -89,6 +91,14 @@ impl Spinner {
     /// Defaults to muted text.
     pub fn color(mut self, color: Hsla) -> Self {
         self.color = Some(color);
+        self
+    }
+
+    /// Limits visual updates without changing the animation's duration or phase.
+    /// By default, redraws on every display frame. Nonpositive or nonfinite values
+    /// retain that default; reduced motion still renders one static frame.
+    pub fn max_fps(mut self, max_fps: f32) -> Self {
+        self.max_fps = (max_fps.is_finite() && max_fps > 0.0).then_some(max_fps);
         self
     }
 }
@@ -232,10 +242,14 @@ impl RenderOnce for Spinner {
         if theme.reduced_motion {
             return frame.child(face(STILL)).into_any_element();
         }
+        let mut animation = Animation::new(style.period()).repeat();
+        if let Some(max_fps) = self.max_fps {
+            animation = animation.with_max_fps(max_fps);
+        }
         frame
             .with_animation(
                 self.id,
-                Animation::new(style.period()).repeat(),
+                animation,
                 move |frame, t| frame.child(face(t)),
             )
             .into_any_element()

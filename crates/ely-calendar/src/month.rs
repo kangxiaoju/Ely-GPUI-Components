@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, Pixels, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
+    ParentElement, Pixels, Rems, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
     prelude::*, relative, rems,
 };
 use jiff::{ToSpan, civil::Date, tz::TimeZone};
@@ -22,7 +22,22 @@ use crate::{
     typography::{Ellipsis, format, fresh},
 };
 
-const WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/// Builds the muted note beside a day's number (lunar date, holiday, …); `None` leaves the day bare.
+pub type DayNote = Rc<dyn Fn(Date) -> Option<gpui::SharedString>>;
+
+/// Builds the short badge at a day's top-right corner, such as "休" for a day off; `None` leaves the corner bare.
+pub type DayBadge = Rc<dyn Fn(Date) -> Option<gpui::SharedString>>;
+
+/// i18n keys for the weekday header, Monday first.
+const WEEKDAY_KEYS: [&str; 7] = [
+    "calendar.weekday.mon",
+    "calendar.weekday.tue",
+    "calendar.weekday.wed",
+    "calendar.weekday.thu",
+    "calendar.weekday.fri",
+    "calendar.weekday.sat",
+    "calendar.weekday.sun",
+];
 
 /// A month of days in week rows, each with its events: what spans days lies across them as bars, the rest by the hour as chips, and what does not fit waits behind "N more". Arrows move a day, Page keys turn the month, and Enter or a double press opens the day.
 ///
@@ -40,9 +55,16 @@ pub struct CalendarMonthView {
     events: Vec<Event>,
     today: Option<Date>,
     zone: Option<TimeZone>,
+    header_leading: Option<AnyElement>,
+    today_leading: Option<AnyElement>,
+    chip: Option<Rems>,
+    day_rows: Option<usize>,
     on_day: Option<OnDay>,
+    on_select: Option<OnDay>,
     on_event: Option<OnValue>,
     on_month: Option<OnDay>,
+    day_note: Option<DayNote>,
+    day_badge: Option<DayBadge>,
 }
 
 impl CalendarMonthView {
@@ -59,8 +81,15 @@ impl CalendarMonthView {
             today: None,
             zone: None,
             on_day: None,
+            on_select: None,
             on_event: None,
             on_month: None,
+            day_note: None,
+            day_badge: None,
+            header_leading: None,
+            today_leading: None,
+            chip: None,
+            day_rows: None,
         }
     }
 
@@ -73,6 +102,12 @@ impl CalendarMonthView {
     /// The zone its days and hours read in; the system's otherwise.
     pub fn zone(mut self, zone: TimeZone) -> Self {
         self.zone = Some(zone);
+        self
+    }
+
+    /// Gets each day as the cursor lands on it: a press, the arrow keys, or a page turn's first day.
+    pub fn on_select(mut self, handler: impl Fn(Date, &mut Window, &mut App) + 'static) -> Self {
+        self.on_select = Some(Rc::new(handler));
         self
     }
 
@@ -96,6 +131,45 @@ impl CalendarMonthView {
         self.on_month = Some(Rc::new(handler));
         self
     }
+
+    /// A short badge at each day's top-right corner, such as "休" for a day off.
+    pub fn day_badge(
+        mut self,
+        badge: impl Fn(Date) -> Option<gpui::SharedString> + 'static,
+    ) -> Self {
+        self.day_badge = Some(Rc::new(badge));
+        self
+    }
+
+    /// The height of an event chip under a day's number; the theme's otherwise.
+    pub fn chip_height(mut self, chip: Rems) -> Self {
+        self.chip = Some(chip);
+        self
+    }
+
+    /// How many event rows a day holds under its number; the theme's otherwise.
+    pub fn day_rows(mut self, rows: usize) -> Self {
+        self.day_rows = Some(rows);
+        self
+    }
+
+    /// A control shown at the header's left, with the month title centered beside it.
+    pub fn header_leading(mut self, element: impl IntoElement) -> Self {
+        self.header_leading = Some(element.into_any_element());
+        self
+    }
+
+    /// A control shown in the header's trailing cluster, just before the Today button.
+    pub fn today_leading(mut self, element: impl IntoElement) -> Self {
+        self.today_leading = Some(element.into_any_element());
+        self
+    }
+
+    /// A muted note shown beside each day's number, such as its lunar date or a holiday; the day stays bare where the builder returns `None`.
+    pub fn day_note(mut self, note: impl Fn(Date) -> Option<gpui::SharedString> + 'static) -> Self {
+        self.day_note = Some(Rc::new(note));
+        self
+    }
 }
 
 /// What a week row draws with: the view's id and zone, its events, today, the cursor, and what presses do.
@@ -109,6 +183,8 @@ struct Row<'a> {
     pick: OnDay,
     open: OnDay,
     on_event: Option<OnValue>,
+    day_note: Option<DayNote>,
+    day_badge: Option<DayBadge>,
 }
 
 /// Sizes of a month's rows in pixels: a chip, the gap between rows, and the cell's inset.
@@ -132,7 +208,9 @@ impl Metrics {
 
 impl Row<'_> {
     fn chip(&self, id: String, event: &Event) -> EventChip {
-        let chip = EventChip::new((self.id.clone(), id), event.clone()).zone(self.zone.clone());
+        let chip = EventChip::new((self.id.clone(), id), event.clone())
+            .zone(self.zone.clone())
+            .tooltip(event.title.clone());
         match self.on_event.clone() {
             Some(on_event) => {
                 let key = event.key.clone();
@@ -154,6 +232,7 @@ impl Row<'_> {
             .when(!bar.after, |slot| slot.pr_1())
             .child(
                 self.chip(format!("bar-{}-{monday}", event.key), event)
+                    .centered()
                     .open(bar.before, bar.after),
             )
             .into_any_element()
@@ -173,9 +252,47 @@ impl Row<'_> {
         let on = singles(self.events, day, self.zone);
         let (shown, more) = day_rows(on.len(), hidden, sizes.rows - lanes);
         let label = match day.day() {
-            1 => day.strftime("%b %-d").to_string(),
+            1 => i18n::text(
+                cx,
+                "calendar.monthday",
+                &[
+                    (
+                        "month",
+                        &i18n::text(cx, &format!("calendar.short_month.{}", day.month()), &[]),
+                    ),
+                    ("day", &day.day().to_string()),
+                ],
+            )
+            .to_string(),
             number => number.to_string(),
         };
+        let note = self
+            .day_note
+            .as_ref()
+            .and_then(|note| note(day))
+            .map(|text| {
+                div()
+                    .min_w_0()
+                    .px_1p5()
+                    .text_size(theme.text_size(TextSize::Xs))
+                    .text_color(colors.fg_subtle)
+                    .child(Ellipsis::new(text))
+            });
+        let badge = self
+            .day_badge
+            .as_ref()
+            .and_then(|badge| badge(day))
+            .map(|text| {
+                div()
+                    .flex_none()
+                    .px_1()
+                    .rounded(theme.radius(Radius::Sm))
+                    .bg(colors.danger_subtle)
+                    .text_size(theme.text_size(TextSize::Xs))
+                    .text_color(colors.danger)
+                    .child(text)
+            });
+        let has_badge = badge.is_some();
         let fg = if day.first_of_month() == self.shown {
             colors.fg
         } else {
@@ -250,22 +367,31 @@ impl Row<'_> {
                 )
             })
             .child(
-                div().h(sizes.chip).flex().items_center().child(
-                    div()
-                        .px_1p5()
-                        .rounded_full()
-                        .text_size(theme.text_size(TextSize::Xs))
-                        .text_color(fg)
-                        .map(|number| match day == self.today {
-                            true => number
-                                .bg(colors.accent)
-                                .text_color(colors.on_accent)
-                                .font_weight(FontWeight::SEMIBOLD),
-                            false => number,
-                        })
-                        .child(label),
-                ),
+                div()
+                    .h(sizes.chip)
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap_1()
+                    .child(
+                        div()
+                            .px_1p5()
+                            .rounded_full()
+                            .text_size(theme.text_size(TextSize::Xs))
+                            .text_color(fg)
+                            .map(|number| match day == self.today {
+                                true => number
+                                    .bg(colors.accent)
+                                    .text_color(colors.on_accent)
+                                    .font_weight(FontWeight::SEMIBOLD),
+                                false => number,
+                            })
+                            .child(label),
+                    )
+                    .when(has_badge, |row| row.pr_6())
+                    .children(note),
             )
+            .children(badge.map(|badge| badge.absolute().top_1().right_1()))
             .children((0..lanes).map(|_| div().flex_none().h(sizes.chip)))
             .children(on.iter().take(shown).map(|&ix| {
                 let event = &self.events[ix];
@@ -355,12 +481,16 @@ impl RenderOnce for CalendarMonthView {
         };
         let pick: OnDay = {
             let cursor = cursor.clone();
+            let (on_select, turn) = (self.on_select.clone(), turn.clone());
             Rc::new(move |day, window, cx| {
                 cursor.update(cx, |cursor, cx| {
                     *cursor = day;
                     cx.notify();
                 });
                 turn(day, window, cx);
+                if let Some(on_select) = &on_select {
+                    on_select(day, window, cx);
+                }
             })
         };
         let open: OnDay = {
@@ -414,10 +544,10 @@ impl RenderOnce for CalendarMonthView {
         let colors = &theme.colors;
         let rem = window.rem_size();
         let sizes = Metrics {
-            chip: theme.calendar().chip.to_pixels(rem),
+            chip: self.chip.unwrap_or(theme.calendar().chip).to_pixels(rem),
             gap: rems(0.125).to_pixels(rem),
             pad: rems(0.25).to_pixels(rem),
-            rows: theme.calendar().day_rows,
+            rows: self.day_rows.unwrap_or(theme.calendar().day_rows),
         };
         let row = Row {
             id: &self.id,
@@ -429,8 +559,11 @@ impl RenderOnce for CalendarMonthView {
             pick,
             open,
             on_event: self.on_event.clone(),
+            day_note: self.day_note.clone(),
+            day_badge: self.day_badge.clone(),
         };
-        let weekdays = div().flex().children(WEEKDAYS.map(|name| {
+        let weekday_names = WEEKDAY_KEYS.map(|key| i18n::text(cx, key, &[]));
+        let weekdays = div().flex().children(weekday_names.map(|name| {
             div()
                 .flex_none()
                 .w(relative(1.0 / 7.0))
@@ -444,7 +577,18 @@ impl RenderOnce for CalendarMonthView {
             .into_iter()
             .map(|monday| row.week(monday, &sizes, cx))
             .collect();
-        let title = shown.strftime("%B %Y").to_string();
+        let title = i18n::text(
+            cx,
+            "calendar.title",
+            &[
+                (
+                    "month",
+                    &i18n::text(cx, &format!("calendar.month.{}", shown.month()), &[]),
+                ),
+                ("year", &shown.year().to_string()),
+            ],
+        )
+        .to_string();
         div()
             .flex()
             .flex_col()
@@ -455,6 +599,8 @@ impl RenderOnce for CalendarMonthView {
                 "calendar.month.previous",
                 "calendar.month.next",
                 step,
+                self.header_leading,
+                self.today_leading,
                 cx,
             ))
             .child(

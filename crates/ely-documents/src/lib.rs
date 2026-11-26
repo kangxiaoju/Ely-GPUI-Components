@@ -14,6 +14,8 @@ mod contents;
 mod counts;
 mod diagram;
 mod document;
+/// Native structured HTML mail editing and its safe document format.
+pub mod email;
 mod epub;
 mod format;
 mod history;
@@ -52,6 +54,7 @@ pub use document::{
     TargetBlock,
 };
 pub use epub::{Chapter, EpubReader};
+pub use email::{EmailDocument, EmailEditorEvent, EmailEditorView, HtmlEmailEditor};
 pub use format::{Format, format};
 pub use history::Change;
 pub use history::{PageHistoryDiff, Version, VersionHistory};
@@ -77,12 +80,16 @@ pub use tree::emoji::Shortcodes;
 pub use tree::{AlertKind, Inline, Node as MarkdownBlock, ShortcodeRun, Style};
 pub use tree::{Reader as MarkdownReader, alert, is_toc};
 pub use viewer::step as zoom_step;
-pub use viewer::{DocPage, DocumentViewer, PageHit, PageNote};
+pub use viewer::{
+    DEFAULT_CACHE_BUDGET, DocPage, DocumentViewer, PageHit, PageNote, PageRequestKind,
+    PageResource, PageSource,
+};
 
 /// Binds the documents keys. `init` calls it.
 pub fn bind_keys(cx: &mut App) {
     rich::bind_keys(cx);
     document::bind_keys(cx);
+    email::bind_keys(cx);
 }
 
 /// Core's test setup with this chapter's keys.
