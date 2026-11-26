@@ -4,7 +4,7 @@ use std::{
 };
 
 use gpui::{
-    AnyElement, App, Div, ElementId, Entity, FocusHandle, InteractiveElement, IntoElement,
+    AnyElement, App, Axis, Div, ElementId, Entity, FocusHandle, InteractiveElement, IntoElement,
     ParentElement, Pixels, RenderOnce, ScrollHandle, SharedString, StatefulInteractiveElement,
     StyleRefinement, Styled, UniformListScrollHandle, Window, div, prelude::*, uniform_list,
 };
@@ -18,7 +18,7 @@ use super::{
 };
 use crate::{
     forms::{CheckState, Editing, check_mark},
-    layout::{on_axis, seeded::use_seeded},
+    layout::{Scrollbar, on_axis, seeded::use_seeded},
     lists::{Pick, picked},
     navigation::Pagination,
     primitives::tab_stop,
@@ -410,26 +410,65 @@ impl RenderOnce for DataTable {
                 body.clone(),
             );
             let least = body.least(&shown_columns, true, rem);
-            sideways(&id, &slide)
+            let gutter = cx.theme().scrollbar_track();
+            // Keep the bars in the viewport, not in the horizontally moving
+            // column canvas. The vertical handle belongs only to the rows.
+            div()
+                .relative()
                 .size_full()
+                .pr(gutter)
+                .pb(gutter)
+                .child(
+                    sideways(&id, &slide).size_full().child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .size_full()
+                            .min_w(least)
+                            .child(heads(&shown_columns, true, cx))
+                            .child(
+                                div().relative().flex_1().min_h_0().child(on_axis(
+                                    uniform_list(
+                                        (id.clone(), "rows"),
+                                        count,
+                                        move |range, window, cx| {
+                                            range
+                                                .map(|at| drawn.line(at, &cols, true, window, cx))
+                                                .collect()
+                                        },
+                                    )
+                                    .track_scroll(&scroll)
+                                    .size_full(),
+                                )),
+                            )
+                            .children(figures(&shown_columns, true, cx)),
+                    ),
+                )
                 .child(
                     div()
-                        .flex()
-                        .flex_col()
-                        .size_full()
-                        .min_w(least)
-                        .child(heads(&shown_columns, true, cx))
-                        .child(on_axis(
-                            uniform_list((id.clone(), "rows"), count, move |range, window, cx| {
-                                range
-                                    .map(|at| drawn.line(at, &cols, true, window, cx))
-                                    .collect()
-                            })
-                            .track_scroll(&scroll)
-                            .flex_1()
-                            .min_h_0(),
-                        ))
-                        .children(figures(&shown_columns, true, cx)),
+                        .absolute()
+                        .top(body.height)
+                        .bottom(gutter)
+                        .right_0()
+                        .w(gutter)
+                        .child(Scrollbar::new(
+                            (id.clone(), "vertical-scrollbar"),
+                            &view.read(cx).scroll.0.borrow().base_handle,
+                            Axis::Vertical,
+                        )),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left_0()
+                        .right(gutter)
+                        .bottom_0()
+                        .h(gutter)
+                        .child(Scrollbar::new(
+                            (id.clone(), "horizontal-scrollbar"),
+                            &slide,
+                            Axis::Horizontal,
+                        )),
                 )
                 .into_any_element()
         } else if pinned_any {

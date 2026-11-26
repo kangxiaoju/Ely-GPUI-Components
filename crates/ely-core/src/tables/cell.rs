@@ -242,7 +242,13 @@ pub(crate) fn draw(cell: &Cell, column: &Column, id: ElementId, cx: &App) -> Any
     let colors = &cx.theme().colors;
     match cell {
         Cell::Empty => div().into_any_element(),
-        Cell::Text(text) => Ellipsis::new(text.clone()).into_any_element(),
+        // GPUI shapes and truncates this single line once. The canvas-based
+        // Ellipsis repeatedly measures candidate prefixes on every scroll frame.
+        Cell::Text(text) => div()
+            .min_w_0()
+            .truncate()
+            .child(text.clone())
+            .into_any_element(),
         Cell::Number(value) => tabular(div())
             .child(column.reads(*value))
             .into_any_element(),

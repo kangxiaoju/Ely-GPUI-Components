@@ -11,6 +11,7 @@ use gpui::{
 
 mod chinese;
 mod columns;
+mod scrolling;
 
 use super::{
     Aggregate, Column, DataTable, FilterBuilder, FilterRule, PivotTable, Row, Spreadsheet,
