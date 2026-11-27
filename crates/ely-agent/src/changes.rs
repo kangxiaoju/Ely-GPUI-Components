@@ -10,7 +10,7 @@ use crate::{
     buttons::{Button, ButtonVariant},
     collab::Decision,
     forms::OnFlag,
-    git::{DiffStat, DiffViewer, stat},
+    git::{DiffStat, DiffViewer, Stretch, diff, stat},
     primitives::{Disclosure, FocusRing, Icon, IconName, Tooltip, file_icon},
     theme::{ActiveTheme, ControlSize, IconSize, Radius, TextSize},
     typography::Ellipsis,
@@ -142,6 +142,12 @@ impl RenderOnce for FileChangeCard {
         });
         let theme = cx.theme();
         let colors = theme.colors.clone();
+        let rows = diff(&self.change.old, &self.change.new, 3).iter().enumerate().map(|(ix, stretch)| match stretch {
+            Stretch::Hunk { lines, .. } => lines.len() + 1,
+            Stretch::Folded(lines) => if unfolded.contains(&ix) { lines.len() } else { 1 },
+        }).sum::<usize>();
+        let line_height = theme.text_size(TextSize::Sm).to_pixels(window.rem_size()) * 1.4;
+        let diff_height = (line_height * rows.max(1) as f32).min(theme.list_max_height().to_pixels(window.rem_size()));
         div()
             .rounded(theme.radius(Radius::Md))
             .border_1()
@@ -205,7 +211,7 @@ impl RenderOnce for FileChangeCard {
             .when(open, |card| {
                 card.child(
                     div()
-                        .h(theme.list_max_height())
+                        .h(diff_height)
                         .border_t_1()
                         .border_color(colors.border)
                         .child(

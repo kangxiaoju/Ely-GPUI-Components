@@ -3,6 +3,7 @@
 What changes for an app built on Ely, newest first. An entry names the crates it touches. Versions follow semver: below 1.0, a breaking change raises the minor version, and CI's `semver` job fails one that does not.
 
 ## Unreleased
+- `ely-agent`: expanded FileChangeCard diffs size to their visible lines up to the theme viewport cap, instead of reserving the maximum height for a tiny change.
 - `ely-core`: DataTable text cells paint a UTF-8-safe preview capped at 1024 bytes, normalizing control characters for single-line layout; sorting, filtering and editing retain the full original value. Very wide columns may still show an ellipsis.
 - `ely-chat`: `MessageList::content_revision` invalidates changed row heights once per content revision while preserving the reader's absolute scroll anchor; shrinking a long answer no longer reattaches a manually scrolled conversation to the newest message.
 - `ely-canvas` 0.4.0: native content colors override theme slots without losing alpha; separate fill/image opacity, seeded solid/hachure/cross-hatch/zigzag fills and left/center/right text alignment render natively. Inspector retains eight-color palettes and clears exact overrides when a slot is chosen; fill styles and text alignment reuse Ely controls.

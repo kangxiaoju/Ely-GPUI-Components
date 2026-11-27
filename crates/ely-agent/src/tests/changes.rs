@@ -88,6 +88,7 @@ fn a_press_on_accept_decides_and_leaves_the_card_shut(cx: &mut TestAppContext) {
     cx.simulate_click(chevron, Modifiers::none());
     settle(cx);
     assert!(height.get() > shut, "the header opens the diff");
+    assert!(height.get() - shut < px(160.), "a tiny diff must not reserve the maximum viewport: {:?}", height.get());
 }
 
 /// Three proposed changes under review, and the decisions made.
