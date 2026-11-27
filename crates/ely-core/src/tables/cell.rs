@@ -247,7 +247,10 @@ pub(crate) fn draw(cell: &Cell, column: &Column, id: ElementId, cx: &App) -> Any
         Cell::Text(text) => div()
             .min_w_0()
             .truncate()
-            .child(text.clone())
+            .child(match super::text_preview::preview(text) {
+                std::borrow::Cow::Borrowed(_) => text.clone(),
+                std::borrow::Cow::Owned(preview) => preview.into(),
+            })
             .into_any_element(),
         Cell::Number(value) => tabular(div())
             .child(column.reads(*value))
@@ -284,5 +287,19 @@ pub(crate) fn draw(cell: &Cell, column: &Column, id: ElementId, cx: &App) -> Any
         Cell::Link(label, url) => {
             ExternalLink::new(id, label.clone(), url.clone()).into_any_element()
         }
+    }
+}
+
+#[cfg(test)]
+mod preview_contract_tests {
+    use super::*;
+    #[test]
+    fn full_value_remains_available_for_edit_filter_and_sort() {
+        let original = format!("{}hidden searchable tail", "中文".repeat(20_000));
+        let cell = Cell::Text(original.clone().into());
+        let shown = super::super::text_preview::preview(&original);
+        assert!(shown.len() <= 1027);
+        assert_eq!(cell.words().as_ref(), original.as_str());
+        assert!(cell.words().ends_with("hidden searchable tail"));
     }
 }
